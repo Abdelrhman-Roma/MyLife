@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Create a MYLIFE account to track habits, tasks, goals, nutrition, sleep, study, and progress." />
+    <title>Register - MYLIFE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="stylesheet" href="css/reset.css" />
+    <link rel="stylesheet" href="css/variables.css" />
+    <link rel="stylesheet" href="css/global.css" />
+  </head>
+  <body class="auth-body">
+    <main class="auth-shell">
+      <section class="auth-art">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">M</span>
+          <span><strong>MYLIFE</strong><small>Life Tracker</small></span>
+        </a>
+        <div>
+          <h1>Organize your life.</h1>
+          <p>Build the personal dashboard that keeps your habits, health, and goals moving.</p>
+        </div>
+        <div class="auth-preview">
+          <span>Today Focus</span>
+          <strong>3 / 5</strong>
+          <div class="progress-track"><span class="green" style="width: 60%"></span></div>
+        </div>
+      </section>
+      <section class="auth-card card">
+        <h2>Create account</h2>
+        <p>Start your MYLIFE workspace.</p>
+        <form data-auth-form="register">
+          <label>Full name<input type="text" name="name" autocomplete="name" required /></label>
+          <label>Email<input type="email" name="email" autocomplete="email" required /></label>
+          <label>Password<input type="password" name="password" autocomplete="new-password" minlength="6" required /></label>
+          <button class="primary-action" type="submit">Create Account</button>
+        </form>
+        <p class="auth-switch">Already have an account? <a href="login.html">Log in</a></p>
+      </section>
+    </main>
+    <script src="js/auth.js" defer></script>
+  </body>
+</html>

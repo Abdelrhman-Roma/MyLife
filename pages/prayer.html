@@ -1,0 +1,239 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="MYLIFE helps you track your daily tasks, habits, goals, workouts, prayer, nutrition, water, sleep, study, and progress." />
+    <title>Prayer - MYLIFE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+    <link rel="stylesheet" href="../css/reset.css" />
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/global.css" />
+    <link rel="stylesheet" href="../css/responsive.css" />
+    <link rel="stylesheet" href="../css/layout/sidebar.css" />
+    <link rel="stylesheet" href="../css/layout/navbar.css" />
+    <style>
+      .prayer-content {
+        padding: var(--spacing-3xl);
+      }
+      .prayer-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: var(--spacing-2xl);
+        margin-top: var(--spacing-2xl);
+      }
+      .prayer-card {
+        text-align: center;
+      }
+      .prayer-name {
+        font-weight: 700;
+        font-size: 18px;
+        margin: var(--spacing-lg) 0;
+      }
+      .prayer-time {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: var(--spacing-lg);
+      }
+      .prayer-status {
+        padding: var(--spacing-sm) var(--spacing-lg);
+        background: var(--secondary-color);
+        color: white;
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: var(--spacing-lg);
+      }
+      .prayer-status.missed {
+        background: var(--danger-color);
+      }
+      .prayer-icon {
+        font-size: 48px;
+        margin-bottom: var(--spacing-lg);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="logo">
+          <h2>MYLIFE</h2>
+          <p>Life Tracker</p>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="../index.html" class="nav-item">
+            <i class="fas fa-house"></i>
+            <span>Dashboard</span>
+          </a>
+          <a href="todo.html" class="nav-item">
+            <i class="fas fa-list-check"></i>
+            <span>Todo</span>
+          </a>
+          <a href="habits.html" class="nav-item">
+            <i class="fas fa-repeat"></i>
+            <span>Habits</span>
+          </a>
+          <a href="goals.html" class="nav-item">
+            <i class="fas fa-bullseye"></i>
+            <span>Goals</span>
+          </a>
+          <a href="calendar.html" class="nav-item">
+            <i class="fas fa-calendar"></i>
+            <span>Calendar</span>
+          </a>
+          <a href="gym.html" class="nav-item">
+            <i class="fas fa-dumbbell"></i>
+            <span>Gym</span>
+          </a>
+          <a href="prayer.html" class="nav-item active">
+            <i class="fas fa-person-praying"></i>
+            <span>Prayer</span>
+          </a>
+          <a href="nutrition.html" class="nav-item">
+            <i class="fas fa-apple-whole"></i>
+            <span>Nutrition</span>
+          </a>
+          <a href="water.html" class="nav-item">
+            <i class="fas fa-glass-water"></i>
+            <span>Water</span>
+          </a>
+          <a href="sleep.html" class="nav-item">
+            <i class="fas fa-moon"></i>
+            <span>Sleep</span>
+          </a>
+          <a href="study.html" class="nav-item">
+            <i class="fas fa-book"></i>
+            <span>Study</span>
+          </a>
+          <a href="statistics.html" class="nav-item">
+            <i class="fas fa-chart-line"></i>
+            <span>Statistics</span>
+          </a>
+          <a href="settings.html" class="nav-item">
+            <i class="fas fa-gear"></i>
+            <span>Settings</span>
+          </a>
+        </nav>
+        <div class="streak-section">
+          <div class="streak-title">Daily Streak</div>
+          <div class="flame-icon">&#128293;</div>
+          <div class="streak-days">Keep going! &#128293;</div>
+          <div class="days-display">
+            <span class="day">M</span>
+            <span class="day">T</span>
+            <span class="day">W</span>
+            <span class="day">T</span>
+            <span class="day">F</span>
+            <span class="day">S</span>
+            <span class="day">S</span>
+          </div>
+        </div>
+        <div class="profile-section">
+          <div class="profile-avatar">
+            <img
+              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='40' fill='%236c5ce7'/%3E%3Ctext x='40' y='47' font-family='Arial,sans-serif' font-size='24' font-weight='700' text-anchor='middle' fill='white'%3EAF%3C/text%3E%3C/svg%3E"
+              alt="Ahmed Farouk"
+            />
+          </div>
+          <div class="profile-info">
+            <div class="profile-name">Ahmed Farouk</div>
+            <div class="profile-role">Premium User</div>
+          </div>
+        </div>
+        <div class="theme-toggle">
+          <i class="fas fa-moon"></i>
+          <label class="toggle-switch">
+            <input type="checkbox" id="darkModeToggle" aria-label="Toggle dark mode" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
+        <div class="navbar">
+          <div class="navbar-left">
+            <button class="menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+              <i class="fas fa-bars"></i>
+            </button>
+          </div>
+          <div class="navbar-title">
+            <h1>Prayer Times</h1>
+            <p>Stay connected to your spiritual routine</p>
+          </div>
+          <div class="navbar-right">
+            <div class="date-display">
+              <i class="fas fa-calendar-alt"></i>
+              <span>17 May 2025, Saturday</span>
+            </div>
+            <div class="notifications">
+              <i class="fas fa-bell"></i>
+              <span class="badge">2</span>
+            </div>
+            <div class="user-menu">
+              <img
+                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='40' fill='%236c5ce7'/%3E%3Ctext x='40' y='47' font-family='Arial,sans-serif' font-size='24' font-weight='700' text-anchor='middle' fill='white'%3EAF%3C/text%3E%3C/svg%3E"
+                alt="User"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="prayer-content">
+          <div class="card">
+            <div class="card-header">
+              <h3>Today's Prayer Schedule</h3>
+            </div>
+            <div class="prayer-grid">
+              <div class="card prayer-card">
+                <div class="prayer-icon" aria-hidden="true">*</div>
+                <div class="prayer-name">Fajr</div>
+                <div class="prayer-time">05:00 AM</div>
+                <div class="prayer-status">Prayed</div>
+              </div>
+              <div class="card prayer-card">
+                <div class="prayer-icon" aria-hidden="true">*</div>
+                <div class="prayer-name">Dhuhr</div>
+                <div class="prayer-time">12:30 PM</div>
+                <div class="prayer-status">Prayed</div>
+              </div>
+              <div class="card prayer-card">
+                <div class="prayer-icon" aria-hidden="true">*</div>
+                <div class="prayer-name">Asr</div>
+                <div class="prayer-time">03:45 PM</div>
+                <div class="prayer-status">Prayed</div>
+              </div>
+              <div class="card prayer-card">
+                <div class="prayer-icon" aria-hidden="true">*</div>
+                <div class="prayer-name">Maghrib</div>
+                <div class="prayer-time">07:15 PM</div>
+                <div class="prayer-status">Prayed</div>
+              </div>
+              <div class="card prayer-card">
+                <div class="prayer-icon" aria-hidden="true">*</div>
+                <div class="prayer-name">Isha</div>
+                <div class="prayer-time">08:45 PM</div>
+                <div class="prayer-status missed">Not Yet</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="../js/app.js"></script>
+  </body>
+</html>
+
+
+

@@ -1,0 +1,255 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="MYLIFE helps you track your daily tasks, habits, goals, workouts, prayer, nutrition, water, sleep, study, and progress." />
+    <title>Statistics - MYLIFE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+    <link rel="stylesheet" href="../css/reset.css" />
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/global.css" />
+    <link rel="stylesheet" href="../css/responsive.css" />
+    <link rel="stylesheet" href="../css/layout/sidebar.css" />
+    <link rel="stylesheet" href="../css/layout/navbar.css" />
+    <style>
+      .stats-content {
+        padding: var(--spacing-3xl);
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--spacing-2xl);
+        margin-top: var(--spacing-2xl);
+      }
+      .stat-card {
+        text-align: center;
+        padding: var(--spacing-2xl);
+      }
+      .stat-icon {
+        font-size: 36px;
+        margin-bottom: var(--spacing-lg);
+      }
+      .stat-number {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: var(--spacing-sm);
+      }
+      .stat-title {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .chart-section {
+        margin-top: var(--spacing-2xl);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="logo">
+          <h2>MYLIFE</h2>
+          <p>Life Tracker</p>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="../index.html" class="nav-item">
+            <i class="fas fa-house"></i>
+            <span>Dashboard</span>
+          </a>
+          <a href="todo.html" class="nav-item">
+            <i class="fas fa-list-check"></i>
+            <span>Todo</span>
+          </a>
+          <a href="habits.html" class="nav-item">
+            <i class="fas fa-repeat"></i>
+            <span>Habits</span>
+          </a>
+          <a href="goals.html" class="nav-item">
+            <i class="fas fa-bullseye"></i>
+            <span>Goals</span>
+          </a>
+          <a href="calendar.html" class="nav-item">
+            <i class="fas fa-calendar"></i>
+            <span>Calendar</span>
+          </a>
+          <a href="gym.html" class="nav-item">
+            <i class="fas fa-dumbbell"></i>
+            <span>Gym</span>
+          </a>
+          <a href="prayer.html" class="nav-item">
+            <i class="fas fa-person-praying"></i>
+            <span>Prayer</span>
+          </a>
+          <a href="nutrition.html" class="nav-item">
+            <i class="fas fa-apple-whole"></i>
+            <span>Nutrition</span>
+          </a>
+          <a href="water.html" class="nav-item">
+            <i class="fas fa-glass-water"></i>
+            <span>Water</span>
+          </a>
+          <a href="sleep.html" class="nav-item">
+            <i class="fas fa-moon"></i>
+            <span>Sleep</span>
+          </a>
+          <a href="study.html" class="nav-item">
+            <i class="fas fa-book"></i>
+            <span>Study</span>
+          </a>
+          <a href="statistics.html" class="nav-item active">
+            <i class="fas fa-chart-line"></i>
+            <span>Statistics</span>
+          </a>
+          <a href="settings.html" class="nav-item">
+            <i class="fas fa-gear"></i>
+            <span>Settings</span>
+          </a>
+        </nav>
+        <div class="streak-section">
+          <div class="streak-title">Daily Streak</div>
+          <div class="flame-icon">&#128293;</div>
+          <div class="streak-days">Keep going! &#128293;</div>
+          <div class="days-display">
+            <span class="day">M</span>
+            <span class="day">T</span>
+            <span class="day">W</span>
+            <span class="day">T</span>
+            <span class="day">F</span>
+            <span class="day">S</span>
+            <span class="day">S</span>
+          </div>
+        </div>
+        <div class="profile-section">
+          <div class="profile-avatar">
+            <img
+              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='40' fill='%236c5ce7'/%3E%3Ctext x='40' y='47' font-family='Arial,sans-serif' font-size='24' font-weight='700' text-anchor='middle' fill='white'%3EAF%3C/text%3E%3C/svg%3E"
+              alt="Ahmed Farouk"
+            />
+          </div>
+          <div class="profile-info">
+            <div class="profile-name">Ahmed Farouk</div>
+            <div class="profile-role">Premium User</div>
+          </div>
+        </div>
+        <div class="theme-toggle">
+          <i class="fas fa-moon"></i>
+          <label class="toggle-switch">
+            <input type="checkbox" id="darkModeToggle" aria-label="Toggle dark mode" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
+        <div class="navbar">
+          <div class="navbar-left">
+            <button class="menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+              <i class="fas fa-bars"></i>
+            </button>
+          </div>
+          <div class="navbar-title">
+            <h1>Statistics</h1>
+            <p>View your overall progress</p>
+          </div>
+          <div class="navbar-right">
+            <div class="date-display">
+              <i class="fas fa-calendar-alt"></i>
+              <span>17 May 2025, Saturday</span>
+            </div>
+            <div class="notifications">
+              <i class="fas fa-bell"></i>
+              <span class="badge">2</span>
+            </div>
+            <div class="user-menu">
+              <img
+                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='40' fill='%236c5ce7'/%3E%3Ctext x='40' y='47' font-family='Arial,sans-serif' font-size='24' font-weight='700' text-anchor='middle' fill='white'%3EAF%3C/text%3E%3C/svg%3E"
+                alt="User"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-content">
+          <div class="card">
+            <div class="card-header">
+              <h3>This Month's Overview</h3>
+            </div>
+            <div class="stats-grid">
+              <div class="card stat-card">
+                <div class="stat-icon" aria-hidden="true">*</div>
+                <div class="stat-number">127</div>
+                <div class="stat-title">Tasks Completed</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-icon" aria-hidden="true">*</div>
+                <div class="stat-number">24</div>
+                <div class="stat-title">Days Streak</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-icon" aria-hidden="true">*</div>
+                <div class="stat-number">18</div>
+                <div class="stat-title">Workouts Done</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-icon" aria-hidden="true">*</div>
+                <div class="stat-number">67</div>
+                <div class="stat-title">Study Hours</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-icon" aria-hidden="true">*</div>
+                <div class="stat-number">8.2</div>
+                <div class="stat-title">Avg Sleep Hours</div>
+              </div>
+              <div class="card stat-card">
+                <div class="stat-icon" aria-hidden="true">*</div>
+                <div class="stat-number">224</div>
+                <div class="stat-title">Glasses of Water</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-section">
+            <div class="card">
+              <div class="card-header">
+                <h3>Monthly Progress</h3>
+              </div>
+              <div
+                style="
+                  padding: var(--spacing-2xl);
+                  text-align: center;
+                  color: var(--text-secondary);
+                "
+              >
+                <p style="margin-bottom: var(--spacing-xl)">
+                  Your productivity is trending upwards! Keep maintaining these
+                  great habits.
+                </p>
+                <div style="font-size: 18px; margin: var(--spacing-2xl) 0">
+                  Progress is trending upward.
+                </div>
+                <p>Week 1: 85% | Week 2: 88% | Week 3: 91% | Week 4: 94%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="../js/app.js"></script>
+  </body>
+</html>
+
+
+
+

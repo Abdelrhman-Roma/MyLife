@@ -1,0 +1,133 @@
+{
+  "user": {
+    "name": "Abdelrhman Taha",
+    "email": "abdelrhman.taha@email.com",
+    "role": "Premium User",
+    "location": "Cairo, Egypt",
+    "memberSince": "12 Jan 2025",
+    "birthDate": "15 March 2002",
+    "gender": "Male",
+    "phone": "+20 101 234 5678",
+    "timezone": "(GMT+2:00) Cairo, Egypt",
+    "bio": "Motivated to become a better version of myself every single day.",
+    "avatarInitials": "AF"
+  },
+  "dashboard": {
+    "greeting": "Good Morning, Ahmed!",
+    "subtitle": "You've got a lot planned today.",
+    "motivation": "Stay focused and keep pushing forward!",
+    "summary": [
+      { "label": "Tasks Completed", "value": "8", "meta": "of 12 tasks", "percent": 67, "icon": "fa-check", "tone": "purple" },
+      { "label": "Habits Completed", "value": "7", "meta": "of 10 habits", "percent": 70, "icon": "fa-bullseye", "tone": "green" },
+      { "label": "Calories Consumed", "value": "1,850", "meta": "of 2,500 kcal", "percent": 74, "icon": "fa-fire", "tone": "orange" },
+      { "label": "Water Intake", "value": "6", "meta": "of 8 glasses", "percent": 75, "icon": "fa-droplet", "tone": "blue" },
+      { "label": "Sleep", "value": "7h 32m", "meta": "of 8h goal", "percent": 91, "icon": "fa-moon", "tone": "purple" }
+    ],
+    "priorities": [
+      { "title": "Chest Workout", "category": "Gym", "time": "07:00 AM" },
+      { "title": "Study Mathematics", "category": "Study", "time": "10:00 AM" },
+      { "title": "Read Quran", "category": "Prayer", "time": "08:30 PM" }
+    ],
+    "weeklyProgress": {
+      "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      "series": [
+        { "name": "Tasks", "color": "#4f46e5", "values": [70, 82, 88, 80, 86, 79, 91] },
+        { "name": "Habits", "color": "#22c55e", "values": [48, 64, 55, 45, 67, 58, 70] },
+        { "name": "Gym", "color": "#f97316", "values": [28, 30, 45, 72, 68, 40, 50] },
+        { "name": "Study", "color": "#3b82f6", "values": [50, 62, 50, 45, 32, 34, 24] }
+      ]
+    }
+  },
+  "tasks": [
+    { "title": "Finish project proposal", "category": "Work", "priority": "High", "time": "08:00 AM", "date": "19 May", "status": "pending" },
+    { "title": "Study Calculus chapter 5", "category": "Study", "priority": "Medium", "time": "09:30 AM", "date": "17 May", "status": "completed" },
+    { "title": "Buy groceries", "category": "Personal", "priority": "Low", "time": "11:00 AM", "date": "17 May", "status": "pending" },
+    { "title": "Morning workout", "category": "Gym", "priority": "Medium", "time": "01:00 PM", "date": "17 May", "status": "completed" },
+    { "title": "Read 20 pages", "category": "Personal", "priority": "Low", "time": "04:00 PM", "date": "18 May", "status": "in-progress" },
+    { "title": "Prepare presentation", "category": "Work", "priority": "High", "time": "07:30 PM", "date": "20 May", "status": "pending" }
+  ],
+  "habits": [
+    { "name": "Drink 8 glasses of water", "shortName": "Drink water", "frequency": "Daily", "progress": 75, "streak": 12, "best": 20, "days": [true, true, true, true, true, false, false], "icon": "fa-droplet", "tone": "blue" },
+    { "name": "Morning workout", "shortName": "Workout", "frequency": "Daily", "progress": 88, "streak": 9, "best": 15, "days": [true, true, false, true, false, true, false], "icon": "fa-dumbbell", "tone": "purple" },
+    { "name": "Read Quran", "shortName": "Read Quran", "frequency": "Daily", "progress": 100, "streak": 7, "best": 12, "days": [true, true, true, true, true, true, true], "icon": "fa-book-quran", "tone": "green" },
+    { "name": "Sleep before 11 PM", "shortName": "Sleep early", "frequency": "Daily", "progress": 62, "streak": 5, "best": 10, "days": [true, true, true, true, false, false, false], "icon": "fa-moon", "tone": "purple" },
+    { "name": "No junk food", "shortName": "No junk food", "frequency": "Daily", "progress": 50, "streak": 3, "best": 8, "days": [true, false, true, false, true, false, false], "icon": "fa-ban", "tone": "orange" }
+  ],
+  "goals": [
+    { "name": "Lose 10 kg", "progress": 70, "tone": "green", "icon": "fa-heart-pulse" },
+    { "name": "Build Muscle", "progress": 60, "tone": "purple", "icon": "fa-dumbbell" },
+    { "name": "Read 12 books this year", "progress": 40, "tone": "orange", "icon": "fa-book-open" },
+    { "name": "Save $5,000", "progress": 55, "tone": "blue", "icon": "fa-droplet" }
+  ],
+  "schedule": [
+    { "time": "05:00 AM", "title": "Fajr Prayer", "category": "Prayer", "icon": "fa-hands-praying" },
+    { "time": "07:00 AM", "title": "Chest Workout", "category": "Gym", "icon": "fa-dumbbell" },
+    { "time": "10:00 AM", "title": "Study Session", "category": "Mathematics", "icon": "fa-book-open" },
+    { "time": "01:30 PM", "title": "Lunch", "category": "Nutrition", "icon": "fa-bowl-food" },
+    { "time": "08:30 PM", "title": "Read Quran", "category": "Prayer", "icon": "fa-book-quran" }
+  ],
+  "nutrition": {
+    "calories": 1850,
+    "goal": 2500,
+    "macros": [
+      { "name": "Protein", "value": "145g", "percent": 31, "color": "#22c55e" },
+      { "name": "Carbs", "value": "210g", "percent": 45, "color": "#f97316" },
+      { "name": "Fats", "value": "60g", "percent": 13, "color": "#ec4899" },
+      { "name": "Fiber", "value": "25g", "percent": 5, "color": "#3b82f6" },
+      { "name": "Others", "value": "13g", "percent": 2, "color": "#cbd5e1" }
+    ],
+    "meals": [
+      { "name": "Breakfast", "time": "08:00 AM", "calories": 450, "items": ["Oatmeal with berries", "Scrambled eggs", "Orange juice"] },
+      { "name": "Lunch", "time": "12:30 PM", "calories": 650, "items": ["Grilled chicken breast", "Brown rice", "Mixed vegetables"] },
+      { "name": "Snack", "time": "04:00 PM", "calories": 150, "items": ["Apple", "Almonds", "Yogurt"] },
+      { "name": "Dinner", "time": "07:30 PM", "calories": 600, "items": ["Salmon fillet", "Sweet potato", "Steamed broccoli"] }
+    ]
+  },
+  "water": { "current": 6, "goal": 8, "volume": "2.4L", "weeklyTotal": 42 },
+  "sleep": {
+    "duration": "7h 32m",
+    "goal": "8h",
+    "score": 85,
+    "quality": "Great",
+    "fellAsleep": "10:45 PM",
+    "wokeUp": "06:15 AM",
+    "logs": [
+      { "date": "May 17, 2025", "duration": "7h 32m", "quality": "Excellent", "interruptions": 0 },
+      { "date": "May 16, 2025", "duration": "7h 15m", "quality": "Good", "interruptions": 1 },
+      { "date": "May 15, 2025", "duration": "6h 45m", "quality": "Good", "interruptions": 2 }
+    ]
+  },
+  "workouts": [
+    { "name": "Chest Workout", "minutes": 45, "calories": 280, "difficulty": "8/10", "sets": "4/4", "progress": 100 },
+    { "name": "Leg Day", "minutes": 60, "calories": 420, "difficulty": "9/10", "sets": "3/4", "progress": 75 },
+    { "name": "Cardio Session", "minutes": 30, "calories": 350, "difficulty": "6/10", "sets": "1/1", "progress": 100 }
+  ],
+  "prayers": [
+    { "name": "Fajr", "time": "04:15 AM", "done": true },
+    { "name": "Dhuhr", "time": "12:30 PM", "done": true },
+    { "name": "Asr", "time": "03:45 PM", "done": true },
+    { "name": "Maghrib", "time": "06:50 PM", "done": false },
+    { "name": "Isha", "time": "08:20 PM", "done": false }
+  ],
+  "study": [
+    { "subject": "Mathematics", "topic": "Algebra & Geometry", "duration": "5h 30m", "progress": 70 },
+    { "subject": "English", "topic": "Literature & Writing", "duration": "4h 15m", "progress": 55 },
+    { "subject": "Programming", "topic": "JavaScript & Web Dev", "duration": "6h 45m", "progress": 85 }
+  ],
+  "stats": {
+    "journey": [
+      { "label": "Total Goals Achieved", "value": "18" },
+      { "label": "Habits Completed", "value": "156" },
+      { "label": "Tasks Completed", "value": "342" },
+      { "label": "Total Focus Time", "value": "120h 45m" }
+    ],
+    "activity": [
+      { "label": "Tasks Completed", "value": "28 / 40", "percent": 70 },
+      { "label": "Habits Completed", "value": "6 / 8", "percent": 75 },
+      { "label": "Study Time", "value": "12h 30m / 15h", "percent": 83 },
+      { "label": "Workout", "value": "4 / 5", "percent": 80 },
+      { "label": "Water Intake", "value": "6 / 8 glasses", "percent": 75 },
+      { "label": "Sleep", "value": "6h 45m / 8h", "percent": 84 }
+    ]
+  }
+}
