@@ -1,683 +1,115 @@
-﻿<!-- test -->
-<!doctype html>
+﻿<!doctype html>
+<!-- ده الملف الرئيسي لصفحة تسجيل الدخول في مشروع MYLIFE -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="MYLIFE is a personal dashboard for tracking tasks, habits, goals, workouts, prayer, nutrition, water, sleep, study, and progress."
-    />
-    <title>MYLIFE - Life Tracker Dashboard</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    />
-    <link rel="stylesheet" href="css/reset.css" />
-    <link rel="stylesheet" href="css/variables.css" />
-    <link rel="stylesheet" href="css/global.css" />
-    <link rel="stylesheet" href="css/responsive.css" />
-    <link rel="stylesheet" href="css/layout/sidebar.css" />
-    <link rel="stylesheet" href="css/layout/navbar.css" />
-    <link rel="stylesheet" href="css/pages/dashboard.css" />
+    <title>MYLIFE | Login</title>
+    <link rel="stylesheet" href="css/styles.css" />
   </head>
-
-  <body>
-    <div class="app-container">
-      <!-- ================= SIDEBAR ================= -->
-      <aside class="sidebar">
-        <div class="logo">
-          <h2>MYLIFE</h2>
-          <p>Life Tracker</p>
-        </div>
-
-        <nav class="sidebar-nav">
-          <a href="index.html" class="nav-item active">
-            <i class="fas fa-house"></i>
-            <span>Dashboard</span>
-          </a>
-          <a href="pages/todo.html" class="nav-item">
-            <i class="fas fa-list-check"></i>
-            <span>Todo</span>
-          </a>
-          <a href="pages/habits.html" class="nav-item">
-            <i class="fas fa-repeat"></i>
-            <span>Habits</span>
-          </a>
-          <a href="pages/goals.html" class="nav-item">
-            <i class="fas fa-bullseye"></i>
-            <span>Goals</span>
-          </a>
-          <a href="pages/calendar.html" class="nav-item">
-            <i class="fas fa-calendar"></i>
-            <span>Calendar</span>
-          </a>
-          <a href="pages/gym.html" class="nav-item">
-            <i class="fas fa-dumbbell"></i>
-            <span>Gym</span>
-          </a>
-          <a href="pages/prayer.html" class="nav-item">
-            <i class="fas fa-person-praying"></i>
-            <span>Prayer</span>
-          </a>
-          <a href="pages/nutrition.html" class="nav-item">
-            <i class="fas fa-apple-whole"></i>
-            <span>Nutrition</span>
-          </a>
-          <a href="pages/water.html" class="nav-item">
-            <i class="fas fa-glass-water"></i>
-            <span>Water</span>
-          </a>
-          <a href="pages/sleep.html" class="nav-item">
-            <i class="fas fa-moon"></i>
-            <span>Sleep</span>
-          </a>
-          <a href="pages/study.html" class="nav-item">
-            <i class="fas fa-book"></i>
-            <span>Study</span>
-          </a>
-          <a href="pages/statistics.html" class="nav-item">
-            <i class="fas fa-chart-line"></i>
-            <span>Statistics</span>
-          </a>
-          <a href="pages/settings.html" class="nav-item">
-            <i class="fas fa-gear"></i>
-            <span>Settings</span>
-          </a>
-        </nav>
-
-        <div class="streak-section">
-          <div class="streak-title">Daily Streak</div>
-          <div class="flame-icon">&#128293;</div>
-          <div class="streak-days">Keep going! &#128293;</div>
-          <div class="days-display">
-            <span class="day">M</span>
-            <span class="day">T</span>
-            <span class="day">W</span>
-            <span class="day">T</span>
-            <span class="day">F</span>
-            <span class="day">S</span>
-            <span class="day">S</span>
+  <body data-page="auth">
+    <!-- ده القسم الرئيسي لصفحة تسجيل الدخول والتسجيل -->
+    <main class="auth-page">
+      <section class="auth-visual" aria-label="MYLIFE dashboard design preview">
+        <div class="mock-browser">
+          <div class="mock-sidebar">
+            <div class="mock-logo"></div>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="mock-main">
+            <div class="mock-top"></div>
+            <div class="mock-hero">
+              <div>
+                <b></b>
+                <strong></strong>
+                <p></p>
+              </div>
+              <i></i>
+            </div>
+            <div class="mock-stats">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="mock-grid"><span></span><span></span><span></span></div>
           </div>
         </div>
+        <div class="auth-copy">
+          <p class="eyebrow">Private life tracker</p>
+          <h1>MYLIFE</h1>
+          <p>
+            Login or register before using the dashboard. Every task, habit,
+            goal, and setting is saved for the active user only.
+          </p>
+        </div>
+      </section>
 
-        <div class="profile-section">
-          <div class="profile-avatar">
-            <img
-              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='40' fill='%236c5ce7'/%3E%3Ctext x='40' y='47' font-family='Arial,sans-serif' font-size='24' font-weight='700' text-anchor='middle' fill='white'%3EAF%3C/text%3E%3C/svg%3E"
-              alt="Ahmed Farouk"
-            />
-          </div>
-          <div class="profile-info">
-            <div class="profile-name">Ahmed Farouk</div>
-            <div class="profile-role">Premium User</div>
-          </div>
+      <!-- ده القسم اللي بيعرض فورم تسجيل الدخول أو إنشاء حساب جديد -->
+      <section class="auth-card">
+        <div id="login-panel">
+          <p class="eyebrow">Welcome back</p>
+          <h2>Login</h2>
+          <form id="login-form" class="form-stack">
+            <label
+              >Email<input
+                id="login-email"
+                type="email"
+                autocomplete="email"
+                required
+            /></label>
+            <label
+              >Password<input
+                id="login-password"
+                type="password"
+                autocomplete="current-password"
+                required
+            /></label>
+            <p class="form-message" id="login-message"></p>
+            <button class="primary-btn" type="submit">Login</button>
+          </form>
+          <button class="text-btn" id="show-register" type="button">
+            Create account
+          </button>
         </div>
 
-        <div class="theme-toggle">
-          <i class="fas fa-moon"></i>
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              id="darkModeToggle"
-              aria-label="Toggle dark mode"
-            />
-            <span class="slider"></span>
-          </label>
+        <div id="register-panel" class="hidden">
+          <p class="eyebrow">New account</p>
+          <h2>Register</h2>
+          <form id="register-form" class="form-stack">
+            <label
+              >Full name<input id="register-name" autocomplete="name" required
+            /></label>
+            <label
+              >Email<input
+                id="register-email"
+                type="email"
+                autocomplete="email"
+                required
+            /></label>
+            <label
+              >Password<input
+                id="register-password"
+                type="password"
+                minlength="6"
+                autocomplete="new-password"
+                required
+            /></label>
+            <label
+              >Confirm password<input
+                id="register-confirm"
+                type="password"
+                minlength="6"
+                autocomplete="new-password"
+                required
+            /></label>
+            <p class="form-message" id="register-message"></p>
+            <button class="primary-btn" type="submit">Register</button>
+          </form>
+          <button class="text-btn" id="show-login" type="button">
+            Back to login
+          </button>
         </div>
-      </aside>
+      </section>
+    </main>
 
-      <!-- ================= MAIN CONTENT ================= -->
-      <main class="main-content">
-        <!-- ================= NAVBAR ================= -->
-        <div class="navbar">
-          <div class="navbar-left">
-            <button
-              class="menu-toggle"
-              aria-label="Toggle navigation menu"
-              aria-expanded="false"
-            >
-              <i class="fas fa-bars"></i>
-            </button>
-          </div>
-          <div class="navbar-title">
-            <h1>Dashboard</h1>
-          </div>
-          <div class="navbar-right">
-            <div class="date-display">
-              <i class="fas fa-calendar-alt"></i>
-              <span>17 May 2025, Saturday</span>
-            </div>
-            <div class="notifications">
-              <i class="fas fa-bell"></i>
-              <span class="badge">2</span>
-            </div>
-            <div class="user-menu">
-              <img
-                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' rx='40' fill='%236c5ce7'/%3E%3Ctext x='40' y='47' font-family='Arial,sans-serif' font-size='24' font-weight='700' text-anchor='middle' fill='white'%3EAF%3C/text%3E%3C/svg%3E"
-                alt="User"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- ================= DASHBOARD CONTENT ================= -->
-        <div class="dashboard-content">
-          <!-- Hero Section -->
-          <div class="hero-section">
-            <!-- Greeting Card -->
-            <div class="card greeting-card">
-              <div class="greeting-content">
-                <h2>Good Morning, Ahmed!</h2>
-                <p>You've got a lot planned today.</p>
-                <p class="motivation">Stay focused and keep pushing forward!</p>
-              </div>
-              <div class="greeting-illustration">
-                <svg viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient
-                      id="sunGradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="0%"
-                      y2="100%"
-                    >
-                      <stop
-                        offset="0%"
-                        style="stop-color: #ffd93d; stop-opacity: 1"
-                      />
-                      <stop
-                        offset="100%"
-                        style="stop-color: #ff6b6b; stop-opacity: 1"
-                      />
-                    </linearGradient>
-                  </defs>
-                  <ellipse
-                    cx="100"
-                    cy="120"
-                    rx="80"
-                    ry="40"
-                    fill="#FFE5B4"
-                    opacity="0.3"
-                  />
-                  <circle cx="100" cy="40" r="30" fill="url(#sunGradient)" />
-                  <path
-                    d="M 20 100 Q 50 80, 80 90 T 140 85"
-                    stroke="#C7CEEA"
-                    stroke-width="3"
-                    fill="none"
-                    opacity="0.6"
-                  />
-                  <path
-                    d="M 10 115 Q 60 95, 110 110 T 190 105"
-                    stroke="#B2BFF5"
-                    stroke-width="2"
-                    fill="none"
-                    opacity="0.4"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            <!-- Today's Priorities -->
-            <div class="card priorities-card">
-              <div class="card-header">
-                <h3>Today's Priorities</h3>
-                <a href="pages/todo.html" class="view-all">View All</a>
-              </div>
-              <ul class="priorities-list">
-                <li class="priority-item">
-                  <span class="priority-name">Chest Workout</span>
-                  <span class="priority-time">07:00 AM</span>
-                </li>
-                <li class="priority-item">
-                  <span class="priority-name">Study Mathematics</span>
-                  <span class="priority-time">10:00 AM</span>
-                </li>
-                <li class="priority-item">
-                  <span class="priority-name">Read Quran</span>
-                  <span class="priority-time">08:30 PM</span>
-                </li>
-              </ul>
-            </div>
-
-            <!-- Today's Tasks -->
-            <div class="card tasks-card">
-              <div class="card-header">
-                <h3>Today's Tasks</h3>
-              </div>
-              <div class="task-progress">
-                <svg class="progress-circle" viewBox="0 0 120 120">
-                  <circle cx="60" cy="60" r="55" class="progress-bg" />
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="55"
-                    class="progress-fill"
-                    style="stroke-dasharray: 188.4; stroke-dashoffset: 47.1"
-                  />
-                </svg>
-                <div class="progress-text">
-                  <div class="progress-number">6</div>
-                  <div class="progress-label">of 10</div>
-                </div>
-              </div>
-              <div class="progress-bar">
-                <div class="progress-bar-fill" style="width: 60%"></div>
-              </div>
-              <div class="progress-percentage">60% Completed</div>
-            </div>
-          </div>
-
-          <!-- Today Overview -->
-          <div class="overview-section">
-            <div class="section-title">Today Overview</div>
-            <div class="overview-grid">
-              <div class="card stat-card">
-                <div class="stat-icon completed">
-                  <i class="fas fa-check"></i>
-                </div>
-                <div class="stat-label">Tasks Completed</div>
-                <div class="stat-value">8</div>
-                <div class="stat-meta">of 12 tasks</div>
-                <div class="stat-bar">
-                  <div class="stat-bar-fill" style="width: 67%"></div>
-                </div>
-                <div class="stat-percentage">67%</div>
-              </div>
-
-              <div class="card stat-card">
-                <div class="stat-icon habits">
-                  <i class="fas fa-circle-check"></i>
-                </div>
-                <div class="stat-label">Habits Completed</div>
-                <div class="stat-value">7</div>
-                <div class="stat-meta">of 10 habits</div>
-                <div class="stat-bar">
-                  <div
-                    class="stat-bar-fill habits-fill"
-                    style="width: 70%"
-                  ></div>
-                </div>
-                <div class="stat-percentage">70%</div>
-              </div>
-
-              <div class="card stat-card">
-                <div class="stat-icon calories">
-                  <i class="fas fa-fire"></i>
-                </div>
-                <div class="stat-label">Calories Consumed</div>
-                <div class="stat-value">1,850</div>
-                <div class="stat-meta">of 2,500 kcal</div>
-                <div class="stat-bar">
-                  <div
-                    class="stat-bar-fill calories-fill"
-                    style="width: 74%"
-                  ></div>
-                </div>
-                <div class="stat-percentage">74%</div>
-              </div>
-
-              <div class="card stat-card">
-                <div class="stat-icon water">
-                  <i class="fas fa-droplet"></i>
-                </div>
-                <div class="stat-label">Water Intake</div>
-                <div class="stat-value">6</div>
-                <div class="stat-meta">of 8 glasses</div>
-                <div class="stat-bar">
-                  <div
-                    class="stat-bar-fill water-fill"
-                    style="width: 75%"
-                  ></div>
-                </div>
-                <div class="stat-percentage">75%</div>
-              </div>
-
-              <div class="card stat-card">
-                <div class="stat-icon sleep">
-                  <i class="fas fa-moon"></i>
-                </div>
-                <div class="stat-label">Sleep</div>
-                <div class="stat-value">7h 32m</div>
-                <div class="stat-meta">of 8h goal</div>
-                <div class="stat-bar">
-                  <div
-                    class="stat-bar-fill sleep-fill"
-                    style="width: 91%"
-                  ></div>
-                </div>
-                <div class="stat-percentage">91%</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Middle Section: Schedule and Habits -->
-          <div class="middle-grid">
-            <!-- Today's Schedule -->
-            <div class="card schedule-card">
-              <div class="card-header">
-                <h3>Today's Schedule</h3>
-                <a href="pages/calendar.html" class="view-link"
-                  >View Calendar</a
-                >
-              </div>
-              <ul class="schedule-list">
-                <li class="schedule-item">
-                  <div class="time">05:00 AM</div>
-                  <div class="schedule-content">
-                    <i class="fas fa-hands-praying"></i>
-                    <span>Fair Prayer</span>
-                  </div>
-                </li>
-                <li class="schedule-item">
-                  <div class="time">07:00 AM</div>
-                  <div class="schedule-content">
-                    <i class="fas fa-dumbbell"></i>
-                    <span>Chest Workout</span>
-                  </div>
-                </li>
-                <li class="schedule-item">
-                  <div class="time">10:00 AM</div>
-                  <div class="schedule-content">
-                    <i class="fas fa-book"></i>
-                    <span>Mathematics Study</span>
-                  </div>
-                </li>
-                <li class="schedule-item">
-                  <div class="time">01:30 PM</div>
-                  <div class="schedule-content">
-                    <i class="fas fa-utensils"></i>
-                    <span>Lunch</span>
-                  </div>
-                </li>
-                <li class="schedule-item">
-                  <div class="time">08:30 PM</div>
-                  <div class="schedule-content">
-                    <i class="fas fa-book-quran"></i>
-                    <span>Read Quran</span>
-                  </div>
-                </li>
-                <li class="schedule-item add-reminder">
-                  <i class="fas fa-plus"></i>
-                  <span>Add Reminder</span>
-                </li>
-              </ul>
-            </div>
-
-            <!-- Habits Overview -->
-            <div class="card habits-card">
-              <div class="card-header">
-                <h3>Habits Overview</h3>
-                <select class="time-filter" aria-label="Filter habits by time">
-                  <option>This Week</option>
-                </select>
-              </div>
-              <ul class="habits-list">
-                <li class="habit-item">
-                  <div class="habit-info">
-                    <div class="habit-name">Wake up early</div>
-                    <div class="habit-completion">
-                      <span class="day-badge">M</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">W</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">F</span>
-                      <span class="day-badge">S</span>
-                      <span class="day-badge">S</span>
-                    </div>
-                  </div>
-                  <div class="habit-percentage">86%</div>
-                </li>
-                <li class="habit-item">
-                  <div class="habit-info">
-                    <div class="habit-name">Workout</div>
-                    <div class="habit-completion">
-                      <span class="day-badge">M</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">W</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">F</span>
-                      <span class="day-badge">S</span>
-                      <span class="day-badge">S</span>
-                    </div>
-                  </div>
-                  <div class="habit-percentage">71%</div>
-                </li>
-                <li class="habit-item">
-                  <div class="habit-info">
-                    <div class="habit-name">Read Quran</div>
-                    <div class="habit-completion">
-                      <span class="day-badge">M</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">W</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">F</span>
-                      <span class="day-badge">S</span>
-                      <span class="day-badge">S</span>
-                    </div>
-                  </div>
-                  <div class="habit-percentage">100%</div>
-                </li>
-                <li class="habit-item">
-                  <div class="habit-info">
-                    <div class="habit-name">Drink Water</div>
-                    <div class="habit-completion">
-                      <span class="day-badge">M</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">W</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">F</span>
-                      <span class="day-badge">S</span>
-                      <span class="day-badge">S</span>
-                    </div>
-                  </div>
-                  <div class="habit-percentage">86%</div>
-                </li>
-                <li class="habit-item">
-                  <div class="habit-info">
-                    <div class="habit-name">No Junk Food</div>
-                    <div class="habit-completion">
-                      <span class="day-badge">M</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">W</span>
-                      <span class="day-badge">T</span>
-                      <span class="day-badge">F</span>
-                      <span class="day-badge">S</span>
-                      <span class="day-badge">S</span>
-                    </div>
-                  </div>
-                  <div class="habit-percentage">57%</div>
-                </li>
-              </ul>
-              <a href="pages/habits.html" class="view-habits-link"
-                >View Habits</a
-              >
-            </div>
-          </div>
-
-          <!-- Weekly Progress -->
-          <div class="card weekly-progress-card">
-            <div class="card-header">
-              <h3>Weekly Progress</h3>
-              <select
-                class="time-filter"
-                aria-label="Filter weekly progress by time"
-              >
-                <option>This Week</option>
-              </select>
-            </div>
-            <div class="chart-container">
-              <canvas id="weeklyChart"></canvas>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"
-                ><span class="legend-color tasks"></span>Tasks</span
-              >
-              <span class="legend-item"
-                ><span class="legend-color habits"></span>Habits</span
-              >
-              <span class="legend-item"
-                ><span class="legend-color gym"></span>Gym</span
-              >
-              <span class="legend-item"
-                ><span class="legend-color study"></span>Study</span
-              >
-            </div>
-          </div>
-
-          <!-- Bottom Grid: Nutrition, Water, Sleep -->
-          <div class="bottom-grid">
-            <!-- Nutrition Summary -->
-            <div class="card nutrition-card">
-              <div class="card-header">
-                <h3>Nutrition Summary</h3>
-                <a href="pages/nutrition.html" class="view-details"
-                  >View Details</a
-                >
-              </div>
-              <div class="nutrition-content">
-                <svg class="nutrition-pie" viewBox="0 0 100 100">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    class="pie-segment protein"
-                    style="stroke-dasharray: 75.36; stroke-dashoffset: 0"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    class="pie-segment carbs"
-                    style="stroke-dasharray: 113.04; stroke-dashoffset: -75.36"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    class="pie-segment fats"
-                    style="stroke-dasharray: 75.36; stroke-dashoffset: -188.4"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    class="pie-segment fiber"
-                    style="stroke-dasharray: 75.36; stroke-dashoffset: -263.76"
-                  />
-                </svg>
-                <div class="nutrition-label">
-                  <div class="calorie-amount">1,850</div>
-                  <div class="calorie-unit">kcal</div>
-                </div>
-              </div>
-              <div class="nutrition-legend">
-                <div class="legend-item">
-                  <span class="color-box protein"></span>
-                  <span>Protein</span>
-                  <span class="amount">145g (31%)</span>
-                </div>
-                <div class="legend-item">
-                  <span class="color-box carbs"></span>
-                  <span>Carbs</span>
-                  <span class="amount">210g (45%)</span>
-                </div>
-                <div class="legend-item">
-                  <span class="color-box fats"></span>
-                  <span>Fats</span>
-                  <span class="amount">60g (13%)</span>
-                </div>
-                <div class="legend-item">
-                  <span class="color-box fiber"></span>
-                  <span>Fiber</span>
-                  <span class="amount">25g (2%)</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Water Tracker -->
-            <div class="card water-card">
-              <div class="card-header">
-                <h3>Water Tracker</h3>
-                <a href="pages/water.html" class="view-details">View Details</a>
-              </div>
-              <div class="water-content">
-                <div class="water-bars">
-                  <div class="water-bar"></div>
-                  <div class="water-bar"></div>
-                  <div class="water-bar"></div>
-                  <div class="water-bar"></div>
-                  <div class="water-bar"></div>
-                  <div class="water-bar"></div>
-                  <div class="water-bar"></div>
-                  <div class="water-bar"></div>
-                </div>
-                <div class="water-count">6 of 8 glasses</div>
-              </div>
-              <div class="water-message">Great! Keep drinking water</div>
-            </div>
-
-            <!-- Sleep Summary -->
-            <div class="card sleep-card">
-              <div class="card-header">
-                <h3>Sleep Summary</h3>
-                <a href="pages/sleep.html" class="view-details">View Details</a>
-              </div>
-              <div class="sleep-content">
-                <svg class="sleep-circle" viewBox="0 0 120 120">
-                  <circle cx="60" cy="60" r="55" class="sleep-bg" />
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="55"
-                    class="sleep-fill"
-                    style="stroke-dasharray: 275.8; stroke-dashoffset: -27.58"
-                  />
-                </svg>
-                <div class="sleep-label">
-                  <div class="sleep-score">85</div>
-                  <div class="sleep-quality">Sleep Quality</div>
-                  <div class="sleep-quality-text">Great</div>
-                </div>
-              </div>
-              <div class="sleep-stats">
-                <div class="sleep-stat">
-                  <i class="fas fa-moon"></i>
-                  <div>
-                    <div class="stat-title">Time Asleep</div>
-                    <div class="stat-value">7h 32m</div>
-                  </div>
-                </div>
-                <div class="sleep-stat">
-                  <i class="fas fa-heart"></i>
-                  <div>
-                    <div class="stat-title">Fall Asleep</div>
-                    <div class="stat-value">10:45 PM</div>
-                  </div>
-                </div>
-                <div class="sleep-stat">
-                  <i class="fas fa-sun"></i>
-                  <div>
-                    <div class="stat-title">Wake Up</div>
-                    <div class="stat-value">06:15 AM</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-    <script src="js/app.js" defer></script>
+    <script src="js/app.js"></script>
   </body>
 </html>

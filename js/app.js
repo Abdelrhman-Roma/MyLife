@@ -1,620 +1,719 @@
-const DEFAULT_DATA = {
-  user: {
-    name: 'Ahmed Farouk',
-    email: 'ahmed.farouk@email.com',
-    role: 'Premium User',
-    location: 'Cairo, Egypt',
-    memberSince: '12 Jan 2025',
-    birthDate: '15 March 2002',
-    gender: 'Male',
-    phone: '+20 101 234 5678',
-    timezone: '(GMT+2:00) Cairo, Egypt',
-    bio: 'Motivated to become a better version of myself every single day.',
-    avatarInitials: 'AF',
-  },
-  dashboard: {
-    greeting: 'Good Morning, Ahmed!',
-    subtitle: "You've got a lot planned today.",
-    motivation: 'Stay focused and keep pushing forward!',
-    summary: [
-      { label: 'Tasks Completed', value: '8', meta: 'of 12 tasks', percent: 67, icon: 'fa-check', tone: 'purple' },
-      { label: 'Habits Completed', value: '7', meta: 'of 10 habits', percent: 70, icon: 'fa-bullseye', tone: 'green' },
-      { label: 'Calories Consumed', value: '1,850', meta: 'of 2,500 kcal', percent: 74, icon: 'fa-fire', tone: 'orange' },
-      { label: 'Water Intake', value: '6', meta: 'of 8 glasses', percent: 75, icon: 'fa-droplet', tone: 'blue' },
-      { label: 'Sleep', value: '7h 32m', meta: 'of 8h goal', percent: 91, icon: 'fa-moon', tone: 'purple' },
-    ],
-    priorities: [
-      { title: 'Chest Workout', category: 'Gym', time: '07:00 AM' },
-      { title: 'Study Mathematics', category: 'Study', time: '10:00 AM' },
-      { title: 'Read Quran', category: 'Prayer', time: '08:30 PM' },
-    ],
-    weeklyProgress: {
-      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-      series: [
-        { name: 'Tasks', color: '#4f46e5', values: [70, 82, 88, 80, 86, 79, 91] },
-        { name: 'Habits', color: '#22c55e', values: [48, 64, 55, 45, 67, 58, 70] },
-        { name: 'Gym', color: '#f97316', values: [28, 30, 45, 72, 68, 40, 50] },
-        { name: 'Study', color: '#3b82f6', values: [50, 62, 50, 45, 32, 34, 24] },
-      ],
-    },
-  },
-  tasks: [],
-  habits: [],
-  goals: [],
-  schedule: [],
-  nutrition: { calories: 0, goal: 0, macros: [], meals: [] },
-  water: { current: 0, goal: 8, volume: '0L', weeklyTotal: 0 },
-  sleep: { duration: '0h', goal: '8h', score: 0, quality: 'Good', fellAsleep: '', wokeUp: '', logs: [] },
-  workouts: [],
-  prayers: [],
-  study: [],
-  stats: { journey: [], activity: [] },
+// ده الملف الرئيسي اللي بيحمل منطق الصفحة والتعامل مع المستخدم والبيانات في MYLIFE
+const USERS_KEY = 'mylife.users';
+const SESSION_KEY = 'mylife.session';
+const DATA_PREFIX = 'mylife.data.';
+
+const nav = [
+  ['dashboard', 'Dashboard', 'Home'],
+  ['todo', 'Todo', 'Tasks'],
+  ['habits', 'Habits', 'Routines'],
+  ['goals', 'Goals', 'Targets'],
+  ['calendar', 'Calendar', 'Planner'],
+  ['gym', 'Gym', 'Training'],
+  ['prayer', 'Prayer', 'Spiritual'],
+  ['nutrition', 'Nutrition', 'Meals'],
+  ['water', 'Water', 'Hydration'],
+  ['sleep', 'Sleep', 'Recovery'],
+  ['study', 'Study', 'Focus'],
+  ['statistics', 'Statistics', 'Insights'],
+  ['settings', 'Settings', 'System'],
+  ['profile', 'Profile', 'Account'],
+];
+
+const pages = {
+  dashboard: { title: 'Dashboard', kicker: 'Personal workspace', accent: 'blue' },
+  todo: { title: 'Todo', kicker: 'Today tasks', collection: 'tasks', accent: 'blue', fields: [['title', 'Task', 'text'], ['time', 'Time', 'time'], ['priority', 'Priority', 'select', ['Low', 'Medium', 'High']]], labels: ['time', 'priority'] },
+  habits: { title: 'Habits', kicker: 'Daily routines', collection: 'habits', accent: 'green', fields: [['title', 'Habit', 'text'], ['target', 'Target', 'text'], ['category', 'Category', 'text']], labels: ['target', 'category'] },
+  goals: { title: 'Goals', kicker: 'Progress targets', collection: 'goals', accent: 'purple', fields: [['title', 'Goal', 'text'], ['period', 'Period', 'select', ['Daily', 'Weekly', 'Monthly', 'Yearly']], ['category', 'Category', 'text'], ['deadline', 'Deadline', 'date']], labels: ['period', 'category', 'deadline'] },
+  calendar: { title: 'Calendar', kicker: 'Weekly plan', collection: 'events', accent: 'orange', fields: [['title', 'Event', 'text'], ['date', 'Date', 'date'], ['time', 'Time', 'time']], labels: ['date', 'time'] },
+  gym: { title: 'Gym', kicker: 'Workout log', collection: 'workouts', accent: 'red', fields: [['day', 'Workout day', 'date'], ['title', 'Exercise', 'text'], ['weight', 'Weight', 'number'], ['reps', 'Repetitions', 'number'], ['sets', 'Sets', 'number'], ['note', 'Note', 'textarea']], labels: ['day', 'weight', 'reps', 'sets'] },
+  prayer: { title: 'Prayer', kicker: 'Spiritual tracker', collection: 'prayers', accent: 'green', fields: [['title', 'Prayer or routine', 'text'], ['time', 'Time', 'time'], ['status', 'Status', 'select', ['Planned', 'Completed']]], labels: ['time', 'status'] },
+  nutrition: { title: 'Nutrition', kicker: 'Meal tracking', collection: 'meals', accent: 'orange', fields: [['title', 'Meal', 'text'], ['calories', 'Calories', 'number'], ['protein', 'Protein', 'number'], ['carbs', 'Carbs', 'number'], ['fat', 'Fat', 'number'], ['type', 'Type', 'select', ['Breakfast', 'Lunch', 'Dinner', 'Snack']]], labels: ['calories', 'protein', 'carbs', 'fat', 'type'] },
+  water: { title: 'Water', kicker: 'Hydration', collection: 'water', accent: 'blue', fields: [['title', 'Entry', 'text'], ['amount', 'Glasses', 'number'], ['time', 'Time', 'time']], labels: ['amount', 'time'] },
+  sleep: { title: 'Sleep', kicker: 'Recovery', collection: 'sleep', accent: 'purple', fields: [['title', 'Sleep note', 'text'], ['hours', 'Hours', 'number'], ['quality', 'Quality', 'select', ['Low', 'Good', 'Great']]], labels: ['hours', 'quality'] },
+  study: { title: 'Study', kicker: 'Focus sessions', collection: 'study', accent: 'blue', fields: [['title', 'Subject', 'text'], ['topic', 'Topic', 'text'], ['minutes', 'Minutes', 'number']], labels: ['topic', 'minutes'] },
+  statistics: { title: 'Statistics', kicker: 'Calculated insights', accent: 'green' },
+  settings: { title: 'Settings', kicker: 'Preferences', accent: 'orange' },
+  profile: { title: 'Profile', kicker: 'Account details', accent: 'purple' },
 };
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const data = await loadAppData();
-  setupShell(data);
-  renderCurrentPage(data);
-  initializeCommonActions(data);
+let currentUser = null;
+let currentData = null;
+let currentPage = document.body.dataset.page;
+
+// ده الجزء اللي بيشغل التطبيق حسب نوع الصفحة الحالية
+document.addEventListener('DOMContentLoaded', () => {
+  if (currentPage === 'auth') initAuth();
+  else initPage(currentPage);
 });
 
-async function loadAppData() {
-  const dataPath = getDataPath();
-
-  try {
-    const response = await fetch(dataPath, { cache: 'no-store' });
-    if (!response.ok) throw new Error('Data file not found');
-    return { ...DEFAULT_DATA, ...(await response.json()) };
-  } catch {
-    return DEFAULT_DATA;
+// ده الجزء اللي بيهتم بصفحة تسجيل الدخول وإنشاء الحساب
+function initAuth() {
+  applyTheme(localStorage.getItem('mylife.theme') || 'light');
+  if (getSessionUser()) {
+    window.location.href = 'pages/dashboard.html';
+    return;
   }
+  byId('show-register').addEventListener('click', () => showAuthPanel('register'));
+  byId('show-login').addEventListener('click', () => showAuthPanel('login'));
+  byId('login-form').addEventListener('submit', login);
+  byId('register-form').addEventListener('submit', register);
 }
 
-function getDataPath() {
-  return isInsidePages() ? '../data/app-data.json' : 'data/app-data.json';
+// ده الجزء اللي بيحمّل الصفحة الحالية ويجهّز البيانات والواجهة
+function initPage(pageKey) {
+  currentUser = getSessionUser();
+  if (!currentUser) {
+    window.location.href = '../index.html';
+    return;
+  }
+  currentPage = pageKey;
+  currentData = normalizeData(getData(currentUser.email, currentUser.name), currentUser.name);
+  persist();
+  applyTheme(currentData.settings.theme);
+  renderSidebar(pageKey);
+  renderTopbar(pageKey);
+  renderArt(pageKey);
+  renderStats();
+  renderForm(pageKey);
+  renderList(pageKey);
 }
 
-function isInsidePages() {
-  return window.location.pathname.replace(/\\/g, '/').includes('/pages/');
+function showAuthPanel(mode) {
+  byId('login-panel').classList.toggle('hidden', mode !== 'login');
+  byId('register-panel').classList.toggle('hidden', mode !== 'register');
+  document.querySelectorAll('.form-message').forEach((node) => {
+    node.textContent = '';
+  });
 }
 
-function getPageName() {
-  const file = window.location.pathname.split('/').pop() || 'index.html';
-  if (file === 'index.html' || file === '') return 'dashboard';
-  return file.replace('.html', '');
+function login(event) {
+  event.preventDefault();
+  const email = byId('login-email').value.trim().toLowerCase();
+  const password = byId('login-password').value;
+  const user = getUsers().find((item) => item.email === email && item.password === password);
+  if (!user) {
+    byId('login-message').textContent = 'Invalid email or password.';
+    return;
+  }
+  localStorage.setItem(SESSION_KEY, email);
+  window.location.href = 'pages/dashboard.html';
 }
 
-function pageUrl(pageName) {
-  const inPages = isInsidePages();
-  const paths = {
-    dashboard: inPages ? '../index.html' : 'index.html',
-    todo: inPages ? 'todo.html' : 'pages/todo.html',
-    habits: inPages ? 'habits.html' : 'pages/habits.html',
-    goals: inPages ? 'goals.html' : 'pages/goals.html',
-    calendar: inPages ? 'calendar.html' : 'pages/calendar.html',
-    gym: inPages ? 'gym.html' : 'pages/gym.html',
-    prayer: inPages ? 'prayer.html' : 'pages/prayer.html',
-    nutrition: inPages ? 'nutrition.html' : 'pages/nutrition.html',
-    water: inPages ? 'water.html' : 'pages/water.html',
-    sleep: inPages ? 'sleep.html' : 'pages/sleep.html',
-    study: inPages ? 'study.html' : 'pages/study.html',
-    statistics: inPages ? 'statistics.html' : 'pages/statistics.html',
-    settings: inPages ? 'settings.html' : 'pages/settings.html',
-    profile: inPages ? 'profile.html' : 'pages/profile.html',
-    login: inPages ? '../login.html' : 'login.html',
-    register: inPages ? '../register.html' : 'register.html',
-  };
-
-  return paths[pageName] || paths.dashboard;
+function register(event) {
+  event.preventDefault();
+  const name = byId('register-name').value.trim();
+  const email = byId('register-email').value.trim().toLowerCase();
+  const password = byId('register-password').value;
+  const confirm = byId('register-confirm').value;
+  const users = getUsers();
+  if (password !== confirm) {
+    byId('register-message').textContent = 'Passwords do not match.';
+    return;
+  }
+  if (users.some((item) => item.email === email)) {
+    byId('register-message').textContent = 'This email already has an account.';
+    return;
+  }
+  const user = { id: makeId(), name, email, password, createdAt: new Date().toISOString() };
+  users.push(user);
+  saveUsers(users);
+  saveData(email, emptyData(name));
+  localStorage.setItem(SESSION_KEY, email);
+  window.location.href = 'pages/dashboard.html';
 }
 
-function setupShell(data) {
-  document.body.classList.toggle('dark-mode', localStorage.getItem('mylife_darkMode') === 'true');
-  renderSidebar(data);
-  updateUserShell(data.user);
-}
-
-function renderSidebar(data) {
-  const sidebar = document.querySelector('.sidebar');
-  if (!sidebar) return;
-
-  const active = getPageName();
-  const nav = [
-    ['dashboard', 'fa-house', 'Dashboard'],
-    ['todo', 'fa-square-check', 'Todo'],
-    ['habits', 'fa-bullseye', 'Habits'],
-    ['goals', 'fa-bullseye', 'Goals'],
-    ['calendar', 'fa-calendar-days', 'Calendar'],
-    ['gym', 'fa-dumbbell', 'Gym'],
-    ['prayer', 'fa-hands-praying', 'Prayer'],
-    ['nutrition', 'fa-apple-whole', 'Nutrition'],
-    ['water', 'fa-droplet', 'Water'],
-    ['sleep', 'fa-moon', 'Sleep'],
-    ['study', 'fa-cube', 'Study'],
-    ['statistics', 'fa-chart-column', 'Statistics'],
-    ['settings', 'fa-gear', 'Settings'],
-  ];
-
-  sidebar.innerHTML = `
-    <a class="brand" href="${pageUrl('dashboard')}" aria-label="MYLIFE dashboard">
+// ده الجزء اللي بيظبط الشريط الجانبي والروابط بين الصفحات
+function renderSidebar(pageKey) {
+  byId('sidebar').innerHTML = `
+    <a class="brand" href="dashboard.html">
       <span class="brand-mark">M</span>
       <span><strong>MYLIFE</strong><small>Life Tracker</small></span>
     </a>
-    <nav class="sidebar-nav" aria-label="Main navigation">
-      ${nav
-        .map(
-          ([page, icon, label]) => `
-            <a href="${pageUrl(page)}" class="nav-item ${active === page ? 'active' : ''}">
-              <i class="fas ${icon}" aria-hidden="true"></i>
-              <span>${label}</span>
-            </a>`,
-        )
-        .join('')}
+    <nav class="nav-list">
+      ${nav.map(([key, title, label]) => `
+        <a class="nav-item ${key === pageKey ? 'active' : ''}" href="${key}.html">
+          <span>${label}</span>
+          <strong>${title}</strong>
+        </a>
+      `).join('')}
     </nav>
-    <div class="sidebar-focus">
-      <p>${active === 'dashboard' ? 'Daily Streak' : 'Keep it up!'}</p>
-      <strong>${active === 'dashboard' ? '16 days' : '78%'}</strong>
-      <span>${active === 'dashboard' ? 'Keep going!' : 'Overall Score'}</span>
+    <div class="sidebar-card">
+      <span>Signed in</span>
+      <strong>${escapeHtml(currentUser.name)}</strong>
     </div>
-    <button class="sidebar-user" data-action="profile">
-      ${avatar(data.user)}
-      <span><strong>${data.user.name}</strong><small>${data.user.role}</small></span>
-      <i class="fas fa-chevron-down" aria-hidden="true"></i>
-    </button>
-    <label class="theme-pill">
-      <i class="fas fa-moon" aria-hidden="true"></i>
-      <span>Dark Mode</span>
-      <input type="checkbox" id="darkModeToggle" ${document.body.classList.contains('dark-mode') ? 'checked' : ''} aria-label="Toggle dark mode" />
-    </label>
-    <a class="auth-link" href="${pageUrl('login')}">Login</a>
   `;
 }
 
-function updateUserShell(user) {
-  document.querySelectorAll('.profile-name').forEach((node) => {
-    node.textContent = user.name;
-  });
+function renderTopbar(pageKey) {
+  const page = pages[pageKey];
+  byId('topbar').innerHTML = `
+    <div>
+      <p class="eyebrow">${page.kicker}</p>
+      <h1>${page.title}</h1>
+    </div>
+    <div class="topbar-actions">
+      <button class="secondary-btn" id="theme-btn" type="button">${currentData.settings.theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
+      <button class="secondary-btn" id="export-btn" type="button">Export</button>
+      <button class="danger-btn" id="logout-btn" type="button">Logout</button>
+      <div class="avatar">${initials(currentUser.name)}</div>
+    </div>
+  `;
+  byId('logout-btn').addEventListener('click', logout);
+  byId('export-btn').addEventListener('click', exportData);
+  byId('theme-btn').addEventListener('click', toggleTheme);
 }
 
-function renderCurrentPage(data) {
-  const page = getPageName();
-  const main = document.querySelector('.main-content');
-  if (!main) return;
+function renderArt(pageKey) {
+  const page = pages[pageKey];
+  const counts = getCounts();
+  byId('page-art').className = `page-art accent-${page.accent}`;
+  byId('page-art').innerHTML = `
+    <div class="art-copy">
+      <p class="eyebrow">${page.kicker}</p>
+      <h2>${pageKey === 'dashboard' ? `Welcome back, ${escapeHtml(firstName(currentUser.name))}.` : page.title}</h2>
+      <p>${artDescription(pageKey)}</p>
+    </div>
+    <div class="art-board art-${pageKey}">
+      ${artMarkup(pageKey, counts)}
+    </div>
+  `;
+}
 
-  const renderers = {
-    dashboard: renderDashboard,
-    todo: renderTodo,
-    habits: renderHabits,
-    goals: renderGoals,
-    calendar: renderCalendar,
-    gym: renderGym,
-    prayer: renderPrayer,
-    nutrition: renderNutrition,
-    water: renderWater,
-    sleep: renderSleep,
-    study: renderStudy,
-    statistics: renderStatistics,
-    settings: renderSettings,
-    profile: renderProfile,
+function artDescription(pageKey) {
+  const text = {
+    dashboard: 'Your dashboard is built from your own saved records, completion checks, workouts, nutrition, and goals.',
+    todo: 'Check completed tasks and watch the statistics update instantly.',
+    habits: 'Check completed habits and keep routines visible.',
+    goals: 'Create daily, weekly, monthly, and yearly goals with categories.',
+    calendar: 'A calendar-style planning surface made from code.',
+    gym: 'Track workout days, exercises, weights, repetitions, sets, notes, and progress.',
+    prayer: 'Prayer routine cards with clear planned and completed states.',
+    nutrition: 'Track calories, protein, carbs, and fat against your personal targets.',
+    water: 'Hydration bars generated from your water entries.',
+    sleep: 'Sleep quality cards and recovery meters.',
+    study: 'Study session panels with subject and topic tracking.',
+    statistics: 'Charts and totals are calculated from your account data.',
+    settings: 'Switch light or dark mode and set nutrition and health targets.',
+    profile: 'Account profile details for the active user.',
   };
-
-  main.innerHTML = renderers[page] ? renderers[page](data) : renderDashboard(data);
+  return text[pageKey];
 }
 
-function pageHeader(icon, title, subtitle, action = '') {
+function artMarkup(pageKey, counts) {
+  if (pageKey === 'calendar') {
+    return `<div class="calendar-grid">${Array.from({ length: 35 }, (_, index) => `<span class="${index % 7 === 0 ? 'hot' : ''}">${index + 1}</span>`).join('')}</div>`;
+  }
+  if (pageKey === 'water') {
+    return `<div class="water-bars">${Array.from({ length: 8 }, (_, index) => `<span class="${index < Math.min(counts.water, 8) ? 'filled' : ''}"></span>`).join('')}</div><strong>${counts.water}/${currentData.settings.waterGoal} glasses</strong>`;
+  }
+  if (pageKey === 'sleep') {
+    return `<div class="sleep-ring"><span>${counts.sleep}</span></div><p>sleep records</p>`;
+  }
+  if (pageKey === 'nutrition') {
+    const n = nutritionTotals();
+    return macroBoard([
+      ['Calories', n.calories, currentData.settings.calorieTarget],
+      ['Protein', n.protein, currentData.settings.proteinTarget],
+      ['Carbs', n.carbs, currentData.settings.carbTarget],
+      ['Fat', n.fat, currentData.settings.fatTarget],
+    ]);
+  }
+  if (pageKey === 'gym') {
+    return `<div class="chart-bars">${gymStats().byExercise.map((item) => `<span style="height:${Math.max(18, Math.min(100, item.volume / Math.max(gymStats().maxVolume, 1) * 100))}%"></span>`).join('') || '<span style="height:18%"></span><span style="height:18%"></span><span style="height:18%"></span>'}</div>`;
+  }
+  if (pageKey === 'statistics') {
+    return `<div class="chart-bars">${Object.values(counts).slice(0, 8).map((value) => `<span style="height:${Math.max(14, Math.min(96, value * 12))}%"></span>`).join('')}</div>`;
+  }
   return `
-    <header class="app-header">
-      <div class="page-title">
-        <button class="menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
-          <i class="fas fa-bars" aria-hidden="true"></i>
-        </button>
-        <span class="page-icon"><i class="fas ${icon}" aria-hidden="true"></i></span>
-        <span><h1>${title}</h1><p>${subtitle}</p></span>
-      </div>
-      <div class="header-actions">
-        <button class="date-chip"><i class="fas fa-calendar-days" aria-hidden="true"></i>${formatDate()}</button>
-        <button class="icon-button" aria-label="Notifications"><i class="fas fa-bell" aria-hidden="true"></i><span class="badge">3</span></button>
-        ${action}
-      </div>
-    </header>`;
+    <div class="mini-top"></div>
+    <div class="mini-cards"><span></span><span></span><span></span></div>
+    <div class="mini-list"><span></span><span></span><span></span><span></span></div>
+  `;
 }
 
-function renderDashboard(data) {
-  return `
-    ${pageHeader('fa-house', 'Dashboard', `Welcome back, ${data.user.name.split(' ')[0]}!`, '<button class="primary-action" data-action="add">+ Add New</button>')}
-    <section class="dashboard-grid">
-      <article class="card hero-card">
-        <div>
-          <h2>${data.dashboard.greeting}</h2>
-          <p>${data.dashboard.subtitle}</p>
-          <p>${data.dashboard.motivation}</p>
-        </div>
-        <div class="sunset-art" aria-hidden="true"></div>
-      </article>
-      <article class="card priorities-panel">
-        <div class="card-title"><h3>Today's Priorities</h3><a href="${pageUrl('todo')}">View All</a></div>
-        ${data.dashboard.priorities.map((item) => priorityRow(item)).join('')}
-      </article>
-      <article class="card task-ring-panel">
-        <div class="card-title"><h3>Today's Tasks</h3><a href="${pageUrl('todo')}">View All</a></div>
-        ${ring(60, '6', 'of 10')}
-        <div class="legend-list">
-          <span><b class="dot green"></b>Completed <strong>6</strong></span>
-          <span><b class="dot blue"></b>In Progress <strong>2</strong></span>
-          <span><b class="dot orange"></b>Pending <strong>2</strong></span>
-        </div>
-      </article>
-    </section>
-    <section class="metric-grid">${data.dashboard.summary.map(metricCard).join('')}</section>
-    <section class="content-grid three">
-      <article class="card">${sectionTitle("Today's Schedule", `<a href="${pageUrl('calendar')}">View Calendar</a>`)}${data.schedule.map(scheduleRow).join('')}<button class="link-action" data-action="add-reminder">+ Add Reminder</button></article>
-      <article class="card">${sectionTitle('Habits Overview', '<button class="select-chip">This Week</button>')}${data.habits.map(habitCompact).join('')}<a class="link-action" href="${pageUrl('habits')}">View Habits</a></article>
-      <article class="card">${sectionTitle('Weekly Progress', '<button class="select-chip">This Week</button>')}${lineChart(data.dashboard.weeklyProgress)}${chartLegend(data.dashboard.weeklyProgress.series)}</article>
-    </section>
-    <section class="content-grid three">
-      <article class="card">${nutritionSummary(data)}</article>
-      <article class="card">${waterSummary(data)}</article>
-      <article class="card">${sleepSummary(data)}</article>
-    </section>`;
+function macroBoard(rows) {
+  return `<div class="macro-board">${rows.map(([label, value, target]) => `
+    <div>
+      <strong>${escapeHtml(label)}</strong>
+      <span>${value}/${target}</span>
+      <i><b style="width:${percent(value, target)}%"></b></i>
+    </div>
+  `).join('')}</div>`;
 }
 
-function renderTodo(data) {
-  const total = data.tasks.length;
-  const completed = data.tasks.filter((task) => task.status === 'completed').length;
-  const pending = data.tasks.filter((task) => task.status === 'pending').length;
-  const progress = data.tasks.filter((task) => task.status === 'in-progress').length;
-
-  return `
-    ${pageHeader('fa-clipboard-check', 'To Do', 'Organize your tasks and get things done.', '<button class="primary-action" data-action="add-task">+ Add Task</button>')}
-    <section class="metric-grid">
-      ${metricCard({ label: 'All Tasks', value: total, meta: 'Total tasks', percent: 100, icon: 'fa-list-check', tone: 'purple' })}
-      ${metricCard({ label: 'Completed', value: completed, meta: `${Math.round((completed / total) * 100)}% completed`, percent: (completed / total) * 100, icon: 'fa-check', tone: 'green' })}
-      ${metricCard({ label: 'In Progress', value: progress, meta: `${Math.round((progress / total) * 100)}% in progress`, percent: (progress / total) * 100, icon: 'fa-clock', tone: 'blue' })}
-      ${metricCard({ label: 'Pending', value: pending, meta: `${Math.round((pending / total) * 100)}% pending`, percent: (pending / total) * 100, icon: 'fa-hourglass-half', tone: 'orange' })}
-    </section>
-    <section class="content-grid two-one">
-      <article class="card">${sectionTitle('My Day', '<button class="select-chip">Today</button>')}${data.tasks.map(timelineTask).join('')}<button class="link-action" data-action="add-task">+ Add Task</button></article>
-      <article class="card">${sectionTitle('All Tasks', '')}<div class="data-table">${data.tasks.map(taskRow).join('')}</div></article>
-      <article class="card">${sectionTitle('Task by Priority', '')}${donut('24', 'Total')}<div class="legend-list">${['High (5)', 'Medium (8)', 'Low (7)', 'No Priority (4)'].map((label, index) => `<span><b class="dot ${['red', 'orange', 'blue', 'gray'][index]}"></b>${label}</span>`).join('')}</div></article>
-    </section>
-    <section class="content-grid three">
-      <article class="card">${sectionTitle('Upcoming Tasks', '<button class="select-chip">Next 7 days</button>')}${data.tasks.slice(0, 4).map(upcomingRow).join('')}</article>
-      <article class="card wide">${sectionTitle('Productivity Trend', '<button class="select-chip">This Week</button>')}${lineChart(data.dashboard.weeklyProgress, 'Tasks')}</article>
-      <article class="card">${sectionTitle('Quick Add', '')}<div class="quick-grid"><button>Add Task</button><button>Add Recurring Task</button><button>Add Note</button><button>Add Checklist</button></div></article>
-    </section>`;
-}
-
-function renderHabits(data) {
-  return `
-    ${pageHeader('fa-bullseye', 'Habits', 'Build good habits and become your best self.', '<button class="primary-action" data-action="add-habit">+ Add Habit</button>')}
-    <section class="metric-grid">
-      ${metricCard({ label: 'Habits Completed', value: '6 / 8', meta: '75% completed', percent: 75, icon: 'fa-check', tone: 'green' })}
-      ${metricCard({ label: 'Current Streak', value: '12 days', meta: 'Best: 18 days', percent: 85, icon: 'fa-calendar-check', tone: 'purple' })}
-      ${metricCard({ label: 'Total Perfect Days', value: '8', meta: 'This month', percent: 65, icon: 'fa-fire', tone: 'orange' })}
-      ${metricCard({ label: 'Monthly Progress', value: '76%', meta: '+12% from last month', percent: 76, icon: 'fa-dumbbell', tone: 'blue' })}
-    </section>
-    <section class="content-grid two-one">
-      <article class="card wide">${sectionTitle('Habit Progress', '<button class="select-chip">This Week</button>')}${lineChart(data.dashboard.weeklyProgress, 'Habits')}<div class="day-summary">${data.habits.slice(0, 5).map((habit) => `<span><small>${habit.shortName}</small><strong>${habit.progress}%</strong></span>`).join('')}</div></article>
-      <article class="card">${sectionTitle('Current Streaks', '<a href="#">View All</a>')}${data.habits.map(streakRow).join('')}</article>
-    </section>
-    <section class="content-grid two-one">
-      <article class="card wide">${sectionTitle('My Habits', '<button class="select-chip">All Habits</button>')}<div class="data-table habit-table">${data.habits.map(habitRow).join('')}</div><button class="link-action" data-action="add-habit">+ Add Habit</button></article>
-      <aside class="side-stack"><article class="card">${sectionTitle('Habit Insights', '<button class="select-chip">This Week</button>')}<div class="insight-grid"><span><strong>Morning workout</strong><small>Most Consistent</small></span><span><strong>Tahajjud prayer</strong><small>Need Focus</small></span></div></article><article class="card">${sectionTitle('Quick Actions', '')}<div class="quick-grid"><button>Add Habit</button><button>Habit Templates</button><button>Edit Reminders</button><button>Habit Settings</button></div></article></aside>
-    </section>`;
-}
-
-function renderGoals(data) {
-  return `
-    ${pageHeader('fa-bullseye', 'Goals', 'Track your long-term goals and milestones.', '<button class="primary-action" data-action="add-goal">+ Add Goal</button>')}
-    <section class="metric-grid">${data.goals.map((goal) => metricCard({ label: goal.name, value: `${goal.progress}%`, meta: 'Goal progress', percent: goal.progress, icon: goal.icon, tone: goal.tone })).join('')}</section>
-    <section class="content-grid two-one">
-      <article class="card wide">${sectionTitle('Goal Progress', '<button class="select-chip">This Month</button>')}${data.goals.map(goalRow).join('')}</article>
-      <article class="card">${sectionTitle('Goal Categories', '')}${donut(data.goals.length, 'Active')}</article>
-    </section>`;
-}
-
-function renderCalendar(data) {
-  return `
-    ${pageHeader('fa-calendar-days', 'Calendar', 'View your schedule and daily plans.')}
-    <section class="content-grid two-one">
-      <article class="card wide">${sectionTitle('May 2025', '<div class="button-pair"><button><</button><button>></button></div>')}<div class="calendar-board">${calendarDays()}</div></article>
-      <article class="card">${sectionTitle('May 17 Events', '')}${data.schedule.map(scheduleRow).join('')}</article>
-    </section>`;
-}
-
-function renderGym(data) {
-  return `
-    ${pageHeader('fa-dumbbell', 'Gym', 'Track workouts, calories, and strength.', '<button class="primary-action" data-action="log-workout">+ Log Workout</button>')}
-    <section class="metric-grid">
-      ${metricCard({ label: 'Workouts', value: data.workouts.length, meta: '+1 from last week', percent: 80, icon: 'fa-dumbbell', tone: 'green' })}
-      ${metricCard({ label: 'Calories Burned', value: '2,450', meta: '+350 from last week', percent: 74, icon: 'fa-fire', tone: 'orange' })}
-      ${metricCard({ label: 'Average Time', value: '45m', meta: 'per session', percent: 70, icon: 'fa-clock', tone: 'blue' })}
-    </section>
-    <section class="content-grid three">${data.workouts.map(workoutCard).join('')}</section>`;
-}
-
-function renderPrayer(data) {
-  return `
-    ${pageHeader('fa-hands-praying', 'Prayer', 'Never miss a prayer with smart reminders.')}
-    <section class="content-grid two-one">
-      <article class="card wide">${sectionTitle('Prayer Times', '')}${data.prayers.map(prayerRow).join('')}</article>
-      <article class="card">${sectionTitle('Today Progress', '')}${ring(60, '3', 'of 5')}</article>
-    </section>`;
-}
-
-function renderNutrition(data) {
-  return `
-    ${pageHeader('fa-apple-whole', 'Nutrition', 'Track calories, meals, and macros.', '<button class="primary-action" data-action="add-meal">+ Add Meal</button>')}
-    <section class="content-grid two-one">
-      <article class="card">${nutritionSummary(data)}</article>
-      <article class="card wide">${sectionTitle("Today's Meals", '')}<div class="card-grid">${data.nutrition.meals.map(mealCard).join('')}</div></article>
-    </section>`;
-}
-
-function renderWater(data) {
-  return `
-    ${pageHeader('fa-droplet', 'Water', 'Stay hydrated and maintain your daily goal.', '<button class="primary-action" data-action="add-water">+ Add Glass</button>')}
-    <section class="content-grid two-one">
-      <article class="card wide">${waterSummary(data)}<button class="link-action" data-action="add-water">+ Add Glass</button></article>
-      <article class="card">${sectionTitle('Weekly Summary', '')}${metricList([{ label: 'Today Consumed', value: data.water.current }, { label: 'This Week', value: data.water.weeklyTotal }, { label: 'Daily Goal', value: `${Math.round((data.water.current / data.water.goal) * 100)}%` }, { label: 'Total Volume', value: data.water.volume }])}</article>
-    </section>`;
-}
-
-function renderSleep(data) {
-  return `
-    ${pageHeader('fa-moon', 'Sleep', 'Monitor sleep duration and quality.')}
-    <section class="content-grid two-one">
-      <article class="card">${sleepSummary(data)}</article>
-      <article class="card wide">${sectionTitle('Sleep Logs', '')}${data.sleep.logs.map((log) => `<div class="list-row"><span><strong>${log.date}</strong><small>${log.duration} - ${log.quality}</small></span><strong>${log.interruptions} interruptions</strong></div>`).join('')}</article>
-    </section>`;
-}
-
-function renderStudy(data) {
-  return `
-    ${pageHeader('fa-cube', 'Study', 'Plan study sessions and stay focused.', '<button class="primary-action" data-action="log-session">+ Log Session</button>')}
-    <section class="content-grid three">${data.study.map(studyCard).join('')}</section>`;
-}
-
-function renderStatistics(data) {
-  return `
-    ${pageHeader('fa-chart-column', 'Statistics', 'Beautiful insights into your overall progress.')}
-    <section class="content-grid two-one">
-      <article class="card wide">${sectionTitle('My Journey', '<button class="select-chip">This Month</button>')}${lineChart(data.dashboard.weeklyProgress, 'Tasks')}${metricList(data.stats.journey)}</article>
-      <article class="card">${sectionTitle('Achievements', '<a href="#">View All</a>')}<div class="achievement-grid">${['Consistency Master', 'Goal Getter', 'Study Star', 'Hydration Hero', 'Sleep Tracker'].map((name) => `<span><i class="fas fa-award"></i><strong>${name}</strong></span>`).join('')}</div></article>
-    </section>
-    <section class="card">${sectionTitle('Activity Overview', '<button class="select-chip">This Week</button>')}${data.stats.activity.map(activityRow).join('')}</section>`;
-}
-
-function renderSettings(data) {
-  return `
-    ${pageHeader('fa-gear', 'Settings', 'Manage your profile, preferences and app settings.')}
-    <section class="settings-layout">
-      <aside class="card settings-menu">${['Profile & Account', 'Personal Information', 'Body & Goals', 'App Preferences', 'Reminders & Notifications', 'Privacy & Security', 'Data & Backup', 'Integrations', 'Subscription', 'Support & Help', 'About MyLife'].map((item, index) => `<button class="${index === 0 ? 'active' : ''}">${item}</button>`).join('')}</aside>
-      <main class="settings-main">
-        <article class="card profile-strip">${avatar(data.user, 'large')}<span><h2>${data.user.name}</h2><p>${data.user.email} - Email verified</p><p>${data.user.location}</p></span><button class="select-chip">Edit Profile</button></article>
-        <article class="card">${sectionTitle('Personal Information', '<button class="select-chip">Edit</button>')}${infoGrid(data)}</article>
-        <article class="card">${sectionTitle('App Preferences', '')}${preferenceRows()}</article>
-      </main>
-      <aside class="side-stack"><article class="card">${sectionTitle('Your Goals Overview', '')}${data.goals.map(goalRow).join('')}</article><article class="card">${sectionTitle('Data & Backup', '')}${['Backup Now', 'Export Data', 'Import Data'].map((item) => `<button class="settings-action">${item}<i class="fas fa-chevron-right"></i></button>`).join('')}</article></aside>
-    </section>`;
-}
-
-function renderProfile(data) {
-  return `
-    ${pageHeader('fa-user', 'Profile', 'Manage your profile and track your journey.')}
-    <section class="profile-layout">
-      <article class="card profile-hero">
-        ${avatar(data.user, 'xl')}
-        <div><h2>${data.user.name} <span class="tag">Premium</span></h2><p>${data.user.email} - Verified</p><p>${data.user.location}</p><p>Member since ${data.user.memberSince}</p></div>
-        <button class="select-chip">Edit Profile</button>
-        <div class="profile-stats">${metricList([{ label: 'Days Active', value: '128' }, { label: 'Current Streak', value: '24' }, { label: 'Overall Progress', value: '78%' }, { label: 'Points Earned', value: '1,250' }])}</div>
-      </article>
-      <article class="card">${sectionTitle('About Me', '<button class="select-chip">Edit</button>')}${infoGrid(data)}</article>
-      <article class="card wide">${sectionTitle('My Journey', '<button class="select-chip">This Month</button>')}${lineChart(data.dashboard.weeklyProgress, 'Tasks')}${metricList(data.stats.journey)}</article>
-      <article class="card">${sectionTitle('Achievements', '<a href="#">View All</a>')}<div class="achievement-grid">${['Consistency Master', 'Goal Getter', 'Study Star', 'Hydration Hero', 'Sleep Tracker'].map((name) => `<span><i class="fas fa-award"></i><strong>${name}</strong></span>`).join('')}</div></article>
-    </section>`;
-}
-
-function metricCard(item) {
-  return `
-    <article class="card metric-card">
-      <span class="metric-icon ${item.tone}"><i class="fas ${item.icon}" aria-hidden="true"></i></span>
-      <span><small>${item.label}</small><strong>${item.value}</strong><em>${item.meta}</em></span>
-      <div class="progress-track"><span class="${item.tone}" style="width:${Math.min(item.percent, 100)}%"></span></div>
-      <b>${Math.round(item.percent)}%</b>
-    </article>`;
-}
-
-function sectionTitle(title, action) {
-  return `<div class="card-title"><h3>${title}</h3>${action || ''}</div>`;
-}
-
-function priorityRow(item) {
-  return `<div class="list-row"><span><strong>${item.title}</strong><small>${item.category}</small></span><time>${item.time}</time></div>`;
-}
-
-function scheduleRow(item) {
-  return `<div class="timeline-row"><time>${item.time}</time><i class="fas ${item.icon}" aria-hidden="true"></i><span><strong>${item.title}</strong><small>${item.category}</small></span></div>`;
-}
-
-function habitCompact(habit) {
-  return `<div class="habit-compact"><span><strong>${habit.shortName}</strong>${dayDots(habit.days)}</span><b>${habit.progress}%</b></div>`;
-}
-
-function dayDots(days) {
-  return `<div class="day-dots">${days.map((done, index) => `<i class="${done ? 'done' : ''}">${['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}</i>`).join('')}</div>`;
-}
-
-function ring(percent, value, label) {
-  return `<div class="ring" style="--value:${percent}"><span><strong>${value}</strong><small>${label}</small></span></div>`;
-}
-
-function donut(value, label) {
-  return `<div class="donut"><span><strong>${value}</strong><small>${label}</small></span></div>`;
-}
-
-function lineChart(progress, preferredSeries) {
-  const series = preferredSeries ? progress.series.filter((item) => item.name === preferredSeries) : progress.series;
-  return `
-    <div class="css-chart">
-      <div class="chart-grid"></div>
-      ${series
-        .map(
-          (item) => `
-          <svg viewBox="0 0 700 180" preserveAspectRatio="none" style="--line:${item.color}">
-            <polyline points="${item.values.map((value, index) => `${index * (700 / (item.values.length - 1))},${180 - value * 1.6}`).join(' ')}" />
-          </svg>`,
-        )
-        .join('')}
-      <div class="chart-labels">${progress.labels.map((label) => `<span>${label}</span>`).join('')}</div>
-    </div>`;
-}
-
-function chartLegend(series) {
-  return `<div class="chart-legend">${series.map((item) => `<span><b style="background:${item.color}"></b>${item.name}</span>`).join('')}</div>`;
-}
-
-function nutritionSummary(data) {
-  return `
-    ${sectionTitle('Nutrition Summary', `<a href="${pageUrl('nutrition')}">View Details</a>`)}
-    <div class="nutrition-summary">
-      ${donut(data.nutrition.calories.toLocaleString(), 'kcal')}
-      <div>${data.nutrition.macros.map((macro) => `<div class="macro-row"><b style="background:${macro.color}"></b><span>${macro.name}</span><strong>${macro.value} (${macro.percent}%)</strong></div>`).join('')}</div>
-    </div>`;
-}
-
-function waterSummary(data) {
-  const filled = data.water.current;
-  return `
-    ${sectionTitle('Water Tracker', `<a href="${pageUrl('water')}">View Details</a>`)}
-    <div class="water-glasses">${Array.from({ length: data.water.goal }, (_, index) => `<span class="${index < filled ? 'filled' : ''}"></span>`).join('')}</div>
-    <h3 class="center-value">${filled} <small>of ${data.water.goal} glasses</small></h3>
-    <p class="soft-message">Great! Keep drinking water</p>`;
-}
-
-function sleepSummary(data) {
-  return `
-    ${sectionTitle('Sleep Summary', `<a href="${pageUrl('sleep')}">View Details</a>`)}
-    <div class="sleep-summary">${ring(data.sleep.score, data.sleep.score, 'Sleep Score')}<div class="legend-list"><span>Time Asleep <strong>${data.sleep.duration}</strong></span><span>Sleep Quality <strong>${data.sleep.quality}</strong></span><span>Fell Asleep <strong>${data.sleep.fellAsleep}</strong></span><span>Woke Up <strong>${data.sleep.wokeUp}</strong></span></div></div>`;
-}
-
-function taskRow(task) {
-  return `<div class="table-row"><input type="checkbox" ${task.status === 'completed' ? 'checked' : ''} aria-label="Complete ${task.title}"><strong>${task.title}</strong><span>${task.category}</span><em class="priority ${task.priority.toLowerCase()}">${task.priority}</em><time>${task.date}</time><button aria-label="More task options">...</button></div>`;
-}
-
-function timelineTask(task) {
-  return `<div class="timeline-row"><time>${task.time}</time><input type="checkbox" ${task.status === 'completed' ? 'checked' : ''} aria-label="Complete ${task.title}"><span><strong>${task.title}</strong><small>${task.category}</small></span><em class="priority ${task.priority.toLowerCase()}">${task.priority}</em></div>`;
-}
-
-function upcomingRow(task) {
-  return `<div class="list-row"><span><strong>${task.title}</strong><small>${task.category}</small></span><em class="priority ${task.priority.toLowerCase()}">${task.priority}</em></div>`;
-}
-
-function habitRow(habit) {
-  return `<div class="table-row"><i class="fas ${habit.icon}"></i><strong>${habit.name}</strong><span>${habit.frequency}</span><div class="mini-progress"><b style="width:${habit.progress}%"></b></div>${dayDots(habit.days)}<span>${habit.streak} days</span><span>${habit.best} days</span></div>`;
-}
-
-function streakRow(habit) {
-  return `<div class="list-row"><span><i class="fas ${habit.icon}"></i><strong>${habit.shortName}</strong><small>Best: ${habit.best} days</small></span><strong>${habit.streak} days</strong></div>`;
-}
-
-function goalRow(goal) {
-  return `<div class="goal-row"><span><i class="fas ${goal.icon}"></i>${goal.name}</span><div class="progress-track"><span class="${goal.tone}" style="width:${goal.progress}%"></span></div><strong>${goal.progress}%</strong></div>`;
-}
-
-function workoutCard(workout) {
-  return `<article class="card"><h3>${workout.name}</h3>${metricList([{ label: 'Minutes', value: workout.minutes }, { label: 'Calories', value: workout.calories }, { label: 'Difficulty', value: workout.difficulty }])}<div class="progress-track"><span class="purple" style="width:${workout.progress}%"></span></div><p>${workout.sets} sets</p></article>`;
-}
-
-function prayerRow(prayer) {
-  return `<div class="list-row"><span><i class="fas fa-hands-praying"></i><strong>${prayer.name}</strong></span><time>${prayer.time}</time><i class="fas ${prayer.done ? 'fa-check' : 'fa-circle'}"></i></div>`;
-}
-
-function mealCard(meal) {
-  return `<article class="sub-card"><h3>${meal.name}</h3><p>${meal.time}</p><strong>${meal.calories} kcal</strong><ul>${meal.items.map((item) => `<li>${item}</li>`).join('')}</ul></article>`;
-}
-
-function studyCard(item) {
-  return `<article class="card"><h3>${item.subject}</h3><p>${item.topic}</p><strong>${item.duration}</strong><div class="progress-track"><span class="blue" style="width:${item.progress}%"></span></div><small>${item.progress}% Complete</small></article>`;
-}
-
-function activityRow(item) {
-  return `<div class="activity-row"><span>${item.label}</span><strong>${item.value}</strong><div class="progress-track"><span class="purple" style="width:${item.percent}%"></span></div><b>${item.percent}%</b></div>`;
-}
-
-function metricList(items) {
-  return `<div class="metric-list">${items.map((item) => `<span><strong>${item.value}</strong><small>${item.label}</small></span>`).join('')}</div>`;
-}
-
-function infoGrid(data) {
-  const user = data.user;
-  const items = [
-    ['Full Name', user.name],
-    ['Email Address', user.email],
-    ['Date of Birth', user.birthDate],
-    ['Phone Number', user.phone],
-    ['Gender', user.gender],
-    ['Timezone', user.timezone],
-    ['Bio', user.bio],
+// ده الجزء اللي بيعرض الإحصائيات السريعة في الصفحة
+function renderStats() {
+  const counts = getCounts();
+  const stats = [
+    ['Tasks done', `${counts.completedTasks}/${counts.tasks}`, percent(counts.completedTasks, counts.tasks || 1)],
+    ['Habits done', `${counts.completedHabits}/${counts.habits}`, percent(counts.completedHabits, counts.habits || 1)],
+    ['Goal progress', `${counts.completedGoals}/${counts.goals}`, percent(counts.completedGoals, counts.goals || 1)],
+    ['Water', `${counts.water}/${currentData.settings.waterGoal}`, percent(counts.water, currentData.settings.waterGoal)],
   ];
-
-  return `<div class="info-grid">${items.map(([label, value]) => `<span><small>${label}</small><strong>${value}</strong></span>`).join('')}</div>`;
+  byId('stats-grid').innerHTML = stats.map(([label, value, width]) => `
+    <article class="stat-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(value))}</strong>
+      <div class="meter"><i style="width:${width}%"></i></div>
+    </article>
+  `).join('');
 }
 
-function preferenceRows() {
-  return ['Theme', 'Language', 'Start of the Week', 'Date Format', 'Time Format', 'Units']
-    .map((label) => `<label class="preference-row"><span><strong>${label}</strong><small>Choose your preferred ${label.toLowerCase()}</small></span><select aria-label="${label}"><option>Default</option><option>Light</option><option>Dark</option></select></label>`)
-    .join('');
+function renderForm(pageKey) {
+  const page = pages[pageKey];
+  byId('form-title').textContent = page.title;
+  byId('form-kicker').textContent = page.collection ? 'Add user data' : 'Manage';
+  if (page.collection) {
+    byId('entry-form').innerHTML = `
+      <div class="form-grid">${page.fields.map(fieldHtml).join('')}</div>
+      <button class="primary-btn" type="submit">Add ${page.title}</button>
+    `;
+    byId('entry-form').onsubmit = (event) => addEntry(event, pageKey);
+    return;
+  }
+  if (pageKey === 'settings') {
+    byId('entry-form').innerHTML = `
+      <div class="form-grid">
+        <label>Theme<select name="theme"><option value="light" ${selected(currentData.settings.theme, 'light')}>Light</option><option value="dark" ${selected(currentData.settings.theme, 'dark')}>Dark</option></select></label>
+        <label>Water goal<input name="waterGoal" type="number" min="1" value="${currentData.settings.waterGoal}" required /></label>
+        <label>Sleep goal<input name="sleepGoal" type="number" min="1" value="${currentData.settings.sleepGoal}" required /></label>
+        <label>Calories target<input name="calorieTarget" type="number" min="0" value="${currentData.settings.calorieTarget}" required /></label>
+        <label>Protein target<input name="proteinTarget" type="number" min="0" value="${currentData.settings.proteinTarget}" required /></label>
+        <label>Carbs target<input name="carbTarget" type="number" min="0" value="${currentData.settings.carbTarget}" required /></label>
+        <label>Fat target<input name="fatTarget" type="number" min="0" value="${currentData.settings.fatTarget}" required /></label>
+      </div>
+      <button class="primary-btn" type="submit">Save settings</button>
+    `;
+    byId('entry-form').onsubmit = saveSettings;
+    return;
+  }
+  if (pageKey === 'profile') {
+    byId('entry-form').innerHTML = `
+      <div class="form-grid">
+        <label>Name<input name="name" value="${escapeAttr(currentUser.name)}" required /></label>
+        <label>Email<input value="${escapeAttr(currentUser.email)}" disabled /></label>
+        <label>Phone<input name="phone" value="${escapeAttr(currentData.profile.phone)}" /></label>
+        <label>Location<input name="location" value="${escapeAttr(currentData.profile.location)}" /></label>
+      </div>
+      <label>Bio<textarea name="bio">${escapeHtml(currentData.profile.bio)}</textarea></label>
+      <button class="primary-btn" type="submit">Save profile</button>
+    `;
+    byId('entry-form').onsubmit = saveProfile;
+    return;
+  }
+  byId('entry-form').innerHTML = '<div class="empty-state">Use the separated pages in the sidebar to add your personal data.</div>';
+  byId('entry-form').onsubmit = null;
 }
 
-function calendarDays() {
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return `${labels.map((label) => `<b>${label}</b>`).join('')}${Array.from({ length: 35 }, (_, index) => {
-    const day = index < 3 ? 28 + index : index - 2;
-    const active = [8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 26, 27, 28, 29, 30].includes(day);
-    return `<button class="${day === 17 ? 'today' : ''} ${active ? 'done' : ''}">${day}</button>`;
-  }).join('')}`;
+// ده الجزء اللي بيعرض قائمة البيانات الخاصة بالصفحة
+function renderList(pageKey) {
+  byId('list-title').textContent = pages[pageKey].title;
+  if (pageKey === 'dashboard') return renderDashboard();
+  if (pageKey === 'statistics') return renderStatistics();
+  if (pageKey === 'nutrition') return renderNutrition();
+  if (pageKey === 'gym') return renderGym();
+  if (pageKey === 'goals') return renderGoals();
+  if (pageKey === 'todo' || pageKey === 'habits') return renderChecklist(pageKey);
+  if (pageKey === 'settings') {
+    byId('data-list').innerHTML = `
+      <article class="data-card stacked"><h3>Current targets</h3>
+        <p>Theme: ${escapeHtml(currentData.settings.theme)}</p>
+        <p>Water: ${currentData.settings.waterGoal} glasses</p>
+        <p>Sleep: ${currentData.settings.sleepGoal} hours</p>
+        <p>Nutrition: ${currentData.settings.calorieTarget} calories, ${currentData.settings.proteinTarget}g protein, ${currentData.settings.carbTarget}g carbs, ${currentData.settings.fatTarget}g fat</p>
+      </article>`;
+    return;
+  }
+  if (pageKey === 'profile') {
+    byId('data-list').innerHTML = `<article class="data-card stacked"><h3>${escapeHtml(currentUser.name)}</h3><p>${escapeHtml(currentUser.email)}</p><p>${escapeHtml(currentData.profile.phone || 'No phone')}</p><p>${escapeHtml(currentData.profile.location || 'No location')}</p><p>${escapeHtml(currentData.profile.bio || 'No bio')}</p></article>`;
+    return;
+  }
+  renderGenericList(pageKey);
 }
 
-function avatar(user, size = '') {
-  return `<span class="avatar ${size}">${user.avatarInitials || user.name.slice(0, 2)}</span>`;
+function renderGenericList(pageKey) {
+  const page = pages[pageKey];
+  const items = currentData[page.collection];
+  if (!items.length) {
+    byId('data-list').innerHTML = `<div class="empty-state">No ${page.title.toLowerCase()} records yet. Add your first one.</div>`;
+    return;
+  }
+  byId('data-list').innerHTML = items.map((item) => cardHtml(item, page)).join('');
+  bindDeleteButtons(pageKey);
 }
 
-function formatDate() {
-  return new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
+function renderChecklist(pageKey) {
+  const page = pages[pageKey];
+  const items = currentData[page.collection];
+  if (!items.length) {
+    byId('data-list').innerHTML = `<div class="empty-state">No ${page.title.toLowerCase()} records yet. Add your first one.</div>`;
+    return;
+  }
+  byId('data-list').innerHTML = items.map((item) => `
+    <article class="data-card checklist-card ${item.completed ? 'complete' : ''}">
+      <label class="check-row"><input type="checkbox" data-toggle="${escapeAttr(item.id)}" ${item.completed ? 'checked' : ''} /><span>${escapeHtml(item.title)}</span></label>
+      <p>${page.labels.map((key) => item[key] !== undefined ? `${labelize(key)}: ${escapeHtml(item[key])}` : '').filter(Boolean).join(' | ')}</p>
+      <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">Delete</button>
+    </article>
+  `).join('');
+  document.querySelectorAll('[data-toggle]').forEach((input) => input.addEventListener('change', () => toggleComplete(pageKey, input.dataset.toggle)));
+  bindDeleteButtons(pageKey);
 }
 
-function initializeCommonActions(data) {
-  document.addEventListener('click', (event) => {
-    const target = event.target.closest('[data-action]');
-    if (!target) return;
+function renderGoals() {
+  const groups = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
+  const items = currentData.goals;
+  byId('data-list').innerHTML = groups.map((period) => {
+    const periodItems = items.filter((item) => item.period === period);
+    return `
+      <section class="group-card">
+        <h3>${period} goals</h3>
+        ${periodItems.length ? periodItems.map((item) => goalCard(item)).join('') : '<p class="muted">No goals in this period.</p>'}
+      </section>
+    `;
+  }).join('');
+  document.querySelectorAll('[data-toggle]').forEach((input) => input.addEventListener('change', () => toggleComplete('goals', input.dataset.toggle)));
+  bindDeleteButtons('goals');
+}
 
-    const action = target.dataset.action;
-    if (action === 'profile') window.location.href = pageUrl('profile');
-    if (action === 'add-water') {
-      data.water.current = Math.min(data.water.goal, data.water.current + 1);
-      renderCurrentPage(data);
-      showToast('Water glass added.');
-    }
-    if (action.startsWith('add') || action.startsWith('log')) showToast('Saved to your local MYLIFE data.');
+function goalCard(item) {
+  return `
+    <article class="data-card checklist-card ${item.completed ? 'complete' : ''}">
+      <label class="check-row"><input type="checkbox" data-toggle="${escapeAttr(item.id)}" ${item.completed ? 'checked' : ''} /><span>${escapeHtml(item.title)}</span></label>
+      <p>Category: ${escapeHtml(item.category)} | Deadline: ${escapeHtml(item.deadline)}</p>
+      <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">Delete</button>
+    </article>
+  `;
+}
+
+function renderNutrition() {
+  const totals = nutritionTotals();
+  const items = currentData.meals;
+  byId('data-list').innerHTML = `
+    <div class="summary-grid">
+      ${nutritionSummaryCard('Calories', totals.calories, currentData.settings.calorieTarget)}
+      ${nutritionSummaryCard('Protein', totals.protein, currentData.settings.proteinTarget, 'g')}
+      ${nutritionSummaryCard('Carbs', totals.carbs, currentData.settings.carbTarget, 'g')}
+      ${nutritionSummaryCard('Fat', totals.fat, currentData.settings.fatTarget, 'g')}
+    </div>
+    ${items.length ? items.map((item) => cardHtml(item, pages.nutrition)).join('') : '<div class="empty-state">No meals yet. Add calories, protein, carbs, and fat.</div>'}
+  `;
+  bindDeleteButtons('nutrition');
+}
+
+function nutritionSummaryCard(label, value, target, suffix = '') {
+  return `<article class="data-card stacked"><h3>${label}</h3><strong>${value}${suffix} / ${target}${suffix}</strong><div class="meter"><i style="width:${percent(value, target)}%"></i></div></article>`;
+}
+
+function renderGym() {
+  const stats = gymStats();
+  const items = currentData.workouts;
+  byId('data-list').innerHTML = `
+    <div class="summary-grid">
+      <article class="data-card stacked"><h3>Workout days</h3><strong>${stats.days}</strong></article>
+      <article class="data-card stacked"><h3>Exercises</h3><strong>${stats.exercises}</strong></article>
+      <article class="data-card stacked"><h3>Total volume</h3><strong>${stats.volume}</strong></article>
+    </div>
+    ${items.length ? items.map((item) => `
+      <article class="data-card stacked">
+        <div class="data-card-head"><h3>${escapeHtml(item.title)}</h3><button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">Delete</button></div>
+        <p>Day: ${escapeHtml(item.day)} | Weight: ${item.weight} | Reps: ${item.reps} | Sets: ${item.sets}</p>
+        <p>${escapeHtml(item.note || 'No note')}</p>
+      </article>
+    `).join('') : '<div class="empty-state">No workouts yet. Add a workout day, exercise, weight, repetitions, sets, and note.</div>'}
+  `;
+  bindDeleteButtons('gym');
+}
+
+function renderDashboard() {
+  const counts = getCounts();
+  byId('data-list').innerHTML = `
+    <div class="summary-grid">
+      ${nutritionSummaryCard('Task completion', counts.completedTasks, counts.tasks || 1)}
+      ${nutritionSummaryCard('Habit completion', counts.completedHabits, counts.habits || 1)}
+      ${nutritionSummaryCard('Goal completion', counts.completedGoals, counts.goals || 1)}
+      ${nutritionSummaryCard('Gym volume', gymStats().volume, Math.max(gymStats().volume, 1))}
+    </div>
+    ${['tasks', 'habits', 'goals', 'workouts', 'meals', 'study'].map((key) => `
+      <article class="data-card stacked">
+        <h3>${labelize(key)}</h3>
+        <p>${(currentData[key] || []).length} user records</p>
+        <small>${latestText(key)}</small>
+      </article>
+    `).join('')}
+  `;
+}
+
+function renderStatistics() {
+  const counts = getCounts();
+  const n = nutritionTotals();
+  const g = gymStats();
+  byId('data-list').innerHTML = `
+    <div class="summary-grid">
+      ${nutritionSummaryCard('Tasks done', counts.completedTasks, counts.tasks || 1)}
+      ${nutritionSummaryCard('Habits done', counts.completedHabits, counts.habits || 1)}
+      ${nutritionSummaryCard('Goals done', counts.completedGoals, counts.goals || 1)}
+      ${nutritionSummaryCard('Calories', n.calories, currentData.settings.calorieTarget)}
+    </div>
+    <article class="data-card stacked">
+      <h3>Gym statistics</h3>
+      <p>Workout days: ${g.days}</p>
+      <p>Total exercises: ${g.exercises}</p>
+      <p>Total volume: ${g.volume}</p>
+    </article>
+    ${Object.entries(counts).map(([key, value]) => `<article class="data-card stat-line"><h3>${labelize(key)}</h3><strong>${value}</strong></article>`).join('')}
+  `;
+}
+
+function fieldHtml([name, label, type, options]) {
+  if (type === 'textarea') return `<label class="full-field">${label}<textarea name="${name}"></textarea></label>`;
+  if (type === 'select') return `<label>${label}<select name="${name}" required>${options.map((item) => `<option>${item}</option>`).join('')}</select></label>`;
+  return `<label>${label}<input name="${name}" type="${type}" required /></label>`;
+}
+
+// ده الجزء اللي بيضيف عنصر جديد إلى أي قائمة داخل التطبيق
+function addEntry(event, pageKey) {
+  event.preventDefault();
+  const page = pages[pageKey];
+  const form = new FormData(event.currentTarget);
+  const item = { id: makeId(), completed: false };
+  page.fields.forEach(([name, , type]) => {
+    const value = form.get(name);
+    item[name] = type === 'number' ? Number(value) : String(value || '');
   });
-
-  document.addEventListener('change', (event) => {
-    if (event.target.id === 'darkModeToggle') {
-      document.body.classList.toggle('dark-mode', event.target.checked);
-      localStorage.setItem('mylife_darkMode', String(event.target.checked));
-    }
-  });
-
-  document.querySelector('.menu-toggle')?.addEventListener('click', () => {
-    document.querySelector('.sidebar')?.classList.toggle('sidebar-open');
-  });
+  currentData[page.collection].push(item);
+  persist();
+  event.currentTarget.reset();
+  initPage(pageKey);
 }
 
-function showToast(message) {
-  const toast = document.createElement('div');
-  toast.className = 'app-toast show';
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  window.setTimeout(() => toast.remove(), 2200);
+function toggleComplete(pageKey, id) {
+  const collection = pages[pageKey].collection;
+  const item = currentData[collection].find((entry) => entry.id === id);
+  if (item) item.completed = !item.completed;
+  persist();
+  initPage(pageKey);
+}
+
+function bindDeleteButtons(pageKey) {
+  document.querySelectorAll('[data-delete]').forEach((button) => button.addEventListener('click', () => deleteEntry(pageKey, button.dataset.delete)));
+}
+
+function deleteEntry(pageKey, id) {
+  const collection = pages[pageKey].collection;
+  currentData[collection] = currentData[collection].filter((item) => item.id !== id);
+  persist();
+  initPage(pageKey);
+}
+
+// ده الجزء اللي بيحفظ الإعدادات مثل الثيم والهدف اليومي
+function saveSettings(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  currentData.settings.theme = String(form.get('theme'));
+  currentData.settings.waterGoal = Number(form.get('waterGoal'));
+  currentData.settings.sleepGoal = Number(form.get('sleepGoal'));
+  currentData.settings.calorieTarget = Number(form.get('calorieTarget'));
+  currentData.settings.proteinTarget = Number(form.get('proteinTarget'));
+  currentData.settings.carbTarget = Number(form.get('carbTarget'));
+  currentData.settings.fatTarget = Number(form.get('fatTarget'));
+  persist();
+  initPage('settings');
+}
+
+// ده الجزء اللي بيحفظ بيانات الملف الشخصي للمستخدم
+function saveProfile(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  currentUser.name = String(form.get('name')).trim();
+  currentData.profile.phone = String(form.get('phone')).trim();
+  currentData.profile.location = String(form.get('location')).trim();
+  currentData.profile.bio = String(form.get('bio')).trim();
+  saveUsers(getUsers().map((user) => (user.email === currentUser.email ? currentUser : user)));
+  persist();
+  initPage('profile');
+}
+
+function cardHtml(item, page) {
+  return `
+    <article class="data-card">
+      <div>
+        <h3>${escapeHtml(item.title)}</h3>
+        <p>${page.labels.map((key) => item[key] !== undefined ? `${labelize(key)}: ${escapeHtml(item[key])}` : '').filter(Boolean).join(' | ')}</p>
+      </div>
+      <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">Delete</button>
+    </article>
+  `;
+}
+
+function toggleTheme() {
+  currentData.settings.theme = currentData.settings.theme === 'dark' ? 'light' : 'dark';
+  persist();
+  initPage(currentPage);
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+  localStorage.setItem('mylife.theme', theme === 'dark' ? 'dark' : 'light');
+}
+
+function logout() {
+  localStorage.removeItem(SESSION_KEY);
+  window.location.href = '../index.html';
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify({ user: currentUser, data: currentData }, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `mylife-${currentUser.email}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// ده الجزء اللي بيحسب عدد العناصر والإكمال في كل قسم
+function getCounts() {
+  return {
+    tasks: currentData.tasks.length,
+    completedTasks: currentData.tasks.filter((item) => item.completed).length,
+    habits: currentData.habits.length,
+    completedHabits: currentData.habits.filter((item) => item.completed).length,
+    goals: currentData.goals.length,
+    completedGoals: currentData.goals.filter((item) => item.completed).length,
+    events: currentData.events.length,
+    workouts: currentData.workouts.length,
+    prayers: currentData.prayers.length,
+    meals: currentData.meals.length,
+    water: currentData.water.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    sleep: currentData.sleep.length,
+    study: currentData.study.length,
+  };
+}
+
+function nutritionTotals() {
+  return currentData.meals.reduce((totals, item) => {
+    totals.calories += Number(item.calories || 0);
+    totals.protein += Number(item.protein || 0);
+    totals.carbs += Number(item.carbs || 0);
+    totals.fat += Number(item.fat || 0);
+    return totals;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+}
+
+function gymStats() {
+  const byExerciseMap = new Map();
+  const days = new Set();
+  let volume = 0;
+  currentData.workouts.forEach((item) => {
+    if (item.day) days.add(item.day);
+    const itemVolume = Number(item.weight || 0) * Number(item.reps || 0) * Number(item.sets || 1);
+    volume += itemVolume;
+    byExerciseMap.set(item.title, (byExerciseMap.get(item.title) || 0) + itemVolume);
+  });
+  const byExercise = [...byExerciseMap.entries()].map(([title, exerciseVolume]) => ({ title, volume: exerciseVolume }));
+  return { days: days.size, exercises: currentData.workouts.length, volume, byExercise, maxVolume: Math.max(0, ...byExercise.map((item) => item.volume)) };
+}
+
+// ده الجزء اللي بيجهّز البيانات الافتراضية عند أول استخدام
+function emptyData(name) {
+  return {
+    profile: { phone: '', location: '', bio: `${name} has not added a bio yet.` },
+    settings: { theme: 'light', waterGoal: 8, sleepGoal: 8, calorieTarget: 2200, proteinTarget: 150, carbTarget: 250, fatTarget: 70 },
+    tasks: [],
+    habits: [],
+    goals: [],
+    events: [],
+    workouts: [],
+    prayers: [],
+    meals: [],
+    water: [],
+    sleep: [],
+    study: [],
+  };
+}
+
+function normalizeData(data, name) {
+  const base = emptyData(name);
+  const merged = { ...base, ...data, profile: { ...base.profile, ...(data.profile || {}) }, settings: { ...base.settings, ...(data.settings || {}) } };
+  Object.keys(base).forEach((key) => {
+    if (Array.isArray(base[key]) && !Array.isArray(merged[key])) merged[key] = [];
+  });
+  merged.tasks = merged.tasks.map((item) => ({ completed: false, ...item }));
+  merged.habits = merged.habits.map((item) => ({ completed: false, ...item }));
+  merged.goals = merged.goals.map((item) => ({ period: 'Daily', category: 'General', completed: false, ...item }));
+  merged.meals = merged.meals.map((item) => ({ protein: 0, carbs: 0, fat: 0, ...item }));
+  merged.workouts = merged.workouts.map((item) => ({ day: '', title: item.title || 'Exercise', weight: item.weight || 0, reps: item.reps || 0, sets: item.sets || 1, note: item.note || '', ...item }));
+  return merged;
+}
+
+function getSessionUser() {
+  const email = localStorage.getItem(SESSION_KEY);
+  if (!email) return null;
+  return getUsers().find((user) => user.email === email) || null;
+}
+
+function getUsers() {
+  return JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function getData(email, name) {
+  const saved = localStorage.getItem(DATA_PREFIX + email);
+  if (saved) return JSON.parse(saved);
+  const data = emptyData(name);
+  saveData(email, data);
+  return data;
+}
+
+function saveData(email, data) {
+  localStorage.setItem(DATA_PREFIX + email, JSON.stringify(data));
+}
+
+function persist() {
+  saveData(currentUser.email, currentData);
+}
+
+function latestText(key) {
+  const items = currentData[key] || [];
+  return items.length ? `Latest: ${items[items.length - 1].title}` : 'No user data yet';
+}
+
+function selected(actual, expected) {
+  return actual === expected ? 'selected' : '';
+}
+
+function makeId() {
+  return window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
+function initials(name) {
+  return name.split(' ').filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function firstName(name) {
+  return name.split(' ')[0] || name;
+}
+
+function percent(value, max) {
+  return Math.max(0, Math.min(100, Math.round((Number(value) / Number(max || 1)) * 100)));
+}
+
+function labelize(key) {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function byId(id) {
+  return document.getElementById(id);
+}
+
+function escapeHtml(value) {
+  return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
 }

@@ -1,0 +1,927 @@
+/* ده الملف اللي بيحتوي على ستايل المشروع كله في MYLIFE */
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #eef3f8;
+  --ink: #172033;
+  --muted: #6c7890;
+  --line: #dce5ef;
+  --nav: #111827;
+  --blue: #2f6df6;
+  --green: #16a06a;
+  --purple: #7254d8;
+  --orange: #d9822b;
+  --red: #d94f4f;
+  --shadow: 0 18px 42px rgba(20, 28, 42, 0.1);
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1521;
+  --surface: #161f2e;
+  --surface-2: #202b3b;
+  --ink: #edf3fb;
+  --muted: #a9b6c8;
+  --line: #2c3a4e;
+  --nav: #0b1019;
+  --shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ده الجزء اللي بيحدد الشكل العام للصفحة واللون الأساسي */
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+}
+
+body,
+.auth-visual,
+.auth-card,
+.topbar,
+.page-art,
+.panel,
+.stat-card,
+.data-card,
+input,
+select,
+textarea {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+  color: var(--ink);
+  padding: 12px 13px;
+  outline: 0;
+}
+
+:root[data-theme='dark'] input,
+:root[data-theme='dark'] select,
+:root[data-theme='dark'] textarea {
+  background: #111a27;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(47, 109, 246, 0.13);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--blue);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+/* ده الجزء اللي بيحدد شكل صفحة التسجيل والدخول */
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 22px;
+  padding: 22px;
+}
+
+.auth-visual,
+.auth-card,
+.topbar,
+.page-art,
+.panel,
+.stat-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth-visual {
+  position: relative;
+  min-height: 640px;
+  overflow: hidden;
+  background: #0f1724;
+  padding: 28px;
+}
+
+.auth-copy {
+  position: absolute;
+  left: 36px;
+  right: 36px;
+  bottom: 34px;
+  color: #fff;
+}
+
+.auth-copy .eyebrow {
+  color: #a9c5ff;
+}
+
+.auth-copy h1 {
+  margin: 8px 0;
+  font-size: clamp(3rem, 8vw, 7rem);
+  line-height: 0.92;
+}
+
+.auth-copy p:last-child {
+  max-width: 640px;
+  color: #dbe7f7;
+  line-height: 1.6;
+}
+
+.auth-card {
+  align-self: center;
+  padding: 36px;
+}
+
+.auth-card h2,
+.panel h2,
+.topbar h1,
+.page-art h2 {
+  margin: 6px 0 0;
+}
+
+.form-stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.primary-btn,
+.secondary-btn,
+.danger-btn,
+.text-btn,
+.small-danger {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 900;
+}
+
+.primary-btn {
+  background: var(--blue);
+  color: #fff;
+}
+
+.secondary-btn {
+  background: var(--surface-2);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.danger-btn,
+.small-danger {
+  background: #ffe9e9;
+  color: var(--red);
+}
+
+:root[data-theme='dark'] .danger-btn,
+:root[data-theme='dark'] .small-danger {
+  background: rgba(217, 79, 79, 0.16);
+}
+
+.text-btn {
+  width: 100%;
+  margin-top: 14px;
+  background: transparent;
+  color: var(--blue);
+}
+
+.form-message {
+  min-height: 20px;
+  margin: 0;
+  color: var(--red);
+  font-weight: 800;
+}
+
+.mock-browser {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 14px;
+  min-height: 420px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mock-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.mock-logo,
+.mock-sidebar span,
+.mock-top,
+.mock-hero,
+.mock-stats span,
+.mock-grid span {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.mock-logo {
+  width: 48px;
+  height: 48px;
+}
+
+.mock-sidebar span {
+  height: 18px;
+}
+
+.mock-main {
+  display: grid;
+  gap: 14px;
+}
+
+.mock-top {
+  height: 58px;
+}
+
+.mock-hero {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  gap: 14px;
+  min-height: 140px;
+  padding: 16px;
+}
+
+.mock-hero b,
+.mock-hero strong,
+.mock-hero p,
+.mock-hero i {
+  display: block;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.mock-hero b {
+  width: 80px;
+  height: 12px;
+}
+
+.mock-hero strong {
+  width: 72%;
+  height: 40px;
+  margin-top: 16px;
+}
+
+.mock-hero p {
+  width: 54%;
+  height: 16px;
+  margin-top: 14px;
+}
+
+.mock-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.mock-stats span {
+  height: 74px;
+}
+
+.mock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.mock-grid span {
+  height: 96px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+
+.sidebar {
+  position: sticky;
+  top: 18px;
+  height: calc(100vh - 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--nav);
+  color: #fff;
+  padding: 18px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark,
+.avatar {
+  display: grid;
+  place-items: center;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 900;
+}
+
+.brand-mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+}
+
+.brand small,
+.sidebar-card span {
+  display: block;
+  margin-top: 3px;
+  color: #9ca9bb;
+}
+
+.nav-list {
+  display: grid;
+  gap: 7px;
+}
+
+.nav-item {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #dce6f3;
+}
+
+.nav-item span {
+  color: #92a0b5;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.nav-item.active,
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.sidebar-card {
+  margin-top: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.main-panel {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* ده الجزء اللي بيحدد شكل الهيدر والأزرار في الصفحة */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+.page-art {
+  min-height: 300px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 42%);
+  gap: 18px;
+  overflow: hidden;
+}
+
+.art-copy {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 30px;
+}
+
+.art-copy h2 {
+  max-width: 680px;
+  font-size: clamp(2rem, 5vw, 4.6rem);
+  line-height: 0.98;
+}
+
+.art-copy p:last-child {
+  max-width: 620px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.art-board {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  min-height: 300px;
+  border-left: 1px solid var(--line);
+  background: linear-gradient(135deg, #f7faff, #eaf1f9);
+  padding: 22px;
+}
+
+:root[data-theme='dark'] .art-board {
+  background: linear-gradient(135deg, #111a27, #1a2535);
+}
+
+.accent-blue .art-board,
+.accent-blue .meter i,
+.accent-blue .brand-mark {
+  --accent: var(--blue);
+}
+
+.accent-green .art-board,
+.accent-green .meter i {
+  --accent: var(--green);
+}
+
+.accent-purple .art-board,
+.accent-purple .meter i {
+  --accent: var(--purple);
+}
+
+.accent-orange .art-board,
+.accent-orange .meter i {
+  --accent: var(--orange);
+}
+
+.accent-red .art-board,
+.accent-red .meter i {
+  --accent: var(--red);
+}
+
+.mini-top,
+.mini-cards span,
+.mini-list span,
+.calendar-grid span,
+.water-bars span {
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(29, 43, 68, 0.08);
+}
+
+:root[data-theme='dark'] .mini-top,
+:root[data-theme='dark'] .mini-cards span,
+:root[data-theme='dark'] .mini-list span,
+:root[data-theme='dark'] .calendar-grid span,
+:root[data-theme='dark'] .water-bars span {
+  background: #202b3b;
+}
+
+.mini-top {
+  height: 60px;
+  border-left: 8px solid var(--accent, var(--blue));
+}
+
+.mini-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.mini-cards span {
+  height: 88px;
+}
+
+.mini-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mini-list span {
+  height: 34px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.calendar-grid span {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.calendar-grid .hot {
+  background: var(--orange);
+  color: #fff;
+}
+
+.water-bars {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  align-items: end;
+  gap: 10px;
+  min-height: 180px;
+}
+
+.water-bars span {
+  height: 70px;
+}
+
+.water-bars span:nth-child(2n) {
+  height: 110px;
+}
+
+.water-bars .filled {
+  background: var(--blue);
+}
+
+.sleep-ring {
+  width: 190px;
+  height: 190px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  border: 24px solid #d9cff6;
+  border-top-color: var(--purple);
+  border-radius: 50%;
+}
+
+.sleep-ring span {
+  font-size: 3rem;
+  font-weight: 900;
+}
+
+.chart-bars {
+  height: 210px;
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.chart-bars span {
+  flex: 1;
+  border-radius: 8px 8px 0 0;
+  background: var(--green);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* ده الجزء اللي بيحدد شكل البطاقات والإحصائيات داخل الصفحات */
+.stat-card,
+.panel {
+  padding: 18px;
+}
+
+.stat-card span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 1.8rem;
+}
+
+.meter {
+  height: 8px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.meter i {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.data-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.data-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 14px;
+}
+
+:root[data-theme='dark'] .data-card {
+  background: #121b29;
+}
+
+.data-card.stacked,
+.group-card {
+  display: grid;
+  gap: 10px;
+}
+
+.data-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.data-card h3 {
+  margin: 0 0 6px;
+}
+
+.data-card p,
+.data-card small {
+  margin: 0;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-grid .data-card {
+  min-height: 116px;
+}
+
+.summary-grid strong {
+  font-size: 1.45rem;
+}
+
+.checklist-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.checklist-card p {
+  grid-column: 1 / -1;
+}
+
+.checklist-card.complete {
+  border-color: rgba(22, 160, 106, 0.5);
+  background: rgba(22, 160, 106, 0.08);
+}
+
+.check-row {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.check-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--green);
+}
+
+.check-row span {
+  font-weight: 900;
+}
+
+.full-field {
+  grid-column: 1 / -1;
+}
+
+.group-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px;
+}
+
+.group-card h3 {
+  margin: 0;
+}
+
+.macro-board {
+  display: grid;
+  gap: 12px;
+}
+
+.macro-board div {
+  display: grid;
+  grid-template-columns: 94px 78px 1fr;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.macro-board i,
+.macro-board b {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.macro-board i {
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.macro-board b {
+  background: var(--orange);
+}
+
+.stat-line strong {
+  font-size: 2rem;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
+  padding: 20px;
+}
+
+@media (max-width: 1050px) {
+  .auth-page,
+  .app-shell,
+  .page-art,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+  }
+
+  .nav-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-grid,
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .art-board {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 720px) {
+  .auth-page,
+  .app-shell {
+    padding: 12px;
+  }
+
+  .auth-visual {
+    min-height: 480px;
+  }
+
+  .auth-card,
+  .art-copy,
+  .panel {
+    padding: 20px;
+  }
+
+  .form-grid,
+  .stats-grid,
+  .summary-grid,
+  .nav-list,
+  .mock-browser,
+  .topbar,
+  .topbar-actions,
+  .data-card {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar,
+  .topbar-actions,
+  .data-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-art {
+    min-height: 0;
+  }
+
+  .art-copy h2 {
+    font-size: 2.1rem;
+  }
+
+  .art-board {
+    min-height: 220px;
+  }
+
+  .nav-item {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .macro-board div {
+    grid-template-columns: 1fr;
+  }
+
+  .checklist-card {
+    grid-template-columns: 1fr;
+  }
+}
