@@ -1,34 +1,257 @@
 <!doctype html>
-<!-- ده الملف بتاع صفحة الجيم في مشروع MYLIFE -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MYLIFE | Gym</title>
     <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/gym.css" />
   </head>
-  <body data-page="gym">
-    <!-- ده القسم الرئيسي لعرض صفحة الجيم -->
-    <div class="app-shell">
-      <aside class="sidebar" id="sidebar"></aside>
-      <main class="main-panel">
-        <header class="topbar" id="topbar"></header>
-        <section class="page-art" id="page-art"></section>
-        <section class="stats-grid" id="stats-grid"></section>
-        <section class="content-grid">
-          <div class="panel">
-            <p class="eyebrow" id="form-kicker"></p>
-            <h2 id="form-title"></h2>
-            <form id="entry-form" class="form-stack"></form>
+  <body class="gym-page" data-page="gym">
+    <div class="app-shell gym-shell">
+      <aside class="sidebar gym-sidebar">
+        <a class="gym-brand" href="dashboard.html" aria-label="Go to Dashboard">
+          <img class="gym-brand-logo" src="../assist/Logo/MyLife.png" alt="MYLIFE logo" />
+          <strong>MYLIFE</strong>
+        </a>
+
+        <nav class="nav-list gym-nav" aria-label="Main navigation">
+          <a class="nav-item" href="dashboard.html"><span>Home</span><strong>Dashboard</strong></a>
+          <a class="nav-item" href="todo.html"><span>Tasks</span><strong>Todo</strong></a>
+          <a class="nav-item" href="habits.html"><span>Routines</span><strong>Habits</strong></a>
+          <a class="nav-item" href="goals.html"><span>Targets</span><strong>Goals</strong></a>
+          <a class="nav-item" href="calendar.html"><span>Planner</span><strong>Calendar</strong></a>
+          <a class="nav-item active" href="gym.html"><span>Training</span><strong>Gym</strong></a>
+          <a class="nav-item" href="prayer.html"><span>Spiritual</span><strong>Prayer</strong></a>
+          <a class="nav-item" href="nutrition.html"><span>Meals</span><strong>Nutrition</strong></a>
+          <a class="nav-item" href="water.html"><span>Hydration</span><strong>Water</strong></a>
+          <a class="nav-item" href="sleep.html"><span>Recovery</span><strong>Sleep</strong></a>
+          <a class="nav-item" href="study.html"><span>Focus</span><strong>Study</strong></a>
+          <a class="nav-item" href="statistics.html"><span>Insights</span><strong>Statistics</strong></a>
+          <a class="nav-item" href="settings.html"><span>System</span><strong>Settings</strong></a>
+        </nav>
+
+        <button class="gym-theme-toggle" type="button" id="gym-theme-toggle" aria-label="Toggle theme">
+          <span aria-hidden="true"></span> Dark Mode
+        </button>
+
+        <a class="gym-user" href="profile.html" aria-label="Go to profile">
+          <span class="gym-avatar" aria-hidden="true">AF</span>
+          <span>
+            <strong id="gym-user-name">Ahmed Farouk</strong>
+            <small>Premium User</small>
+          </span>
+          <b aria-hidden="true">&gt;</b>
+        </a>
+      </aside>
+
+      <main class="main-panel gym-main">
+        <header class="topbar gym-topbar">
+          <button class="gym-icon-btn" type="button" aria-label="Toggle sidebar" id="gym-menu-btn">Menu</button>
+          <label class="gym-search">
+            <span aria-hidden="true"></span>
+            <input type="search" placeholder="Search plans or exercises..." id="gym-search" aria-label="Search" />
+            <kbd aria-label="Keyboard shortcut">Ctrl K</kbd>
+          </label>
+          <div class="gym-top-actions">
+            <button class="gym-icon-btn has-dot" type="button" aria-label="Notifications">!</button>
+            <a class="gym-small-profile" href="profile.html" aria-label="Profile">
+              <span class="gym-avatar small" aria-hidden="true">AF</span>
+              <b aria-hidden="true">&gt;</b>
+            </a>
           </div>
-          <div class="panel">
-            <p class="eyebrow">Your data</p>
-            <h2 id="list-title"></h2>
-            <div class="data-list" id="data-list"></div>
+        </header>
+
+        <section class="gym-view active" id="gym-dashboard-view" aria-label="Gym dashboard">
+          <div class="gym-hero">
+            <div class="gym-title-block">
+              <div class="gym-title-icon" aria-hidden="true">GYM</div>
+              <div>
+                <h1>Gym</h1>
+                <p>Track workouts, build strength, and reach your fitness goals.</p>
+              </div>
+            </div>
+            <div class="gym-hero-actions">
+              <button class="gym-soft-btn" type="button" id="body-stats-btn">Body Stats</button>
+              <button class="gym-primary-btn" type="button" id="new-workout-btn">+ New Workout</button>
+            </div>
+          </div>
+
+          <section class="gym-stat-grid" id="gym-stat-grid" aria-label="Stats"></section>
+
+          <section class="gym-panel">
+            <div class="gym-section-head">
+              <h2>My Workout Plans</h2>
+            </div>
+            <div class="gym-plan-grid" id="gym-plan-grid"></div>
+          </section>
+
+          <section class="gym-panel">
+            <div class="gym-section-head">
+              <h2>Recent Workouts</h2>
+              <button class="gym-link-btn" type="button" id="view-all-workouts">View All</button>
+            </div>
+            <div class="gym-table-wrap">
+              <table class="gym-table" aria-label="Recent workouts">
+                <thead>
+                  <tr>
+                    <th scope="col">Workout</th>
+                    <th scope="col">Exercises</th>
+                    <th scope="col">Time</th>
+                    <th scope="col">Calories</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-workouts-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="gym-view" id="gym-plan-view" aria-label="Plan detail" hidden>
+          <div class="gym-detail-head">
+            <button class="gym-back-btn" type="button" data-back-dashboard aria-label="Back to dashboard">&lt;</button>
+            <div>
+              <h1 id="plan-title">Full Body (A)</h1>
+              <p id="plan-subtitle">6 Exercises</p>
+            </div>
+            <span class="gym-status-pill">Active</span>
+            <div class="gym-detail-actions">
+              <button class="gym-soft-btn" type="button" id="edit-plan-btn">Edit Plan</button>
+              <button class="gym-primary-btn" type="button" id="add-exercise-btn">+ Add Exercise</button>
+              <button class="gym-danger-btn" type="button" id="delete-plan-btn">Delete Plan</button>
+            </div>
+          </div>
+          <div class="gym-plan-tables" id="gym-plan-tables"></div>
+        </section>
+
+        <section class="gym-view" id="gym-workout-view" aria-label="Active workout" hidden>
+          <div class="gym-detail-head">
+            <button class="gym-back-btn" type="button" data-back-dashboard aria-label="Back to dashboard">&lt;</button>
+            <div>
+              <h1><span id="workout-title">Full Body (A)</span> - Today</h1>
+              <button class="gym-date-chip" type="button" id="workout-date" aria-label="Workout date">Today</button>
+            </div>
+            <div class="gym-workout-metrics">
+              <article>
+                <small>Duration</small>
+                <strong id="workout-duration">-</strong>
+              </article>
+              <article>
+                <small>Calories</small>
+                <strong id="workout-calories">-</strong>
+              </article>
+            </div>
+            <button class="gym-primary-btn" type="button" id="finish-workout-btn">Finish Workout</button>
+          </div>
+
+          <div class="gym-table-wrap workout-table-wrap">
+            <table class="gym-table workout-table" aria-label="Today's exercises">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Exercise</th>
+                  <th scope="col">Sets</th>
+                  <th scope="col">Target Reps</th>
+                  <th scope="col">Weight (kg)</th>
+                  <th scope="col">Reps Done</th>
+                  <th scope="col">Done</th>
+                </tr>
+              </thead>
+              <tbody id="today-workout-body"></tbody>
+            </table>
+          </div>
+
+          <div class="gym-workout-footer">
+            <button class="gym-link-btn add-inline" type="button" id="workout-add-exercise">+ Add Exercise</button>
+            <button class="gym-danger-btn" type="button" id="delete-workout-btn">Delete Workout</button>
           </div>
         </section>
       </main>
     </div>
-    <script src="../js/app.js"></script>
+
+    <div class="gym-modal-backdrop" id="exercise-modal" aria-hidden="true" role="dialog" aria-labelledby="exercise-modal-title">
+      <form class="gym-modal" id="exercise-form" novalidate>
+        <button class="gym-modal-close" type="button" data-close-modal aria-label="Close">x</button>
+        <h2 id="exercise-modal-title">Add Exercise</h2>
+
+        <input type="hidden" name="mode" value="add" />
+        <input type="hidden" name="exerciseId" />
+
+        <label>Exercise name
+          <input name="name" placeholder="e.g. Bench Press" required autocomplete="off" />
+        </label>
+
+        <div class="gym-form-row">
+          <label>Sets
+            <select name="sets">
+              <option>1</option>
+              <option>2</option>
+              <option selected>3</option>
+              <option>4</option>
+              <option>5</option>
+            </select>
+          </label>
+          <label>Reps
+            <select name="reps">
+              <option>6</option>
+              <option>8</option>
+              <option>10</option>
+              <option selected>12</option>
+              <option>15</option>
+              <option>20</option>
+              <option>60s</option>
+            </select>
+          </label>
+        </div>
+
+        <label>Weight (kg) - leave blank for bodyweight
+          <input name="weight" type="number" min="0" step="0.5" placeholder="e.g. 60" />
+        </label>
+
+        <label>Notes (optional)
+          <input name="notes" placeholder="e.g. slow and controlled" />
+        </label>
+
+        <div class="gym-modal-actions">
+          <button class="gym-soft-btn" type="button" data-close-modal>Cancel</button>
+          <button class="gym-primary-btn" type="submit">Save Exercise</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="gym-modal-backdrop" id="plan-modal" aria-hidden="true" role="dialog" aria-labelledby="plan-modal-title">
+      <form class="gym-modal compact" id="plan-form" novalidate>
+        <button class="gym-modal-close" type="button" data-close-modal aria-label="Close">x</button>
+        <h2 id="plan-modal-title">Create New Plan</h2>
+
+        <input type="hidden" name="planId" />
+
+        <label>Plan name
+          <input name="name" placeholder="e.g. Push Day" required autocomplete="off" />
+        </label>
+        <label>Group
+          <select name="group">
+            <option>Full Body</option>
+            <option>Upper Body</option>
+            <option>Lower Body</option>
+            <option>Push</option>
+            <option>Pull</option>
+            <option>Legs</option>
+            <option>Rest Day</option>
+          </select>
+        </label>
+
+        <div class="gym-modal-actions">
+          <button class="gym-soft-btn" type="button" data-close-modal>Cancel</button>
+          <button class="gym-primary-btn" type="submit">Save Plan</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="gym-toast" id="gym-toast" role="status" aria-live="polite"></div>
+
+    <script src="../js/gym.js"></script>
   </body>
 </html>

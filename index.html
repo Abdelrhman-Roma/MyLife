@@ -1,5 +1,4 @@
 ﻿<!doctype html>
-<!-- ده الملف الرئيسي لصفحة تسجيل الدخول في مشروع MYLIFE -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,65 +7,63 @@
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body data-page="auth">
-    <!-- ده القسم الرئيسي لصفحة تسجيل الدخول والتسجيل -->
     <main class="auth-page">
-      <section class="auth-visual" aria-label="MYLIFE dashboard design preview">
-        <div class="mock-browser">
-          <div class="mock-sidebar">
-            <div class="mock-logo"></div>
-            <span></span><span></span><span></span><span></span><span></span>
-          </div>
-          <div class="mock-main">
-            <div class="mock-top"></div>
-            <div class="mock-hero">
-              <div>
-                <b></b>
-                <strong></strong>
-                <p></p>
-              </div>
-              <i></i>
+      <section class="auth-visual" aria-label="MYLIFE app preview">
+        <div class="auth-visual-media">
+          <img
+            id="auth-hero-image"
+            class="auth-hero-image"
+            src=""
+            alt="MYLIFE inspiration"
+          />
+          <div class="auth-visual-overlay">
+            <img
+              class="auth-site-logo"
+              src="assist/Logo/MyLife.png"
+              alt="MYLIFE logo"
+            />
+            <div class="auth-copy">
+              <p class="eyebrow">Private life tracker</p>
+              <h1>MYLIFE</h1>
+              <p>
+                Track tasks, habits, goals, workouts, nutrition, sleep, and more
+                — all in one place, saved privately per account.
+              </p>
             </div>
-            <div class="mock-stats">
-              <span></span><span></span><span></span><span></span>
-            </div>
-            <div class="mock-grid"><span></span><span></span><span></span></div>
           </div>
-        </div>
-        <div class="auth-copy">
-          <p class="eyebrow">Private life tracker</p>
-          <h1>MYLIFE</h1>
-          <p>
-            Login or register before using the dashboard. Every task, habit,
-            goal, and setting is saved for the active user only.
-          </p>
         </div>
       </section>
 
-      <!-- ده القسم اللي بيعرض فورم تسجيل الدخول أو إنشاء حساب جديد -->
       <section class="auth-card">
         <div id="login-panel">
           <p class="eyebrow">Welcome back</p>
           <h2>Login</h2>
           <form id="login-form" class="form-stack">
             <label
-              >Email<input
+              >Email
+              <input
                 id="login-email"
                 type="email"
                 autocomplete="email"
+                placeholder="you@email.com"
                 required
-            /></label>
+              />
+            </label>
             <label
-              >Password<input
+              >Password
+              <input
                 id="login-password"
                 type="password"
                 autocomplete="current-password"
+                placeholder="••••••••"
                 required
-            /></label>
-            <p class="form-message" id="login-message"></p>
+              />
+            </label>
+            <p class="form-message" id="login-message" role="alert"></p>
             <button class="primary-btn" type="submit">Login</button>
           </form>
           <button class="text-btn" id="show-register" type="button">
-            Create account
+            Create account →
           </button>
         </div>
 
@@ -75,41 +72,57 @@
           <h2>Register</h2>
           <form id="register-form" class="form-stack">
             <label
-              >Full name<input id="register-name" autocomplete="name" required
-            /></label>
+              >Full name
+              <input
+                id="register-name"
+                autocomplete="name"
+                placeholder="Ahmed Farouk"
+                required
+              />
+            </label>
             <label
-              >Email<input
+              >Email
+              <input
                 id="register-email"
                 type="email"
                 autocomplete="email"
+                placeholder="you@email.com"
                 required
-            /></label>
+              />
+            </label>
             <label
-              >Password<input
+              >Password
+              <input
                 id="register-password"
                 type="password"
                 minlength="6"
                 autocomplete="new-password"
+                placeholder="Min 6 characters"
                 required
-            /></label>
+              />
+            </label>
             <label
-              >Confirm password<input
+              >Confirm password
+              <input
                 id="register-confirm"
                 type="password"
                 minlength="6"
                 autocomplete="new-password"
+                placeholder="Repeat password"
                 required
-            /></label>
-            <p class="form-message" id="register-message"></p>
-            <button class="primary-btn" type="submit">Register</button>
+              />
+            </label>
+            <p class="form-message" id="register-message" role="alert"></p>
+            <button class="primary-btn" type="submit">Create account</button>
           </form>
           <button class="text-btn" id="show-login" type="button">
-            Back to login
+            ← Back to login
           </button>
         </div>
       </section>
     </main>
 
+    <script src="js/photo-library.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>
