@@ -1,0 +1,95 @@
+﻿.auth-page {
+  min-height: 100dvh;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: clamp(12px, 2vw, 22px);
+  padding: clamp(12px, 2vw, 22px);
+  overflow: hidden;
+}
+
+.auth-visual {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--nav);
+  padding: 0;
+}
+
+.auth-visual-media {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.auth-hero-image {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  filter: brightness(0.6) saturate(1.05);
+}
+
+.auth-visual-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 28px;
+  background: linear-gradient(180deg, rgba(7, 16, 31, 0.24) 0%, rgba(7, 16, 31, 0.7) 100%);
+}
+
+.auth-site-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 18px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
+}
+
+.auth-copy {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  color: #fff;
+  max-width: 640px;
+}
+
+.auth-copy .eyebrow {
+  color: var(--orange);
+}
+
+.auth-copy h1 {
+  margin: 8px 0;
+  font-size: clamp(3rem, 8vw, 7rem);
+  line-height: 0.92;
+}
+
+.auth-copy p:last-child {
+  max-width: 640px;
+  color: #fdf4e3;
+  line-height: 1.6;
+}
+
+.auth-card {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(20px, 3vw, 36px);
+  overflow: hidden;
+}
+
+.auth-card > div {
+  width: 100%;
+  max-width: 440px;
+}
+

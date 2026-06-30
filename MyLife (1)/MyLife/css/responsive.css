@@ -1,0 +1,95 @@
+﻿@media (max-width: 1050px) {
+  .auth-page,
+  .app-shell,
+  .page-art,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .auth-visual {
+    min-height: 320px;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+  }
+
+  .nav-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .art-board {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 720px) {
+  .auth-page,
+  .app-shell {
+    padding: 12px;
+  }
+
+  .auth-visual {
+    min-height: 480px;
+  }
+
+  .auth-card,
+  .art-copy,
+  .panel {
+    padding: 20px;
+  }
+
+  .form-grid,
+  .nav-list,
+  .mock-browser,
+  .topbar,
+  .topbar-actions,
+  .data-card {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar,
+  .topbar-actions,
+  .data-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-art {
+    min-height: 0;
+  }
+
+  .art-copy h2 {
+    font-size: 2.1rem;
+  }
+
+  .art-board {
+    min-height: 220px;
+  }
+
+  .nav-item {
+    grid-template-columns: minmax(68px, 0.45fr) minmax(0, 1fr);
+  }
+
+  .macro-board div {
+    grid-template-columns: 1fr;
+  }
+
+  .checklist-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+@media (max-width: 720px) {
+  .workout-set-row { grid-template-columns: 50px 1fr 1fr; }
+  .workout-day-picker .day-btn { flex: 1; }
+}
