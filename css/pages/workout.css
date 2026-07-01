@@ -1,4 +1,7 @@
-﻿.workout-hero-board {
+/* ── Workout page styles ─────────────────────────────────────────────────── */
+
+/* ── Hero board ─────────────────────────────────────────────────────────── */
+.workout-hero-board {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: 12px;
@@ -24,58 +27,20 @@
   color: white;
 }
 
-.workout-hero-card .eyebrow {
-  color: rgba(255,255,255,0.82);
-}
+.workout-hero-card .eyebrow { color: rgba(255,255,255,0.82); }
+.workout-hero-card strong { display: block; margin-top: 6px; font-size: 1.25rem; }
+.workout-hero-card p { margin: 6px 0 0; color: rgba(255,255,255,0.9); }
 
-.workout-hero-card strong {
-  display: block;
-  margin-top: 6px;
-  font-size: 1.25rem;
-}
+.workout-track-list { display: grid; gap: 8px; }
+.workout-track-item { display: flex; justify-content: space-between; align-items: center; }
+.workout-track-item span { font-weight: 800; }
+.workout-track-item b { color: var(--red); font-weight: 900; }
 
-.workout-hero-card p {
-  margin: 6px 0 0;
-  color: rgba(255,255,255,0.9);
-}
+/* ── Lists & pills ──────────────────────────────────────────────────────── */
+.workout-list { display: grid; gap: 12px; }
+.workout-list-card { display: grid; gap: 12px; border-left: 4px solid var(--red); }
 
-.workout-track-list {
-  display: grid;
-  gap: 8px;
-}
-
-.workout-track-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.workout-track-item span {
-  font-weight: 800;
-}
-
-.workout-track-item b {
-  color: var(--red);
-  font-weight: 900;
-}
-
-.workout-list {
-  display: grid;
-  gap: 12px;
-}
-
-.workout-list-card {
-  display: grid;
-  gap: 12px;
-  border-left: 4px solid var(--red);
-}
-
-.workout-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
+.workout-tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .workout-pill {
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(237, 63, 39, 0.14), rgba(237, 63, 39, 0.08));
@@ -85,10 +50,8 @@
   font-weight: 800;
 }
 
-.workout-sections {
-  display: grid;
-  gap: 18px;
-}
+/* ── Sections wrapper ───────────────────────────────────────────────────── */
+.workout-sections { display: grid; gap: 18px; }
 .workout-panel-head {
   display: flex;
   align-items: center;
@@ -98,43 +61,91 @@
   margin-bottom: 14px;
 }
 .workout-panel-head h2 { margin: 0; }
-.workout-analytics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 18px;
-}
-.workout-chart-card {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 18px;
-}
-.workout-chart-card h3 { margin: 0 0 12px; }
 
-/* â”€â”€ Day-picker (Training Days Setup) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Training Days Setup ────────────────────────────────────────────────── */
+.wo-setup-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 600px) {
+  .wo-setup-grid { grid-template-columns: 1fr; }
+}
+
+.wo-setup-label {
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
 .workout-day-picker {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
+
 .workout-day-picker .day-btn {
-  min-height: 42px;
-  padding: 10px 16px;
+  min-height: 40px;
+  padding: 8px 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-2);
   color: var(--ink);
   font-weight: 900;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .workout-day-picker .day-btn.active {
   background: var(--blue);
   border-color: var(--blue);
   color: #fff;
 }
+.workout-day-picker .day-btn:hover:not(.active) {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 10%, var(--surface-2));
+}
 
-/* â”€â”€ Weekly planner table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Manual day toggles */
+.wo-day-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wo-day-toggle {
+  min-height: 40px;
+  min-width: 48px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.82rem;
+}
+.wo-day-toggle.active {
+  border-color: var(--red);
+  background: color-mix(in srgb, var(--red) 12%, var(--surface));
+  color: var(--red);
+}
+.wo-day-toggle:hover:not(.active) {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 8%, var(--surface-2));
+}
+
+.wo-days-summary {
+  margin-top: 14px;
+  font-size: 0.88rem;
+}
+
+/* ── Planner table ──────────────────────────────────────────────────────── */
 .workout-planner-table {
   width: 100%;
   border-collapse: collapse;
@@ -150,7 +161,7 @@
   white-space: nowrap;
 }
 .workout-planner-table td {
-  padding: 12px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   font-size: 0.92rem;
   vertical-align: middle;
@@ -158,42 +169,86 @@
 .workout-planner-table tr:last-child td { border-bottom: 0; }
 .workout-planner-table input,
 .workout-planner-table select {
-  min-height: 36px;
+  min-height: 34px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   color: var(--ink);
-  padding: 6px 10px;
+  padding: 5px 10px;
   font: inherit;
   width: 100%;
 }
-.workout-status-pill {
+
+/* Progress bar in planner */
+.wo-progress-bar {
+  height: 6px;
+  background: var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.wo-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue), color-mix(in srgb, var(--blue) 70%, var(--orange)));
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+
+.workout-table-wrap { overflow-x: auto; }
+
+/* ── Status badges & selects ────────────────────────────────────────────── */
+
+/* Workout day status */
+.wo-status-select {
+  appearance: auto;
+  min-width: 110px;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+}
+.wo-status-select.wo-ns       { border-color: var(--line); color: var(--muted); }
+.wo-status-select.wo-inprogress { border-color: #3b82f6; color: #3b82f6; background: color-mix(in srgb, #3b82f6 10%, var(--surface)); }
+.wo-status-select.wo-done     { border-color: #22c55e; color: #22c55e; background: color-mix(in srgb, #22c55e 10%, var(--surface)); }
+.wo-status-select.wo-skipped  { border-color: var(--red); color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
+
+/* Status badge (session panel header) */
+.wo-status-badge {
+  display: inline-block;
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 0.72rem;
+  padding: 5px 14px;
+  font-size: 0.75rem;
   font-weight: 900;
   text-transform: uppercase;
   white-space: nowrap;
-  display: inline-block;
 }
-.workout-status-pill.pending {
-  background: linear-gradient(90deg, rgba(237,63,39,0.14), rgba(237,63,39,0.08));
-  color: var(--red);
-}
-.workout-status-pill.completed {
-  background: color-mix(in srgb, var(--blue) 14%, var(--surface));
-  color: var(--blue);
-}
-.workout-table-wrap { overflow-x: auto; }
+.wo-status-badge.wo-ns       { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.wo-status-badge.wo-inprogress { background: color-mix(in srgb, #3b82f6 14%, var(--surface)); color: #3b82f6; }
+.wo-status-badge.wo-done     { background: color-mix(in srgb, #22c55e 14%, var(--surface)); color: #22c55e; }
+.wo-status-badge.wo-skipped  { background: color-mix(in srgb, var(--red) 14%, var(--surface)); color: var(--red); }
 
+/* Exercise status select */
+.ex-status-select {
+  appearance: auto;
+  min-width: 108px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  border: 1.5px solid var(--line);
+}
+.ex-status-select.ex-ns      { color: var(--muted); }
+.ex-status-select.ex-done    { border-color: #22c55e; color: #22c55e; background: color-mix(in srgb, #22c55e 12%, var(--surface)); }
+.ex-status-select.ex-skipped { border-color: var(--red); color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
+
+/* Skip session btn */
+.wo-skip-btn { color: var(--red) !important; border-color: var(--red) !important; }
+
+/* ── Excel plan sheet ───────────────────────────────────────────────────── */
 .workout-excel-table th,
-.workout-excel-table td {
-  border-right: 1px solid var(--line);
-}
+.workout-excel-table td { border-right: 1px solid var(--line); }
 .workout-excel-table th:last-child,
-.workout-excel-table td:last-child {
-  border-right: 0;
-}
+.workout-excel-table td:last-child { border-right: 0; }
 .workout-excel-table td input {
   border: 1px solid transparent;
   background: transparent;
@@ -203,22 +258,21 @@
   border-color: var(--line);
   background: var(--surface-2);
 }
-.workout-excel-add-row td {
-  border-right: 0;
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
+.workout-excel-add-row td { border-right: 0; padding-top: 8px; padding-bottom: 8px; }
 
-/* â”€â”€ Exercise session cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Exercise cards ─────────────────────────────────────────────────────── */
 .workout-exercise-card {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--shadow);
   padding: 18px;
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  transition: box-shadow 0.2s;
 }
+.workout-exercise-card:hover { box-shadow: 0 20px 50px rgba(19,70,134,0.13); }
+
 .workout-exercise-head {
   display: flex;
   align-items: flex-start;
@@ -230,38 +284,41 @@
 .workout-exercise-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   color: var(--muted);
   font-size: 0.82rem;
+  margin-top: 6px;
 }
 .workout-exercise-meta span {
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 3px 10px;
   font-weight: 800;
 }
-.workout-video-link {
-  font-weight: 900;
-  color: var(--blue);
-}
-.workout-set-rows {
-  display: grid;
-  gap: 8px;
-}
+
+.workout-video-link { font-weight: 900; color: var(--blue); }
+
+/* ── Set rows ───────────────────────────────────────────────────────────── */
+.workout-set-rows { display: grid; gap: 8px; }
 .workout-set-row {
   display: grid;
-  grid-template-columns: 60px 1fr 1fr auto;
+  grid-template-columns: 54px 1fr 1fr 1fr;
   gap: 8px;
   align-items: center;
 }
-.workout-set-row span {
+.workout-set-row > span:first-child {
   font-weight: 900;
   color: var(--muted);
   font-size: 0.78rem;
   text-transform: uppercase;
 }
+.wo-set-summary {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--blue);
+}
 .workout-set-row input {
-  min-height: 38px;
+  min-height: 36px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-2);
@@ -269,9 +326,11 @@
   padding: 6px 10px;
   font: inherit;
   width: 100%;
+  transition: border-color 0.15s;
 }
+.workout-set-row input:focus { border-color: var(--blue); outline: none; }
 
-/* â”€â”€ Rest timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Rest timer ─────────────────────────────────────────────────────────── */
 .workout-rest-timer {
   display: flex;
   align-items: center;
@@ -280,20 +339,33 @@
   border-radius: 8px;
   background: var(--surface-2);
   padding: 10px 14px;
+  transition: border-color 0.2s;
 }
 .workout-rest-timer strong {
   font-size: 1.4rem;
   font-variant-numeric: tabular-nums;
   min-width: 56px;
 }
-.workout-rest-timer.running strong { color: var(--blue); }
+.workout-rest-timer.running { border-color: #3b82f6; }
+.workout-rest-timer.running strong { color: #3b82f6; }
+.workout-rest-timer.done { border-color: var(--red); }
 .workout-rest-timer.done strong { color: var(--red); }
 
-/* â”€â”€ Analytics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.workout-chart-block {
+/* ── Analytics grid ─────────────────────────────────────────────────────── */
+.workout-analytics-grid {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
 }
+.workout-chart-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 18px;
+}
+.workout-chart-card h3 { margin: 0 0 12px; }
+.workout-chart-block { display: grid; gap: 10px; }
+
 .workout-chart-labels {
   display: flex;
   gap: 12px;
@@ -305,3 +377,28 @@
 .workout-chart-labels span { flex: 1; text-align: center; }
 .workout-line-chart { width: 100%; height: 160px; display: block; }
 
+/* Stat pills row inside analytics cards */
+.wo-stat-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.wo-stat-pill {
+  flex: 1;
+  min-width: 60px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+}
+.wo-stat-pill strong { display: block; font-size: 1.3rem; }
+.wo-stat-pill span { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--muted); }
+.wo-done-pill { background: color-mix(in srgb, #22c55e 12%, var(--surface-2)); }
+.wo-done-pill strong { color: #22c55e; }
+.wo-skip-pill { background: color-mix(in srgb, var(--red) 10%, var(--surface-2)); }
+.wo-skip-pill strong { color: var(--red); }
+.wo-pct-pill { background: color-mix(in srgb, var(--blue) 10%, var(--surface-2)); }
+.wo-pct-pill strong { color: var(--blue); }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .workout-hero-board { grid-template-columns: 1fr; }
+  .workout-set-row { grid-template-columns: 50px 1fr 1fr; }
+  .workout-set-row .wo-set-summary { display: none; }
+  .workout-analytics-grid { grid-template-columns: 1fr; }
+}
