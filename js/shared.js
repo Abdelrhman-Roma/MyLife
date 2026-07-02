@@ -268,22 +268,32 @@ function workoutArtBoard() {
   const today = days[new Date().getDay()];
   const schedule = (currentData.workoutPlan && currentData.workoutPlan.schedule) || [];
   const total = schedule.length;
-  const done  = schedule.filter((s) => s.status === 'Completed').length;
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const done = schedule.filter((s) => {
+    const completed = s.completionDate || s.lastCompletedDate;
+    if (!completed) return s.status === 'Done';
+    const d = new Date(`${completed}T00:00:00`);
+    return d >= weekStart && d < weekEnd;
+  }).length;
   const upcoming = schedule.slice(0, 4);
   return `
     <div class="workout-hero-board">
       <div class="workout-hero-card">
         <p class="eyebrow">This week</p>
         <strong>${done}/${total} workouts done</strong>
-        <p>${percent(done, total || 1)}% of your weekly plan complete${today ? ` â€” today is ${escapeHtml(today)}` : ''}.</p>
+        <p>${percent(done, total || 1)}% of your weekly plan complete${today ? ` — today is ${escapeHtml(today)}` : ''}.</p>
       </div>
       <div class="workout-track-list">
         ${upcoming.length ? upcoming.map((s) => `
           <div class="workout-track-item">
-            <span>${escapeHtml(s.day)} Â· ${escapeHtml(s.type || 'Workout')}</span>
+            <span>${escapeHtml(s.day)} • ${escapeHtml(s.type || 'Workout')}</span>
             <b>${escapeHtml(s.status)}</b>
           </div>
-        `).join('') : '<div class="workout-track-item"><span>No plan yet</span><b>Set up days â†’</b></div>'}
+        `).join('') : '<div class="workout-track-item"><span>No plan yet</span><b>Set up days →</b></div>'}
       </div>
     </div>
   `;

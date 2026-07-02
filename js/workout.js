@@ -1,24 +1,33 @@
-// MYLIFE — Workout page logic (upgraded)
-// Reuses bootShell()/persist()/currentData/escapeHtml/makeId/percent from shared.js
+// MYLIFE - Workout page logic
+// Reuses bootShell(), persist(), currentData, escapeHtml(), escapeAttr(), makeId(), and percent() from shared.js.
 
 const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const DAY_NAMES      = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const WORKOUT_TYPES  = ['Push Day', 'Pull Day', 'Leg Day', 'Upper Body', 'Lower Body', 'Full Body', 'Cardio', 'Rest Day'];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WORKOUT_TYPES = ['Push Day', 'Pull Day', 'Leg Day', 'Upper Body', 'Lower Body', 'Full Body', 'Cardio', 'Rest Day'];
 
-// Exercise status options
-const EX_STATUS = ['Not Started', 'Done', 'Skipped'];
-const EX_STATUS_CLASS = { 'Not Started': 'ex-ns', 'Done': 'ex-done', 'Skipped': 'ex-skipped' };
+const EX_STATUS = ['Not Started', 'In Progress', 'Done', 'Skipped'];
+const EX_STATUS_CLASS = { 'Not Started': 'ex-ns', 'In Progress': 'ex-inprogress', 'Done': 'ex-done', 'Skipped': 'ex-skipped' };
 
-// Workout day status options
 const WO_STATUS = ['Not Started', 'In Progress', 'Done', 'Skipped'];
 const WO_STATUS_CLASS = { 'Not Started': 'wo-ns', 'In Progress': 'wo-inprogress', 'Done': 'wo-done', 'Skipped': 'wo-skipped' };
+const REST_QUOTES = [
+  'Push beyond your limits.',
+  'Champions are built one rep at a time.',
+  'Discipline beats motivation.',
+  'Focus on perfect form.',
+  'The next set matters.',
+  'You are stronger than yesterday.',
+  'Keep going.',
+  'One more set.',
+];
 
-let openSessionId      = null;
-let sessionTimers      = {};
-let restTimerState     = null;
+let openSessionId = null;
+let sessionTimers = {};
+let restTimerState = null;
+let restFocusReturn = null;
 let workoutEventsBound = false;
+let sessionClockInterval = null;
 
-// ─── Boot ───────────────────────────────────────────────────────────────────
 function initWorkoutPage() {
   migrateLegacyData();
   ensureWeekSchedule();
@@ -29,43 +38,75 @@ function initWorkoutPage() {
 
   const dayId = new URLSearchParams(window.location.search).get('day');
   if (dayId && plan().schedule.some((s) => s.id === dayId)) {
-    openSessionId = dayId;
-    const s = plan().schedule.find((x) => x.id === dayId);
-    if (s && s.status === 'Not Started') { s.status = 'In Progress'; persist(); }
-    sessionTimers[dayId] = sessionTimers[dayId] || Date.now();
-    renderWorkoutRoot();
+    openWorkoutSession(dayId);
   }
 }
 
-function plan() { return currentData.workoutPlan; }
-
-// ─── Migration: upgrade old data shape ──────────────────────────────────────
-function migrateLegacyData() {
-  const p = plan();
-  if (!p.trainingDaysFull) p.trainingDaysFull = [];
-  (p.schedule || []).forEach((s) => {
-    if (s.status === 'Pending')   s.status = 'Not Started';
-    if (s.status === 'Completed') s.status = 'Done';
-    (s.exercises || []).forEach((ex) => {
-      if (!ex.exStatus) ex.exStatus = 'Not Started';
-    });
-  });
+function plan() {
+  return currentData.workoutPlan;
 }
 
-// ─── Date helpers ────────────────────────────────────────────────────────────
+function migrateLegacyData() {
+  const p = plan();
+  if (!p.trainingDaysFull || !p.trainingDaysFull.length) {
+    p.trainingDaysFull = (p.trainingDays || ['Mon', 'Wed', 'Fri'])
+      .map((d) => DAY_NAMES_FULL[DAY_NAMES.indexOf(d)] || d)
+      .filter((d) => DAY_NAMES_FULL.includes(d));
+  }
+
+  (p.schedule || []).forEach((s) => {
+    if (s.status === 'Pending') s.status = 'Not Started';
+    if (s.status === 'Completed') s.status = 'Done';
+    if (!s.dayFull && s.day) s.dayFull = DAY_NAMES_FULL[DAY_NAMES.indexOf(s.day)] || s.day;
+    if (!s.date && s.dayFull) s.date = dateForDayFull(s.dayFull);
+    if (!Array.isArray(s.exercises)) s.exercises = [];
+
+    s.exercises.forEach((ex) => {
+      if (!ex.id) ex.id = makeId();
+      if (!ex.exStatus) ex.exStatus = 'Not Started';
+      if (!Array.isArray(ex.log)) ex.log = [];
+      if (!Array.isArray(ex.performanceHistory)) ex.performanceHistory = [];
+      if (ex.videoUrl && !ex.video) ex.video = ex.videoUrl;
+      ex.video = String(ex.video || '').trim();
+      ex.sets = Math.max(1, Number(ex.sets) || 3);
+      ex.repsMin = Number(ex.repsMin) || 8;
+      ex.repsMax = Number(ex.repsMax) || 12;
+      ex.rest = Number(ex.rest) || 90;
+    });
+  });
+  persist();
+}
+
 function startOfWeek(d = new Date()) {
   const date = new Date(d);
-  date.setDate(date.getDate() - date.getDay()); // Sunday-based week
+  date.setDate(date.getDate() - date.getDay());
   date.setHours(0, 0, 0, 0);
   return date;
 }
 
 function dateForDayFull(dayFull) {
-  const dow = DAY_NAMES_FULL.indexOf(dayFull); // 0=Sun..6=Sat
+  const dow = DAY_NAMES_FULL.indexOf(dayFull);
   const sunday = startOfWeek();
   const d = new Date(sunday);
-  d.setDate(d.getDate() + dow);
+  d.setDate(d.getDate() + Math.max(0, dow));
   return d.toISOString().slice(0, 10);
+}
+
+function addDays(dateText, days) {
+  const d = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateForDayFull(DAY_NAMES_FULL[new Date().getDay()]);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function isDateThisWeek(dateText) {
+  if (!dateText) return false;
+  const d = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return false;
+  const start = startOfWeek();
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return d >= start && d < end;
 }
 
 function lastNDates(n) {
@@ -84,17 +125,118 @@ function formatTime(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// ─── Schedule generation ────────────────────────────────────────────────────
+function setIsDone(log) {
+  return !!(log && log.done && hasSetPerformance(log));
+}
+
+function hasSetPerformance(log) {
+  return !!(log && String(log.weight ?? '').trim() !== '' && String(log.reps ?? '').trim() !== '');
+}
+
+function exerciseDoneCount(s) {
+  return (s.exercises || []).filter((ex) => ex.exStatus === 'Done').length;
+}
+
+function exerciseProgress(s) {
+  const total = (s.exercises || []).length;
+  return total ? percent(exerciseDoneCount(s), total) : 0;
+}
+
+function completedWorkoutsThisWeek() {
+  return plan().schedule.filter((s) => {
+    const completedDate = s.completionDate || s.lastCompletedDate;
+    return isDateThisWeek(completedDate);
+  });
+}
+
+function updateExerciseStatusFromSets(ex, workoutDate = new Date().toISOString().slice(0, 10)) {
+  if (ex.exStatus === 'Skipped') return;
+  const doneSets = (ex.log || []).filter(setIsDone).length;
+  const totalSets = Math.max(1, Number(ex.sets) || 1);
+  if (doneSets >= totalSets) {
+    ex.exStatus = 'Done';
+    saveExercisePerformance(ex, workoutDate);
+  } else if (doneSets > 0) {
+    ex.exStatus = 'In Progress';
+  } else {
+    ex.exStatus = 'Not Started';
+  }
+}
+
+function analyzeExercisePerformance(ex) {
+  const completed = (ex.log || []).filter(setIsDone).slice(0, Number(ex.sets) || 1);
+  const totalSets = Math.max(1, Number(ex.sets) || 1);
+  if (completed.length < totalSets) return null;
+
+  const reps = completed.map((set) => Number(set.reps) || 0);
+  const weights = completed.map((set) => Number(set.weight) || 0);
+  const avgReps = reps.reduce((sum, value) => sum + value, 0) / reps.length;
+  const avgWeight = weights.reduce((sum, value) => sum + value, 0) / weights.length;
+  const repsMin = Number(ex.repsMin) || 1;
+  const repsMax = Number(ex.repsMax) || repsMin;
+
+  if (avgReps < repsMin) {
+    return {
+      status: 'Weight Too Heavy',
+      recommendation: 'Reduce weight slightly next session',
+      message: 'You struggled to hit the target reps. Recommended: reduce weight slightly next session.',
+      tone: 'heavy',
+      avgReps,
+      avgWeight,
+      reps,
+    };
+  }
+  if (avgReps >= repsMax) {
+    return {
+      status: 'Ready to Progress',
+      recommendation: 'Increase weight next session',
+      message: 'Excellent performance. Recommended: increase weight next session.',
+      tone: 'progress',
+      avgReps,
+      avgWeight,
+      reps,
+    };
+  }
+  return {
+    status: 'Weight Good',
+    recommendation: 'Current weight is appropriate',
+    message: 'Good performance. Current weight is appropriate.',
+    tone: 'good',
+    avgReps,
+    avgWeight,
+    reps,
+  };
+}
+
+function saveExercisePerformance(ex, workoutDate) {
+  const feedback = analyzeExercisePerformance(ex);
+  if (!feedback) return;
+  ex.performance = feedback;
+  ex.performanceHistory = Array.isArray(ex.performanceHistory) ? ex.performanceHistory : [];
+  const signature = feedback.reps.join(',');
+  const entry = {
+    date: workoutDate,
+    weight: Number(feedback.avgWeight.toFixed(1)),
+    reps: feedback.reps,
+    averageReps: Number(feedback.avgReps.toFixed(1)),
+    status: feedback.status,
+    recommendation: feedback.recommendation,
+    signature,
+  };
+  const existing = ex.performanceHistory.find((item) => item.date === workoutDate && item.signature === signature);
+  if (existing) Object.assign(existing, entry);
+  else ex.performanceHistory.push(entry);
+  ex.performanceHistory = ex.performanceHistory.slice(-12);
+}
+
 function ensureWeekSchedule() {
   const p = plan();
   const weekKey = startOfWeek().toISOString().slice(0, 10);
-  // Regenerate if new week OR no schedule yet
   if (p.weekKey === weekKey && p.schedule.length) return;
-  // Keep existing training days selection, just refresh dates
   const days = (Array.isArray(p.trainingDaysFull) && p.trainingDaysFull.length)
     ? p.trainingDaysFull
     : ['Monday', 'Wednesday', 'Friday'];
-  generateSchedule(p.daysPerWeek || 3, days, weekKey, true);
+  generateSchedule(p.daysPerWeek || days.length, days, weekKey, true);
 }
 
 function generateSchedule(daysPerWeek, trainingDaysFull, weekKey, preserveExercises = false) {
@@ -102,28 +244,32 @@ function generateSchedule(daysPerWeek, trainingDaysFull, weekKey, preserveExerci
   const oldByDay = {};
   (p.schedule || []).forEach((s) => { oldByDay[s.day] = s; });
 
-  p.daysPerWeek      = daysPerWeek;
+  p.daysPerWeek = daysPerWeek;
   p.trainingDaysFull = trainingDaysFull;
-  p.weekKey          = weekKey;
+  p.trainingDays = trainingDaysFull.map((d) => d.slice(0, 3));
+  p.weekKey = weekKey;
   p.schedule = trainingDaysFull.map((dayFull, i) => {
     const shortDay = dayFull.slice(0, 3);
     const prev = oldByDay[shortDay];
+    const exercises = preserveExercises && prev && prev.exercises
+      ? prev.exercises.map((ex) => ({ ...ex, log: [], exStatus: 'Not Started' }))
+      : [];
     return {
-      id:          (prev && prev.id) || makeId(),
-      day:         shortDay,
-      dayFull:     dayFull,
-      date:        dateForDayFull(dayFull),
-      type:        (prev && prev.type) || WORKOUT_TYPES[i % WORKOUT_TYPES.length],
-      exercises:   (preserveExercises && prev && prev.exercises)
-                     ? prev.exercises.map((ex) => ({ ...ex, log: [] }))
-                     : [],
-      status:      'Not Started',
+      id: (prev && prev.id) || makeId(),
+      day: shortDay,
+      dayFull,
+      date: (prev && prev.nextWorkoutDate) || dateForDayFull(dayFull),
+      type: (prev && prev.type) || WORKOUT_TYPES[i % WORKOUT_TYPES.length],
+      exercises,
+      status: 'Not Started',
       durationMin: 0,
-      calories:    0,
-      taskId:      (prev && prev.taskId) || null,
+      calories: 0,
+      taskId: (prev && prev.taskId) || null,
+      completionDate: prev && prev.completionDate,
+      lastCompletedDate: prev && prev.lastCompletedDate,
+      nextWorkoutDate: prev && prev.nextWorkoutDate,
     };
   });
-  // Sort schedule by day of week
   p.schedule.sort((a, b) => DAY_NAMES_FULL.indexOf(a.dayFull) - DAY_NAMES_FULL.indexOf(b.dayFull));
   syncScheduleToTodo();
   persist();
@@ -141,36 +287,33 @@ function setTrainingDays(newDaysFull) {
   return true;
 }
 
-// ─── Todo integration ───────────────────────────────────────────────────────
 function syncScheduleToTodo() {
   const p = plan();
   const validIds = new Set(p.schedule.map((s) => s.id));
   currentData.tasks = currentData.tasks.filter((t) => !t.workoutScheduleId || validIds.has(t.workoutScheduleId));
   p.schedule.forEach((s) => {
-    const title = `${s.day} · ${s.type} workout`;
+    const title = `${s.day} • ${s.type} workout`;
     let task = currentData.tasks.find((t) => t.workoutScheduleId === s.id);
     if (task) {
-      task.title     = title;
-      task.completed = s.status === 'Done';
+      task.title = title;
+      task.completed = isDateThisWeek(s.completionDate || s.lastCompletedDate);
     } else {
-      task = { id: makeId(), title, time: '', priority: 'Medium', completed: s.status === 'Done', workoutScheduleId: s.id };
+      task = { id: makeId(), title, time: '', priority: 'Medium', completed: false, workoutScheduleId: s.id };
       currentData.tasks.push(task);
     }
     s.taskId = task.id;
   });
 }
 
-// ─── Stats ──────────────────────────────────────────────────────────────────
 function renderWorkoutStats() {
-  const p         = plan();
-  const total     = p.schedule.length;
-  const done      = p.schedule.filter((s) => s.status === 'Done');
-  const skipped   = p.schedule.filter((s) => s.status === 'Skipped');
-  const calories  = done.reduce((sum, s) => sum + Number(s.calories || 0), 0);
-  const duration  = done.reduce((sum, s) => sum + Number(s.durationMin || 0), 0);
-  const donePct   = percent(done.length, total || 1);
+  const p = plan();
+  const total = p.schedule.length;
+  const done = completedWorkoutsThisWeek();
+  const skipped = p.schedule.filter((s) => s.status === 'Skipped');
+  const calories = done.reduce((sum, s) => sum + Number(s.calories || 0), 0);
+  const duration = done.reduce((sum, s) => sum + Number(s.durationMin || 0), 0);
+  const donePct = percent(done.length, total || 1);
 
-  // Exercise completion rate across all sessions
   let totalEx = 0, doneEx = 0;
   p.schedule.forEach((s) => {
     (s.exercises || []).forEach((ex) => {
@@ -181,11 +324,11 @@ function renderWorkoutStats() {
   const exPct = percent(doneEx, totalEx || 1);
 
   const stats = [
-    ['Workouts this week',   `${done.length}/${total}`,  donePct],
-    ['Exercise completion',  `${exPct}%`,                 exPct],
-    ['Calories burned',      `${calories} kcal`,          percent(calories, 1500)],
-    ['Workout duration',     `${duration} min`,            percent(duration, 240)],
-    ['Skipped workouts',     `${skipped.length}`,         0],
+    ['Workouts this week', `${done.length}/${total}`, donePct],
+    ['Exercise completion', `${exPct}%`, exPct],
+    ['Calories burned', `${calories} kcal`, percent(calories, 1500)],
+    ['Workout duration', `${duration} min`, percent(duration, 240)],
+    ['Skipped workouts', `${skipped.length}`, 0],
   ];
 
   byId('stats-grid').innerHTML = stats.map(([label, value, width]) => `
@@ -197,21 +340,17 @@ function renderWorkoutStats() {
   `).join('');
 }
 
-// ─── Root content ────────────────────────────────────────────────────────────
 function renderWorkoutRoot() {
   const root = byId('workout-root');
   const p = plan();
   const selected = Array.isArray(p.trainingDaysFull) ? p.trainingDaysFull : [];
 
   root.innerHTML = `
-    <!-- ① Training Days Setup -->
     <section class="panel">
       <div class="workout-panel-head">
         <div><p class="eyebrow">Setup</p><h2>Training days</h2></div>
       </div>
-
       <div class="wo-setup-grid">
-        <!-- Quick-count selector -->
         <div>
           <p class="wo-setup-label">Days per week</p>
           <div class="workout-day-picker">
@@ -220,7 +359,6 @@ function renderWorkoutRoot() {
             `).join('')}
           </div>
         </div>
-        <!-- Manual day toggle -->
         <div>
           <p class="wo-setup-label">Select your days</p>
           <div class="wo-day-toggles">
@@ -232,13 +370,13 @@ function renderWorkoutRoot() {
           </div>
         </div>
       </div>
-
       ${selected.length ? `<p class="muted wo-days-summary">
         <strong>${selected.length} training days:</strong> ${escapeHtml(selected.join(', '))}
       </p>` : '<p class="muted wo-days-summary">Select at least one training day above.</p>'}
     </section>
 
-    <!-- ② Weekly Planner -->
+    ${weeklySummaryHtml()}
+
     <section class="panel">
       <div class="workout-panel-head">
         <div><p class="eyebrow">This week</p><h2>Weekly workout planner</h2></div>
@@ -247,9 +385,9 @@ function renderWorkoutRoot() {
         <table class="workout-planner-table">
           <thead>
             <tr>
-              <th>Day</th><th>Date</th><th>Workout type</th>
-              <th>Exercises</th><th>Progress</th><th>Duration</th>
-              <th>Status</th><th></th>
+              <th>Day</th><th>Date</th><th>Workout Type</th>
+              <th>Exercises Count</th><th>Progress</th><th>Duration</th>
+              <th>Status</th><th>Action</th>
             </tr>
           </thead>
           <tbody>${p.schedule.map(plannerRowHtml).join('')}</tbody>
@@ -257,19 +395,16 @@ function renderWorkoutRoot() {
       </div>
     </section>
 
-    <!-- ③ Plan sheet -->
     <section class="panel">
       <div class="workout-panel-head">
         <div><p class="eyebrow">Your plan</p><h2>Workout plan sheet</h2></div>
       </div>
-      <p class="muted" style="margin-top:-6px">Edit exercises directly — sets, reps range, weight, and rest time.</p>
+      <p class="muted" style="margin-top:-6px">Edit exercises directly — sets, reps range, target weight, rest time, and video URL.</p>
       ${excelPlanTableHtml()}
     </section>
 
-    <!-- ④ Session panel (when open) -->
     ${openSessionId ? sessionPanelHtml(openSessionId) : ''}
 
-    <!-- ⑤ Analytics -->
     <section class="panel">
       <div class="workout-panel-head">
         <div><p class="eyebrow">Insights</p><h2>Analytics</h2></div>
@@ -277,16 +412,34 @@ function renderWorkoutRoot() {
       <div class="workout-analytics-grid">${analyticsBlockHtml()}</div>
     </section>
   `;
+  updateSessionClock();
 }
 
-// ─── Planner row ─────────────────────────────────────────────────────────────
+function weeklySummaryHtml() {
+  const total = plan().schedule.length;
+  const done = completedWorkoutsThisWeek().length;
+  const remaining = Math.max(0, total - done);
+  const pct = percent(done, total || 1);
+  return `
+    <section class="panel workout-weekly-summary">
+      <div class="workout-panel-head">
+        <div><p class="eyebrow">Weekly summary</p><h2>${done} / ${total} workouts done</h2></div>
+        <strong>${pct}% complete</strong>
+      </div>
+      <div class="wo-progress-bar wo-weekly-progress"><div class="wo-progress-fill" style="width:${pct}%"></div></div>
+      <p class="muted">${remaining} ${remaining === 1 ? 'workout' : 'workouts'} remaining</p>
+    </section>
+  `;
+}
+
 function plannerRowHtml(s) {
   const totalEx = s.exercises.length;
-  const doneEx  = s.exercises.filter((ex) => ex.exStatus === 'Done').length;
-  const exPct   = totalEx ? percent(doneEx, totalEx) : 0;
-  const scls    = WO_STATUS_CLASS[s.status] || 'wo-ns';
+  const doneEx = exerciseDoneCount(s);
+  const exPct = exerciseProgress(s);
+  const scls = WO_STATUS_CLASS[s.status] || 'wo-ns';
+  const action = s.status === 'Done' ? 'COMPLETE' : (s.status === 'Not Started' ? 'START' : 'OPEN');
   return `
-    <tr>
+    <tr class="workout-planner-row">
       <td><strong>${escapeHtml(s.day)}</strong></td>
       <td class="muted">${escapeHtml(s.date)}</td>
       <td>
@@ -294,13 +447,13 @@ function plannerRowHtml(s) {
           ${WORKOUT_TYPES.map((t) => `<option ${t === s.type ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
         </select>
       </td>
-      <td>${totalEx ? `${doneEx}/${totalEx}` : '—'}</td>
+      <td>${totalEx}</td>
       <td>
         ${totalEx ? `
           <div class="wo-progress-bar">
             <div class="wo-progress-fill" style="width:${exPct}%"></div>
           </div>
-          <span class="muted" style="font-size:0.72rem">${exPct}%</span>
+          <span class="muted" style="font-size:0.72rem">${doneEx}/${totalEx} • ${exPct}%</span>
         ` : '<span class="muted">—</span>'}
       </td>
       <td>${s.durationMin ? `${s.durationMin} min` : '—'}</td>
@@ -309,12 +462,11 @@ function plannerRowHtml(s) {
           ${WO_STATUS.map((st) => `<option ${st === s.status ? 'selected' : ''}>${escapeHtml(st)}</option>`).join('')}
         </select>
       </td>
-      <td><button type="button" class="secondary-btn" data-open-session="${escapeAttr(s.id)}">${openSessionId === s.id ? 'Close' : 'Open'}</button></td>
+      <td><button type="button" class="secondary-btn" data-open-session="${escapeAttr(s.id)}">${openSessionId === s.id ? 'CLOSE' : action}</button></td>
     </tr>
   `;
 }
 
-// ─── Excel plan sheet ────────────────────────────────────────────────────────
 function excelPlanTableHtml() {
   const rows = [];
   plan().schedule.forEach((s, dayIdx) => {
@@ -323,7 +475,7 @@ function excelPlanTableHtml() {
         <tr>
           <td>${dayIdx + 1}</td>
           <td><strong>${escapeHtml(s.type)}</strong><br><span class="muted">${escapeHtml(s.day)}</span></td>
-          <td colspan="6" class="muted">
+          <td colspan="7" class="muted">
             No exercises yet —
             <button type="button" class="text-btn" data-excel-add="${escapeAttr(s.id)}">+ Add exercise</button>
           </td>
@@ -331,6 +483,7 @@ function excelPlanTableHtml() {
       `);
       return;
     }
+
     s.exercises.forEach((ex, exIdx) => {
       const actual = (ex.log && ex.log[0] && ex.log[0].reps) || '';
       rows.push(`
@@ -339,7 +492,10 @@ function excelPlanTableHtml() {
             <td rowspan="${s.exercises.length}">${dayIdx + 1}</td>
             <td rowspan="${s.exercises.length}"><strong>${escapeHtml(s.type)}</strong><br><span class="muted">${escapeHtml(s.day)}</span></td>
           ` : ''}
-          <td><input type="text" value="${escapeAttr(ex.name)}" data-excel-field="name" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td>
+            <input type="text" value="${escapeAttr(ex.name)}" data-excel-field="name" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
+            ${ex.video ? `<a class="workout-exercise-name-link" href="${escapeAttr(ex.video)}" target="_blank" rel="noopener">${escapeHtml(ex.name)} ▶</a>` : ''}
+          </td>
           <td><input type="number" min="1" value="${ex.sets || 3}" placeholder="sets" data-excel-field="sets" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
           <td>
             <div style="display:flex;gap:4px;align-items:center">
@@ -350,21 +506,23 @@ function excelPlanTableHtml() {
           </td>
           <td><input type="number" step="0.5" min="0" value="${ex.weight || ''}" placeholder="kg" data-excel-field="weight" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
           <td><input type="number" min="0" value="${ex.rest || 90}" placeholder="sec" data-excel-field="rest" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td><input type="url" value="${escapeAttr(ex.video || '')}" placeholder="https://" data-excel-field="video" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
           <td><input type="number" min="0" value="${actual}" placeholder="done" data-excel-field="actual" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
         </tr>
       `);
     });
     rows.push(`
       <tr class="workout-excel-add-row">
-        <td colspan="8"><button type="button" class="text-btn" data-excel-add="${escapeAttr(s.id)}">+ Add exercise to ${escapeHtml(s.day)}</button></td>
+        <td colspan="9"><button type="button" class="text-btn" data-excel-add="${escapeAttr(s.id)}">+ Add exercise to ${escapeHtml(s.day)}</button></td>
       </tr>
     `);
   });
+
   return `
     <div class="workout-table-wrap">
       <table class="workout-planner-table workout-excel-table">
         <thead>
-          <tr><th>#</th><th>Day</th><th>Exercise</th><th>Sets</th><th>Reps (min–max)</th><th>Weight (kg)</th><th>Rest (sec)</th><th>Reps done</th></tr>
+          <tr><th>#</th><th>Day</th><th>Exercise</th><th>Sets</th><th>Reps (min–max)</th><th>Weight (kg)</th><th>Rest (sec)</th><th>Video URL</th><th>Reps done</th></tr>
         </thead>
         <tbody>${rows.join('')}</tbody>
       </table>
@@ -372,63 +530,65 @@ function excelPlanTableHtml() {
   `;
 }
 
-// ─── Session panel ───────────────────────────────────────────────────────────
 function sessionPanelHtml(id) {
   const s = plan().schedule.find((x) => x.id === id);
   if (!s) return '';
   const scls = WO_STATUS_CLASS[s.status] || 'wo-ns';
+  const totalEx = s.exercises.length;
+  const doneEx = exerciseDoneCount(s);
+  const exPct = exerciseProgress(s);
+  const currentExercise = s.exercises.find((ex) => !['Done', 'Skipped'].includes(ex.exStatus || 'Not Started'));
+  const elapsed = sessionTimers[id] ? Math.max(0, Math.floor((Date.now() - sessionTimers[id]) / 1000)) : 0;
+
   return `
     <section class="panel" id="workout-session-panel">
       <div class="workout-panel-head">
         <div>
-          <p class="eyebrow">${escapeHtml(s.day)} · ${escapeHtml(s.date)}</p>
+          <p class="eyebrow">${escapeHtml(s.day)} • ${escapeHtml(s.date)}</p>
           <h2>${escapeHtml(s.type)} session</h2>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <span class="wo-status-badge ${scls}">${escapeHtml(s.status)}</span>
           <button type="button" class="secondary-btn" data-close-session="1">Close</button>
           ${s.status !== 'Done' ? `
-            <button type="button" class="primary-btn" data-finish-session="${escapeAttr(s.id)}">Finish workout</button>
+            <button type="button" class="primary-btn" data-finish-session="${escapeAttr(s.id)}">Complete workout</button>
             <button type="button" class="secondary-btn wo-skip-btn" data-skip-session="${escapeAttr(s.id)}">Skip</button>
           ` : ''}
         </div>
       </div>
 
-      <form data-add-exercise-for="${escapeAttr(s.id)}" class="form-stack" novalidate style="margin-bottom:18px">
-        <label>Exercise name<input name="name" type="text" required /></label>
-        <label>Sets<input name="sets" type="number" min="1" value="3" required /></label>
-        <label>Reps min<input name="repsMin" type="number" min="1" value="8" required /></label>
-        <label>Reps max<input name="repsMax" type="number" min="1" value="12" required /></label>
-        <label>Target weight (kg)<input name="weight" type="number" min="0" step="0.5" /></label>
-        <label>Rest (sec)<input name="rest" type="number" min="0" value="90" /></label>
-        <label class="full-field">Video link (YouTube/URL)<input name="video" type="url" placeholder="https://" /></label>
-        <label class="full-field">Notes<textarea name="notes"></textarea></label>
-        <button class="primary-btn" type="submit">Add exercise</button>
-      </form>
+      <div class="workout-session-grid">
+        <article><span>Session progress</span><strong>${exPct}%</strong><div class="wo-progress-bar"><div class="wo-progress-fill" style="width:${exPct}%"></div></div></article>
+        <article><span>Total exercises</span><strong>${doneEx}/${totalEx}</strong></article>
+        <article><span>Timer</span><strong data-session-elapsed="${escapeAttr(s.id)}">${formatTime(elapsed)}</strong></article>
+        <article><span>Current exercise</span><strong>${currentExercise ? escapeHtml(currentExercise.name) : 'All exercises complete'}</strong></article>
+      </div>
 
       <div class="workout-sections">
         ${s.exercises.length
           ? s.exercises.map((ex) => exerciseCardHtml(s, ex)).join('')
-          : '<div class="empty-state">No exercises yet — add one above.</div>'}
+          : '<div class="empty-state">No exercises saved yet. Add exercises in the workout plan sheet before starting.</div>'}
       </div>
     </section>
   `;
 }
 
-// ─── Exercise card ────────────────────────────────────────────────────────────
 function exerciseCardHtml(s, ex) {
   const logRows = ex.log || [];
-  const exCls   = EX_STATUS_CLASS[ex.exStatus || 'Not Started'] || 'ex-ns';
+  const exCls = EX_STATUS_CLASS[ex.exStatus || 'Not Started'] || 'ex-ns';
+  const doneSets = logRows.filter(setIsDone).length;
+  const feedback = analyzeExercisePerformance(ex) || ex.performance || null;
   return `
     <article class="workout-exercise-card" data-exercise-id="${escapeAttr(ex.id)}">
       <div class="workout-exercise-head">
         <div>
-          <h3>${escapeHtml(ex.name)}</h3>
+          <h3>${ex.video ? `<a class="workout-exercise-name-link" href="${escapeAttr(ex.video)}" target="_blank" rel="noopener">${escapeHtml(ex.name)} ▶</a>` : escapeHtml(ex.name)}</h3>
           <div class="workout-exercise-meta">
             <span>${ex.sets} sets</span>
             <span>${ex.repsMin}–${ex.repsMax} reps</span>
-            <span>${ex.weight ? `${ex.weight} kg` : 'Bodyweight'}</span>
+            <span>${ex.weight ? `${ex.weight} kg target` : 'Bodyweight'}</span>
             <span>${ex.rest || 90}s rest</span>
+            <span>${doneSets}/${ex.sets} sets done</span>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -442,19 +602,27 @@ function exerciseCardHtml(s, ex) {
       ${ex.notes ? `<p class="muted">${escapeHtml(ex.notes)}</p>` : ''}
 
       <div class="workout-set-rows">
-        ${Array.from({ length: ex.sets }, (_, i) => {
+        ${Array.from({ length: Number(ex.sets) || 1 }, (_, i) => {
           const logged = logRows[i] || {};
+          const canComplete = hasSetPerformance(logged);
+          const done = setIsDone(logged);
           const summary = logged.weight && logged.reps ? `${escapeHtml(String(logged.weight))}kg × ${escapeHtml(String(logged.reps))}` : '';
           return `
-            <div class="workout-set-row">
-              <span>Set ${i + 1}</span>
-              <input type="number" placeholder="kg"   value="${logged.weight ?? ''}" data-set-weight="${i}" data-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" />
-              <input type="number" placeholder="reps" value="${logged.reps ?? ''}"   data-set-reps="${i}"   data-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" />
-              <span class="wo-set-summary">${summary}</span>
+            <div class="workout-set-row${done ? ' set-done' : ''}">
+              <label class="wo-set-check">
+                <input type="checkbox" ${done ? 'checked' : ''} ${canComplete ? '' : 'disabled'} data-set-done="${i}" data-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" />
+                <span>Set ${i + 1}</span>
+              </label>
+              <input type="number" min="0" step="0.5" placeholder="Weight (kg)" value="${logged.weight ?? ''}" data-set-weight="${i}" data-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" />
+              <input type="number" min="1" placeholder="Reps" value="${logged.reps ?? ''}" data-set-reps="${i}" data-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" />
+              <span class="wo-set-summary">${summary || (canComplete ? 'Ready to complete' : 'Enter weight and reps first')}</span>
             </div>
           `;
         }).join('')}
       </div>
+
+      ${feedback ? performanceFeedbackHtml(feedback) : ''}
+      ${performanceHistoryHtml(ex)}
 
       <div class="workout-rest-timer" data-rest-timer-for="${escapeAttr(ex.id)}">
         <button type="button" class="secondary-btn" data-start-rest="${escapeAttr(ex.id)}" data-rest-seconds="${ex.rest || 90}">Start rest timer</button>
@@ -464,31 +632,90 @@ function exerciseCardHtml(s, ex) {
   `;
 }
 
-// ─── Finish / Skip session ────────────────────────────────────────────────────
+function performanceFeedbackHtml(feedback) {
+  return `
+    <div class="workout-feedback-card feedback-${escapeAttr(feedback.tone)}">
+      <strong>${escapeHtml(feedback.status)}</strong>
+      <p>${escapeHtml(feedback.message)}</p>
+      <span>Average reps: ${Number(feedback.avgReps).toFixed(1)} • Average weight: ${Number(feedback.avgWeight).toFixed(1)} kg</span>
+    </div>
+  `;
+}
+
+function performanceHistoryHtml(ex) {
+  const history = Array.isArray(ex.performanceHistory) ? ex.performanceHistory.slice(-3).reverse() : [];
+  if (!history.length) return '';
+  return `
+    <div class="workout-history">
+      <strong>Performance history</strong>
+      ${history.map((item) => `
+        <div>
+          <span>${escapeHtml(item.date)}</span>
+          <span>${escapeHtml(String(item.weight))}kg</span>
+          <span>${escapeHtml(item.reps.join(', '))} reps</span>
+          <b>${escapeHtml(item.recommendation)}</b>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function openWorkoutSession(id) {
+  openSessionId = id;
+  sessionTimers[id] = sessionTimers[id] || Date.now();
+  const s = plan().schedule.find((x) => x.id === id);
+  if (s && s.status === 'Not Started') s.status = 'In Progress';
+  syncScheduleToTodo();
+  persist();
+  renderArt('workout');
+  renderWorkoutStats();
+  renderWorkoutRoot();
+}
+
 function finishSession(scheduleId) {
   const s = plan().schedule.find((x) => x.id === scheduleId);
   if (!s) return;
   const startedAt = sessionTimers[scheduleId] || Date.now();
-  s.durationMin   = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
+  s.durationMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
 
   let loggedSetCount = 0;
   s.exercises.forEach((ex) => {
-    const logged = (ex.log || []).filter((l) => l && (l.weight || l.reps));
+    updateExerciseStatusFromSets(ex, s.date);
+    const logged = (ex.log || []).filter(setIsDone);
     loggedSetCount += logged.length;
     if (!logged.length) return;
     const top = logged.reduce((a, b) => (Number(b.weight) || 0) > (Number(a.weight) || 0) ? b : a, logged[0]);
     currentData.workouts.push({
-      id: makeId(), day: s.day, date: s.date, title: ex.name,
-      weight: Number(top.weight) || 0, reps: Number(top.reps) || 0, sets: logged.length, note: '',
+      id: makeId(),
+      day: s.day,
+      date: s.date,
+      title: ex.name,
+      weight: Number(top.weight) || 0,
+      reps: Number(top.reps) || 0,
+      sets: logged.length,
+      note: '',
     });
   });
+
   s.calories = loggedSetCount ? loggedSetCount * 8 : s.exercises.length * 40;
-  s.status   = 'Done';
+  s.status = 'Done';
+  s.completionDate = new Date().toISOString().slice(0, 10);
+  s.lastCompletedDate = s.completionDate;
+  s.lastCompletedWorkoutDate = s.date;
+  s.nextWorkoutDate = addDays(s.date, 7);
+  s.date = s.nextWorkoutDate;
+
+  s.exercises.forEach((ex) => {
+    ex.log = [];
+    ex.exStatus = 'Not Started';
+  });
+  s.status = 'Not Started';
 
   syncScheduleToTodo();
   persist();
   openSessionId = null;
   delete sessionTimers[scheduleId];
+  renderArt('workout');
   renderWorkoutStats();
   renderWorkoutRoot();
 }
@@ -504,38 +731,145 @@ function skipSession(scheduleId) {
   renderWorkoutRoot();
 }
 
-// ─── Rest timer ───────────────────────────────────────────────────────────────
 function startRestTimer(exerciseId, seconds) {
   clearRestTimer();
-  let remaining = seconds;
-  const display = document.querySelector(`[data-timer-display="${exerciseId}"]`);
-  const wrap    = document.querySelector(`[data-rest-timer-for="${exerciseId}"]`);
-  if (wrap)    { wrap.classList.add('running'); wrap.classList.remove('done'); }
-  if (display)   display.textContent = formatTime(remaining);
+  const duration = Math.max(1, Number(seconds) || 90);
+  const wrap = document.querySelector(`[data-rest-timer-for="${exerciseId}"]`);
+  if (wrap) {
+    wrap.classList.add('running');
+    wrap.classList.remove('done');
+  }
 
+  restFocusReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  restTimerState = {
+    exerciseId,
+    total: duration,
+    remaining: duration,
+    quoteIndex: Math.floor(Math.random() * REST_QUOTES.length),
+    interval: null,
+    quoteInterval: null,
+  };
+  renderRestOverlay();
+  const addButton = document.querySelector('[data-rest-add]');
+  if (addButton) addButton.focus();
   const interval = setInterval(() => {
-    remaining -= 1;
-    if (display) display.textContent = formatTime(Math.max(remaining, 0));
-    if (remaining <= 0) {
-      clearInterval(interval);
-      restTimerState = null;
-      if (wrap) { wrap.classList.remove('running'); wrap.classList.add('done'); }
-      window.alert('Rest time is over — start your next set!');
-    }
+    if (!restTimerState) return;
+    restTimerState.remaining -= 1;
+    updateRestOverlay();
+    if (restTimerState.remaining <= 0) finishRestTimer();
   }, 1000);
-  restTimerState = { exerciseId, interval };
+  const quoteInterval = setInterval(() => {
+    if (!restTimerState) return;
+    restTimerState.quoteIndex = (restTimerState.quoteIndex + 1) % REST_QUOTES.length;
+    updateRestOverlay(true);
+  }, 4200);
+  restTimerState.interval = interval;
+  restTimerState.quoteInterval = quoteInterval;
 }
 
 function clearRestTimer() {
   if (restTimerState && restTimerState.interval) clearInterval(restTimerState.interval);
+  if (restTimerState && restTimerState.quoteInterval) clearInterval(restTimerState.quoteInterval);
+  const overlay = document.querySelector('[data-rest-overlay]');
+  if (overlay) overlay.remove();
+  if (restFocusReturn && document.contains(restFocusReturn)) restFocusReturn.focus();
+  restFocusReturn = null;
   restTimerState = null;
 }
 
-// ─── Analytics ────────────────────────────────────────────────────────────────
+function renderRestOverlay() {
+  const existing = document.querySelector('[data-rest-overlay]');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="workout-rest-overlay" data-rest-overlay role="dialog" aria-modal="true" aria-label="Rest timer">
+      <div class="workout-rest-backdrop"></div>
+      <section class="workout-rest-stage">
+        <p class="eyebrow">REST TIME</p>
+        <div class="workout-rest-ring" data-rest-ring style="--rest-progress: 100%">
+          <span data-rest-overlay-time>${formatTime(restTimerState.remaining)}</span>
+        </div>
+        <p class="workout-rest-quote" data-rest-quote>${escapeHtml(REST_QUOTES[restTimerState.quoteIndex])}</p>
+        <p class="workout-rest-coach">Control your breathing. Prepare for the next set.</p>
+        <button type="button" class="primary-btn" data-rest-add="+10">+10 SEC</button>
+      </section>
+    </div>
+  `);
+}
+
+function updateRestOverlay(animateQuote = false) {
+  if (!restTimerState) return;
+  const overlay = document.querySelector('[data-rest-overlay]');
+  if (!overlay) return;
+  const time = overlay.querySelector('[data-rest-overlay-time]');
+  const ring = overlay.querySelector('[data-rest-ring]');
+  const quote = overlay.querySelector('[data-rest-quote]');
+  const progress = percent(Math.max(restTimerState.remaining, 0), restTimerState.total || 1);
+  if (time) time.textContent = formatTime(Math.max(restTimerState.remaining, 0));
+  if (ring) ring.style.setProperty('--rest-progress', `${progress}%`);
+  if (quote) {
+    if (animateQuote) {
+      quote.classList.remove('quote-fade');
+      void quote.offsetWidth;
+      quote.classList.add('quote-fade');
+    }
+    quote.textContent = REST_QUOTES[restTimerState.quoteIndex];
+  }
+}
+
+function finishRestTimer() {
+  if (!restTimerState) return;
+  const exerciseId = restTimerState.exerciseId;
+  const wrap = document.querySelector(`[data-rest-timer-for="${exerciseId}"]`);
+  restFocusReturn = null;
+  clearRestTimer();
+  if (wrap) {
+    wrap.classList.remove('running');
+    wrap.classList.add('done');
+  }
+  focusNextSet(exerciseId);
+  if (navigator.vibrate) navigator.vibrate(180);
+  showRestCompleteMessage();
+}
+
+function focusNextSet(exerciseId) {
+  window.setTimeout(() => {
+    const card = document.querySelector(`[data-exercise-id="${exerciseId}"]`);
+    const row = card && Array.from(card.querySelectorAll('.workout-set-row')).find((item) => !item.classList.contains('set-done'));
+    const input = row && row.querySelector('[data-set-weight], [data-set-reps]');
+    if (input) input.focus();
+  }, 50);
+}
+
+function showRestCompleteMessage() {
+  const panel = byId('workout-session-panel');
+  if (!panel) return;
+  const existing = panel.querySelector('[data-rest-complete-message]');
+  if (existing) existing.remove();
+  panel.insertAdjacentHTML('afterbegin', `
+    <div class="workout-rest-complete" data-rest-complete-message role="status">
+      Rest complete. Time for your next set.
+    </div>
+  `);
+  window.setTimeout(() => {
+    const msg = panel.querySelector('[data-rest-complete-message]');
+    if (msg) msg.remove();
+  }, 4500);
+}
+
+function updateSessionClock() {
+  if (sessionClockInterval) clearInterval(sessionClockInterval);
+  if (!openSessionId) return;
+  sessionClockInterval = setInterval(() => {
+    const display = document.querySelector(`[data-session-elapsed="${openSessionId}"]`);
+    if (!display || !sessionTimers[openSessionId]) return;
+    display.textContent = formatTime(Math.max(0, Math.floor((Date.now() - sessionTimers[openSessionId]) / 1000)));
+  }, 1000);
+}
+
 function analyticsBlockHtml() {
-  const p     = plan();
+  const p = plan();
   const total = p.schedule.length || 1;
-  const done  = p.schedule.filter((s) => s.status === 'Done').length;
+  const done = completedWorkoutsThisWeek().length;
   const skipped = p.schedule.filter((s) => s.status === 'Skipped').length;
   const weeklyPct = percent(done, total);
 
@@ -550,7 +884,7 @@ function analyticsBlockHtml() {
   const exPct = percent(doneEx, totalEx || 1);
 
   const history = currentData.workouts.slice(-80);
-  const byDate  = {};
+  const byDate = {};
   history.forEach((w) => { if (w.date) (byDate[w.date] = byDate[w.date] || []).push(w); });
   const last7 = lastNDates(7);
   const consistency = last7.map((d) => (byDate[d] || []).length);
@@ -564,8 +898,8 @@ function analyticsBlockHtml() {
     <div class="workout-chart-card workout-chart-block">
       <h3>Weekly progress</h3>
       <div class="wo-stat-row">
-        <div class="wo-stat-pill wo-done-pill"><strong>${done}</strong><span>Done</span></div>
-        <div class="wo-stat-pill wo-skip-pill"><strong>${skipped}</strong><span>Skipped</span></div>
+        <div class="wo-stat-pill wo-done-pill"><strong>${done}/${total}</strong><span>Done</span></div>
+        <div class="wo-stat-pill wo-skip-pill"><strong>${Math.max(0, total - done)}</strong><span>Remaining</span></div>
         <div class="wo-stat-pill wo-pct-pill"><strong>${weeklyPct}%</strong><span>Complete</span></div>
       </div>
       <div class="chart-bars" style="height:80px"><span style="height:${weeklyPct}%"></span></div>
@@ -585,7 +919,7 @@ function analyticsBlockHtml() {
       <div class="workout-chart-labels">${last7.map((d) => `<span>${escapeHtml(d.slice(5))}</span>`).join('')}</div>
     </div>
     <div class="workout-chart-card workout-chart-block">
-      <h3>Strength progression${topExercise ? ` · ${escapeHtml(topExercise)}` : ''}</h3>
+      <h3>Strength progression${topExercise ? ` • ${escapeHtml(topExercise)}` : ''}</h3>
       ${series.length > 1 ? buildLineChartSvg(series) : '<p class="muted">Log a few sessions to see your trend.</p>'}
     </div>
   `;
@@ -615,27 +949,58 @@ function buildLineChartSvg(series) {
   `;
 }
 
-// ─── Event delegation ─────────────────────────────────────────────────────────
 function bindWorkoutEventsOnce() {
   if (workoutEventsBound) return;
   workoutEventsBound = true;
   const root = byId('workout-root');
-  root.addEventListener('click',  onWorkoutClick);
+  root.addEventListener('click', onWorkoutClick);
   root.addEventListener('change', onWorkoutChange);
-  root.addEventListener('submit', onWorkoutSubmit);
+  document.addEventListener('click', onWorkoutDocumentClick);
+  document.addEventListener('keydown', onWorkoutKeydown, true);
+}
+
+function onWorkoutDocumentClick(e) {
+  const addRestBtn = e.target.closest('[data-rest-add]');
+  if (!addRestBtn || !restTimerState) return;
+  restTimerState.remaining += 10;
+  restTimerState.total += 10;
+  updateRestOverlay();
+}
+
+function onWorkoutKeydown(e) {
+  if (!restTimerState) return;
+  const overlay = document.querySelector('[data-rest-overlay]');
+  if (!overlay) return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  if (e.key !== 'Tab') return;
+  const focusable = Array.from(overlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+    .filter((el) => !el.disabled && el.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 function onWorkoutClick(e) {
-  // Quick-count buttons
   const daysBtn = e.target.closest('[data-days]');
   if (daysBtn) {
     const n = Number(daysBtn.dataset.days);
     const p = plan();
     const cur = Array.isArray(p.trainingDaysFull) ? p.trainingDaysFull : [];
-    // Trim or auto-extend days to match count
     let newDays = cur.slice(0, n);
     if (newDays.length < n) {
-      // Fill with unused days in order
       for (const d of DAY_NAMES_FULL) {
         if (newDays.length >= n) break;
         if (!newDays.includes(d)) newDays.push(d);
@@ -645,45 +1010,51 @@ function onWorkoutClick(e) {
     return;
   }
 
-  // Manual day toggles
   const toggleBtn = e.target.closest('[data-toggle-day]');
   if (toggleBtn) {
     const day = toggleBtn.dataset.toggleDay;
-    const p   = plan();
-    let selected = Array.isArray(p.trainingDaysFull) ? [...p.trainingDaysFull] : [];
+    let selected = Array.isArray(plan().trainingDaysFull) ? [...plan().trainingDaysFull] : [];
     if (selected.includes(day)) {
-      if (selected.length <= 1) return; // keep at least 1
+      if (selected.length <= 1) return;
       selected = selected.filter((d) => d !== day);
     } else {
       selected.push(day);
-      // Sort by day-of-week order
       selected.sort((a, b) => DAY_NAMES_FULL.indexOf(a) - DAY_NAMES_FULL.indexOf(b));
     }
     setTrainingDays(selected);
     return;
   }
 
-  // Open/close session
   const openBtn = e.target.closest('[data-open-session]');
   if (openBtn) {
     const id = openBtn.dataset.openSession;
-    openSessionId = openSessionId === id ? null : id;
-    if (openSessionId) {
-      sessionTimers[id] = sessionTimers[id] || Date.now();
-      const s = plan().schedule.find((x) => x.id === id);
-      if (s && s.status === 'Not Started') { s.status = 'In Progress'; persist(); }
+    if (openSessionId === id) {
+      openSessionId = null;
+      renderWorkoutRoot();
+    } else {
+      openWorkoutSession(id);
     }
-    return renderWorkoutRoot();
+    return;
   }
 
   const closeBtn = e.target.closest('[data-close-session]');
-  if (closeBtn) { openSessionId = null; return renderWorkoutRoot(); }
+  if (closeBtn) {
+    openSessionId = null;
+    renderWorkoutRoot();
+    return;
+  }
 
   const finishBtn = e.target.closest('[data-finish-session]');
-  if (finishBtn) return finishSession(finishBtn.dataset.finishSession);
+  if (finishBtn) {
+    finishSession(finishBtn.dataset.finishSession);
+    return;
+  }
 
   const skipBtn = e.target.closest('[data-skip-session]');
-  if (skipBtn) return skipSession(skipBtn.dataset.skipSession);
+  if (skipBtn) {
+    skipSession(skipBtn.dataset.skipSession);
+    return;
+  }
 
   const removeBtn = e.target.closest('[data-remove-exercise]');
   if (removeBtn) {
@@ -691,13 +1062,17 @@ function onWorkoutClick(e) {
     if (s) {
       s.exercises = s.exercises.filter((x) => x.id !== removeBtn.dataset.removeExercise);
       persist();
+      renderWorkoutStats();
       renderWorkoutRoot();
     }
     return;
   }
 
   const restBtn = e.target.closest('[data-start-rest]');
-  if (restBtn) return startRestTimer(restBtn.dataset.startRest, Number(restBtn.dataset.restSeconds) || 90);
+  if (restBtn) {
+    startRestTimer(restBtn.dataset.startRest, Number(restBtn.dataset.restSeconds) || 90);
+    return;
+  }
 
   const excelAddBtn = e.target.closest('[data-excel-add]');
   if (excelAddBtn) {
@@ -708,112 +1083,118 @@ function onWorkoutClick(e) {
       renderWorkoutStats();
       renderWorkoutRoot();
     }
-    return;
   }
 }
 
 function onWorkoutChange(e) {
-  // Workout type selector in planner table
   const typeSel = e.target.closest('[data-type-for]');
   if (typeSel) {
     const s = plan().schedule.find((x) => x.id === typeSel.dataset.typeFor);
-    if (s) { s.type = typeSel.value; syncScheduleToTodo(); persist(); }
+    if (s) {
+      s.type = typeSel.value;
+      syncScheduleToTodo();
+      persist();
+      renderArt('workout');
+    }
     return;
   }
 
-  // Workout day status selector in planner table
   const woStatusSel = e.target.closest('[data-wo-status-for]');
   if (woStatusSel) {
     const s = plan().schedule.find((x) => x.id === woStatusSel.dataset.woStatusFor);
     if (s) {
       s.status = woStatusSel.value;
-      // Update color class
-      woStatusSel.className = `wo-status-select ${WO_STATUS_CLASS[s.status] || 'wo-ns'}`;
+      if (s.status === 'Done') {
+        s.completionDate = new Date().toISOString().slice(0, 10);
+        s.lastCompletedDate = s.completionDate;
+      }
       syncScheduleToTodo();
       persist();
+      renderArt('workout');
       renderWorkoutStats();
+      renderWorkoutRoot();
     }
     return;
   }
 
-  // Exercise status selector in session panel
   const exStatusSel = e.target.closest('[data-ex-status-for]');
   if (exStatusSel) {
-    const s  = plan().schedule.find((x) => x.id === exStatusSel.dataset.schedule);
+    const s = plan().schedule.find((x) => x.id === exStatusSel.dataset.schedule);
     const ex = s && s.exercises.find((x) => x.id === exStatusSel.dataset.exStatusFor);
     if (ex) {
+      if (exStatusSel.value === 'Done') {
+        const totalSets = Math.max(1, Number(ex.sets) || 1);
+        const doneSets = (ex.log || []).filter(setIsDone).length;
+        if (doneSets < totalSets) {
+          exStatusSel.value = ex.exStatus || 'Not Started';
+          window.alert('Please enter weight and reps for every set first.');
+          return;
+        }
+      }
       ex.exStatus = exStatusSel.value;
-      exStatusSel.className = `ex-status-select ${EX_STATUS_CLASS[ex.exStatus] || 'ex-ns'}`;
+      if (ex.exStatus === 'Done') saveExercisePerformance(ex, s.date);
       persist();
       renderWorkoutStats();
+      renderWorkoutRoot();
     }
     return;
   }
 
-  // Excel plan sheet fields
   const excelInput = e.target.closest('[data-excel-field]');
   if (excelInput) {
-    const s  = plan().schedule.find((x) => x.id === excelInput.dataset.schedule);
+    const s = plan().schedule.find((x) => x.id === excelInput.dataset.schedule);
     const ex = s && s.exercises.find((x) => x.id === excelInput.dataset.exercise);
     if (!ex) return;
     const field = excelInput.dataset.excelField;
-    if (field === 'name')    ex.name    = excelInput.value.trim() || 'Exercise';
-    if (field === 'sets')    ex.sets    = Math.max(1, Number(excelInput.value) || 1);
+    if (field === 'name') ex.name = excelInput.value.trim() || 'Exercise';
+    if (field === 'sets') {
+      ex.sets = Math.max(1, Number(excelInput.value) || 1);
+      ex.log = (ex.log || []).slice(0, ex.sets);
+      updateExerciseStatusFromSets(ex, s.date);
+    }
     if (field === 'repsMin') ex.repsMin = Number(excelInput.value) || 1;
     if (field === 'repsMax') ex.repsMax = Number(excelInput.value) || 1;
-    if (field === 'weight')  ex.weight  = Number(excelInput.value) || 0;
-    if (field === 'rest')    ex.rest    = Number(excelInput.value) || 90;
+    if (field === 'weight') ex.weight = Number(excelInput.value) || 0;
+    if (field === 'rest') ex.rest = Number(excelInput.value) || 90;
+    if (field === 'video') ex.video = excelInput.value.trim();
     if (field === 'actual') {
       ex.log = ex.log || [];
       ex.log[0] = { ...(ex.log[0] || {}), reps: excelInput.value, weight: ex.log[0]?.weight || ex.weight };
+      updateExerciseStatusFromSets(ex, s.date);
     }
     persist();
+    renderWorkoutStats();
+    renderWorkoutRoot();
     return;
   }
 
-  // Session set log inputs
   const wInput = e.target.closest('[data-set-weight]');
   const rInput = e.target.closest('[data-set-reps]');
-  const target = wInput || rInput;
+  const doneInput = e.target.closest('[data-set-done]');
+  const target = wInput || rInput || doneInput;
   if (!target) return;
 
-  const s  = plan().schedule.find((x) => x.id === target.dataset.schedule);
+  const s = plan().schedule.find((x) => x.id === target.dataset.schedule);
   const ex = s && s.exercises.find((x) => x.id === target.dataset.exercise);
   if (!ex) return;
   ex.log = ex.log || [];
-  const idx = Number(wInput ? target.dataset.setWeight : target.dataset.setReps);
+  const idx = Number(wInput ? target.dataset.setWeight : (rInput ? target.dataset.setReps : target.dataset.setDone));
   ex.log[idx] = ex.log[idx] || {};
-  if (wInput) ex.log[idx].weight = target.value; else ex.log[idx].reps = target.value;
-  persist();
-
-  const row = target.closest('.workout-set-row');
-  const summary = row && row.querySelector('.wo-set-summary');
-  if (summary) {
-    summary.textContent = (ex.log[idx].weight && ex.log[idx].reps)
-      ? `${ex.log[idx].weight}kg × ${ex.log[idx].reps}` : '';
+  if (wInput) {
+    ex.log[idx].weight = target.value;
+    if (!hasSetPerformance(ex.log[idx])) ex.log[idx].done = false;
+  } else if (rInput) {
+    ex.log[idx].reps = target.value;
+    if (!hasSetPerformance(ex.log[idx])) ex.log[idx].done = false;
+  } else if (target.checked && !hasSetPerformance(ex.log[idx])) {
+    target.checked = false;
+    ex.log[idx].done = false;
+    window.alert('Please enter weight and reps first.');
+  } else {
+    ex.log[idx].done = target.checked;
   }
-}
-
-function onWorkoutSubmit(e) {
-  const form = e.target.closest('[data-add-exercise-for]');
-  if (!form) return;
-  e.preventDefault();
-  const s = plan().schedule.find((x) => x.id === form.dataset.addExerciseFor);
-  if (!s) return;
-  const data = new FormData(form);
-  s.exercises.push({
-    id:       makeId(),
-    name:     String(data.get('name') || '').trim() || 'Exercise',
-    sets:     Math.max(1, Number(data.get('sets')) || 3),
-    repsMin:  Number(data.get('repsMin')) || 8,
-    repsMax:  Number(data.get('repsMax')) || 12,
-    weight:   Number(data.get('weight')) || 0,
-    rest:     Number(data.get('rest')) || 90,
-    video:    String(data.get('video') || '').trim(),
-    notes:    String(data.get('notes') || '').trim(),
-    log:      [],
-    exStatus: 'Not Started',
-  });
+  updateExerciseStatusFromSets(ex, s.date);
+  if (s.status === 'Not Started') s.status = 'In Progress';
   persist();
   renderWorkoutStats();
   renderWorkoutRoot();
