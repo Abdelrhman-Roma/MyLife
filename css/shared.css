@@ -1,13 +1,64 @@
-﻿body {
+﻿@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-body: Inter, Segoe UI, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+body {
   min-height: 100dvh;
   margin: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 22px 22px;
   color: var(--ink);
-  font-family: Inter, Segoe UI, Arial, sans-serif;
+  font-family: var(--font-body);
   color-scheme: light;
 }
+
+::selection {
+  background: var(--accent, var(--blue));
+  color: var(--surface);
+}
+
+* {
+  scrollbar-color: var(--line) transparent;
+  scrollbar-width: thin;
+}
+
+.sidebar {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+h1, h2, h3,
+.eyebrow,
+.nav-item span,
+.nav-item strong,
+.stat-card strong,
+.stat-line strong,
+.sleep-ring span,
+.brand small,
+.brand strong,
+.primary-btn,
+.secondary-btn,
+.danger-btn,
+.small-danger,
+.text-btn {
+  font-family: var(--font-mono);
+}
+
+h1, h2, h3 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+h1 { font-size: 1.7rem; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: 1.05rem; }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -97,13 +148,38 @@ textarea:focus {
   display: none !important;
 }
 
+/* Life-domain color system: each page inherits one accent that carries
+   through its topbar, panels, stat cards, eyebrows and progress meters. */
+body[data-page='dashboard'],
+body[data-page='todo'],
+body[data-page='workout'],
+body[data-page='water'],
+body[data-page='study'] { --accent: var(--blue); }
+
+body[data-page='habits'],
+body[data-page='prayer'],
+body[data-page='statistics'] { --accent: var(--green); }
+
+body[data-page='goals'],
+body[data-page='sleep'],
+body[data-page='profile'] { --accent: var(--purple); }
+
+body[data-page='calendar'],
+body[data-page='nutrition'],
+body[data-page='settings'] { --accent: var(--orange); }
+
 .eyebrow {
   margin: 0;
-  color: var(--blue);
-  font-size: 0.76rem;
-  font-weight: 900;
-  letter-spacing: 0;
+  color: var(--accent, var(--blue));
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.eyebrow::before {
+  content: '// ';
+  opacity: 0.55;
 }
 
 
@@ -114,9 +190,16 @@ textarea:focus {
 .panel,
 .stat-card {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.topbar,
+.page-art,
+.panel,
+.stat-card {
+  border-top: 3px solid var(--accent, var(--blue));
 }
 
 .auth-card h2,
@@ -145,19 +228,50 @@ textarea:focus {
 .small-danger {
   min-height: 42px;
   border: 0;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-weight: 900;
+  border-radius: 7px;
+  padding: 10px 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.primary-btn:hover,
+.secondary-btn:hover,
+.danger-btn:hover,
+.small-danger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+}
+
+.primary-btn:active,
+.secondary-btn:active,
+.danger-btn:active,
+.small-danger:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent, var(--blue));
+  outline-offset: 2px;
 }
 
 .primary-btn {
-  background: var(--blue);
-  color: #fff;
+  background: var(--ink);
+  color: var(--surface);
+}
+
+:root[data-theme='dark'] .primary-btn {
+  background: var(--accent, var(--blue));
+  color: #10130f;
 }
 
 .secondary-btn {
   background: var(--surface-2);
   color: var(--ink);
+  border: 1px solid var(--line);
   white-space: nowrap;
 }
 
@@ -202,9 +316,10 @@ textarea:focus {
   flex-direction: column;
   gap: 18px;
   overflow: auto;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
   background: var(--nav);
-  color: #fff;
+  color: var(--on-nav);
   padding: 18px;
 }
 
@@ -222,6 +337,11 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.92);
   padding: 4px;
 }
+
+.nav-item[data-accent='blue']   { --nav-accent: var(--blue); }
+.nav-item[data-accent='green']  { --nav-accent: var(--green); }
+.nav-item[data-accent='purple'] { --nav-accent: var(--purple); }
+.nav-item[data-accent='orange'] { --nav-accent: var(--orange); }
 
 .brand-mark,
 .avatar {
@@ -255,29 +375,69 @@ textarea:focus {
   grid-template-columns: 76px 1fr;
   align-items: center;
   gap: 10px;
-  border-radius: 8px;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
   padding: 10px 12px;
   color: var(--on-nav);
+  transition: background-color 140ms ease, border-color 140ms ease;
 }
 
 .nav-item span {
   color: var(--nav-muted);
-  font-size: 0.72rem;
-  font-weight: 900;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.nav-item.active,
+.nav-item strong {
+  font-weight: 600;
+  font-size: 0.92rem;
+  position: relative;
+  padding-left: 14px;
+}
+
+.nav-item strong::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nav-accent, var(--blue));
+  transform: translateY(-50%);
+}
+
 .nav-item:hover {
-  background: #ed3f27;
-  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border-left-color: var(--nav-accent, var(--blue));
+}
+
+.nav-item.active {
+  background: var(--surface);
+  color: var(--ink);
+  border-left-color: var(--nav-accent, var(--blue));
+}
+
+.nav-item.active span {
+  color: var(--nav-accent, var(--blue));
 }
 
 .sidebar-card {
   margin-top: auto;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 14px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.18);
+  padding: 16px 4px 2px;
+}
+
+.data-card {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.data-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
 }
 
 .main-panel {
@@ -352,7 +512,7 @@ textarea:focus {
   overflow: hidden;
   border-radius: 8px;
   background: var(--surface);
-  box-shadow: 0 18px 34px rgba(19, 70, 134, 0.14);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
 }
 
 .page-image-card img {
@@ -374,7 +534,7 @@ textarea:focus {
 }
 
 :root[data-theme='dark'] .art-board {
-  background: linear-gradient(135deg, #0b2c58, #134686);
+  background: linear-gradient(135deg, var(--surface-3), var(--bg));
 }
 
 .accent-blue .art-board,
@@ -410,7 +570,7 @@ textarea:focus {
 .water-bars span {
   border-radius: 8px;
   background: var(--surface-3);
-  box-shadow: 0 8px 22px rgba(19, 70, 134, 0.08);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
 }
 
 :root[data-theme='dark'] .mini-top,
@@ -418,7 +578,7 @@ textarea:focus {
 :root[data-theme='dark'] .mini-list span,
 :root[data-theme='dark'] .calendar-grid span,
 :root[data-theme='dark'] .water-bars span {
-  background: #134686;
+  background: var(--surface-2);
 }
 
 .mini-top {
@@ -490,8 +650,8 @@ textarea:focus {
   display: grid;
   place-items: center;
   justify-self: center;
-  border: 24px solid #fdf4e3;
-  border-top-color: var(--red);
+  border: 24px solid var(--surface-2);
+  border-top-color: var(--purple);
   border-radius: 50%;
 }
 
@@ -535,6 +695,7 @@ textarea:focus {
   display: block;
   margin-top: 10px;
   font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .meter {
@@ -548,7 +709,7 @@ textarea:focus {
 .meter i {
   display: block;
   height: 100%;
-  background: var(--blue);
+  background: var(--accent, var(--blue));
 }
 
 .content-grid {
@@ -572,7 +733,7 @@ textarea:focus {
   border-radius: 12px;
   background: var(--surface-3);
   padding: 14px;
-  box-shadow: 0 8px 18px rgba(20, 30, 46, 0.04);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
 }
 
 .photo-gallery {
@@ -592,7 +753,7 @@ textarea:focus {
 }
 
 :root[data-theme='dark'] .data-card {
-  background: #0b2c58;
+  background: var(--surface-3);
 }
 
 .data-card.stacked,
@@ -646,8 +807,8 @@ textarea:focus {
 }
 
 .checklist-card.complete {
-  border-color: rgba(19, 70, 134, 0.5);
-  background: rgba(19, 70, 134, 0.08);
+  border-color: var(--accent, var(--green));
+  background: color-mix(in srgb, var(--accent, var(--green)) 10%, var(--surface));
 }
 
 .check-row {

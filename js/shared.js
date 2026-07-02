@@ -152,7 +152,7 @@ function renderSidebar(pageKey) {
     </a>
     <nav class="nav-list">
       ${NAV.map(([key, title, label]) => `
-        <a class="nav-item${key === pageKey ? ' active' : ''}" href="${key}.html">
+        <a class="nav-item${key === pageKey ? ' active' : ''}" data-accent="${(PAGES[key] && PAGES[key].accent) || 'blue'}" href="${key}.html">
           <span>${label}</span>
           <strong>${title}</strong>
         </a>
