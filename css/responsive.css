@@ -88,8 +88,225 @@
   }
 }
 
+@media (max-width: 768px) {
+  body.nav-open {
+    overflow: hidden;
+  }
 
-@media (max-width: 720px) {
-  .workout-set-row { grid-template-columns: 50px 1fr 1fr; }
-  .workout-day-picker .day-btn { flex: 1; }
+  .app-shell {
+    display: block;
+    padding-top: 76px;
+  }
+
+  .main-panel {
+    min-height: 100vh;
+  }
+
+  .topbar {
+    min-height: 190px;
+  }
+
+  .page-art {
+    min-height: 0;
+  }
+
+  .stats-grid {
+    min-height: 414px;
+  }
+
+  .mobile-nav-toggle {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 1001;
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+
+  .mobile-nav-toggle span,
+  .mobile-nav-toggle span::before,
+  .mobile-nav-toggle span::after {
+    width: 20px;
+    height: 2px;
+    display: block;
+    border-radius: 999px;
+    background: currentColor;
+    transition: transform 180ms ease, opacity 180ms ease;
+    content: '';
+  }
+
+  .mobile-nav-toggle span::before {
+    transform: translateY(-7px);
+  }
+
+  .mobile-nav-toggle span::after {
+    transform: translateY(5px);
+  }
+
+  body.nav-open .mobile-nav-toggle span {
+    transform: rotate(45deg);
+  }
+
+  body.nav-open .mobile-nav-toggle span::before {
+    opacity: 0;
+  }
+
+  body.nav-open .mobile-nav-toggle span::after {
+    transform: translateY(-2px) rotate(-90deg);
+  }
+
+  .mobile-nav-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 998;
+    display: block;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0);
+    transition: background-color 180ms ease;
+  }
+
+  body.nav-open .mobile-nav-overlay {
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.56);
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 999;
+    width: min(84vw, 320px);
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0 10px 10px 0;
+    transform: translateX(-102%);
+    transition: transform 220ms ease;
+    will-change: transform;
+  }
+
+  body.nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .nav-list {
+    grid-template-columns: 1fr;
+  }
+
+  .workout-hero-board,
+  .workout-analytics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workout-session-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workout-set-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .wo-set-check {
+    grid-column: 1 / -1;
+  }
+
+  .workout-set-row .wo-set-summary {
+    display: none;
+  }
+
+  .workout-history div {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workout-table-wrap {
+    margin-inline: -8px;
+    padding-inline: 8px;
+  }
+
+  .workout-planner-table {
+    min-width: 760px;
+  }
+
+  .workout-excel-table {
+    min-width: 920px;
+  }
+
+  .workout-day-picker .day-btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .wo-setup-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .workout-session-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workout-rest-timer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workout-rest-stage {
+    min-height: calc(100vh - 48px);
+  }
+
+  .workout-rest-quote {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 425px) {
+  .app-shell {
+    padding-inline: 10px;
+  }
+
+  .panel,
+  .stat-card,
+  .art-copy {
+    padding: 16px;
+  }
+
+  .art-copy h2 {
+    font-size: 1.85rem;
+  }
+
+  .workout-day-picker,
+  .wo-day-toggles,
+  .workout-panel-head {
+    align-items: stretch;
+  }
+
+  .workout-day-picker .day-btn,
+  .wo-day-toggle {
+    flex: 1 1 calc(50% - 6px);
+  }
+}
+
+@media (max-width: 360px) {
+  .app-shell {
+    padding-inline: 8px;
+  }
+
+  .mobile-nav-toggle {
+    left: 10px;
+  }
+
+  .topbar {
+    padding-inline: 14px;
+  }
+
+  .workout-set-row {
+    grid-template-columns: 1fr;
+  }
 }

@@ -27,14 +27,14 @@
   color: white;
 }
 
-.workout-hero-card .eyebrow { color: rgba(255,255,255,0.82); }
+.workout-hero-card .eyebrow { color: #fff; }
 .workout-hero-card strong { display: block; margin-top: 6px; font-size: 1.25rem; }
-.workout-hero-card p { margin: 6px 0 0; color: rgba(255,255,255,0.9); }
+.workout-hero-card p { margin: 6px 0 0; color: #fff; }
 
 .workout-track-list { display: grid; gap: 8px; }
 .workout-track-item { display: flex; justify-content: space-between; align-items: center; }
-.workout-track-item span { font-weight: 800; }
-.workout-track-item b { color: var(--red); font-weight: 900; }
+.workout-track-item span { color: var(--ink); font-weight: 800; }
+.workout-track-item b { color: var(--ink); font-weight: 900; }
 
 /* ── Lists & pills ──────────────────────────────────────────────────────── */
 .workout-list { display: grid; gap: 12px; }
@@ -43,15 +43,20 @@
 .workout-tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .workout-pill {
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(237, 63, 39, 0.14), rgba(237, 63, 39, 0.08));
-  color: var(--red);
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   padding: 6px 10px;
   font-size: 0.78rem;
   font-weight: 800;
 }
 
 /* ── Sections wrapper ───────────────────────────────────────────────────── */
-.workout-sections { display: grid; gap: 18px; }
+.workout-sections {
+  display: grid;
+  gap: 18px;
+  min-height: 720px;
+}
 .workout-panel-head {
   display: flex;
   align-items: center;
@@ -68,9 +73,6 @@
   grid-template-columns: auto 1fr;
   gap: 24px;
   align-items: start;
-}
-@media (max-width: 600px) {
-  .wo-setup-grid { grid-template-columns: 1fr; }
 }
 
 .wo-setup-label {
@@ -296,7 +298,7 @@
   gap: 8px;
 }
 .workout-session-grid span {
-  color: var(--muted);
+  color: var(--ink);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -567,6 +569,7 @@
   border-radius: 10px;
   background: var(--surface);
   padding: 18px;
+  min-height: 246px;
 }
 .workout-chart-card h3 { margin: 0 0 12px; }
 .workout-chart-block { display: grid; gap: 10px; }
@@ -601,19 +604,3 @@
 .wo-pct-pill strong { color: var(--blue); }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .workout-hero-board { grid-template-columns: 1fr; }
-  .workout-session-grid { grid-template-columns: 1fr 1fr; }
-  .workout-set-row { grid-template-columns: 1fr 1fr; }
-  .wo-set-check { grid-column: 1 / -1; }
-  .workout-set-row .wo-set-summary { display: none; }
-  .workout-history div { grid-template-columns: 1fr 1fr; }
-  .workout-analytics-grid { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 520px) {
-  .workout-session-grid { grid-template-columns: 1fr; }
-  .workout-rest-timer { align-items: stretch; flex-direction: column; }
-  .workout-rest-stage { min-height: calc(100vh - 48px); }
-  .workout-rest-quote { font-size: 1.05rem; }
-}

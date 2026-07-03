@@ -131,6 +131,7 @@ function bootShell(pageKey) {
   persist();
   applyTheme(currentData.settings.theme, currentData.settings.palette);
   renderSidebar(pageKey);
+  initMobileNav();
   renderTopbar(pageKey);
   renderArt(pageKey);
   return true;
@@ -147,7 +148,7 @@ function initPage(pageKey) {
 function renderSidebar(pageKey) {
   byId('sidebar').innerHTML = `
     <a class="brand" href="dashboard.html">
-      <img class="brand-logo" src="../assist/Logo/MyLife.png" alt="MYLIFE logo" />
+      <img class="brand-logo" src="../assist/Logo/MyLife.png" alt="MYLIFE logo" width="44" height="44" />
       <span><strong>MYLIFE</strong><small>Life Tracker</small></span>
     </a>
     <nav class="nav-list">
@@ -297,6 +298,61 @@ function workoutArtBoard() {
       </div>
     </div>
   `;
+}
+
+function initMobileNav() {
+  const shell = document.querySelector('.app-shell');
+  const sidebar = byId('sidebar');
+  if (!shell || !sidebar) return;
+
+  let toggle = byId('mobile-nav-toggle');
+  let overlay = byId('mobile-nav-overlay');
+  if (!toggle) {
+    toggle = document.createElement('button');
+    toggle.id = 'mobile-nav-toggle';
+    toggle.className = 'mobile-nav-toggle';
+    toggle.type = 'button';
+    toggle.setAttribute('aria-label', 'Open navigation');
+    toggle.setAttribute('aria-controls', 'sidebar');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.innerHTML = '<span aria-hidden="true"></span>';
+    shell.insertBefore(toggle, sidebar);
+  }
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'mobile-nav-overlay';
+    overlay.className = 'mobile-nav-overlay';
+    overlay.hidden = true;
+    shell.insertBefore(overlay, sidebar.nextSibling);
+  }
+
+  if (shell.dataset.mobileNavBound === 'true') return;
+  shell.dataset.mobileNavBound = 'true';
+
+  const closeNav = () => {
+    document.body.classList.remove('nav-open');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'Open navigation');
+    overlay.hidden = true;
+  };
+  const openNav = () => {
+    document.body.classList.add('nav-open');
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-label', 'Close navigation');
+    overlay.hidden = false;
+  };
+
+  toggle.addEventListener('click', () => {
+    if (document.body.classList.contains('nav-open')) closeNav();
+    else openNav();
+  });
+  overlay.addEventListener('click', closeNav);
+  sidebar.addEventListener('click', (e) => {
+    if (e.target.closest('.nav-item')) closeNav();
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) closeNav();
+  });
 }
 
 function macroBoard(rows) {
