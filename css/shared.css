@@ -77,9 +77,9 @@ h1, h2, h3 {
   line-height: 1.15;
 }
 
-h1 { font-size: 1.7rem; }
-h2 { font-size: 1.3rem; }
-h3 { font-size: 1.05rem; }
+h1 { font-size: var(--fs-h1); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -336,8 +336,8 @@ body[data-page='settings'] { --accent: var(--orange); }
   min-height: 100vh;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  gap: 18px;
-  padding: 18px;
+  gap: var(--app-gap);
+  padding: var(--app-gap);
 }
 
 .sidebar {
@@ -735,7 +735,7 @@ body[data-page='settings'] { --accent: var(--orange); }
 
 .stat-card,
 .panel {
-  padding: 18px;
+  padding: var(--card-pad);
 }
 
 .stat-card span {

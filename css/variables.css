@@ -753,4 +753,42 @@
   box-sizing: border-box;
 }
 
+/* ── Mobile-first design tokens ──────────────────────────────────────────
+   Shared spacing / radius / touch / type scale used across all pages so
+   mobile layouts stay consistent without hard-coded pixel values. */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 28px;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Minimum comfortable tap target (Apple HIG / Material both land ~48px) */
+  --tap: 48px;
+
+  /* Fluid type scale: readable at 320px, doesn't balloon on desktop */
+  --fs-h1: clamp(1.32rem, 1.05rem + 1.4vw, 1.7rem);
+  --fs-h2: clamp(1.08rem, 0.95rem + 0.7vw, 1.3rem);
+  --fs-h3: clamp(0.95rem, 0.88rem + 0.35vw, 1.05rem);
+  --fs-body: clamp(0.88rem, 0.84rem + 0.2vw, 0.95rem);
+  --fs-small: clamp(0.76rem, 0.73rem + 0.15vw, 0.82rem);
+
+  --app-gap: clamp(10px, 3vw, 18px);
+  --card-pad: clamp(14px, 4vw, 18px);
+}
+
+img, svg, video {
+  max-width: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 

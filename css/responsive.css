@@ -91,19 +91,38 @@
 @media (max-width: 768px) {
   body.nav-open {
     overflow: hidden;
+    touch-action: none;
   }
 
   .app-shell {
     display: block;
-    padding-top: 76px;
+    padding: var(--app-gap);
+    padding-top: 72px;
   }
 
   .main-panel {
     min-height: 100vh;
+    gap: var(--space-4);
   }
 
+  /* Compact topbar: current desktop version reserves ~190px, which eats a
+     third of a small phone's viewport before any content shows. */
   .topbar {
-    min-height: 190px;
+    min-height: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .topbar h1 {
+    font-size: var(--fs-h2);
+  }
+
+  .topbar-actions {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
   }
 
   .page-art {
@@ -111,23 +130,61 @@
   }
 
   .stats-grid {
-    min-height: 414px;
+    min-height: 0;
+    gap: var(--space-3);
+  }
+
+  /* Touch-friendly baseline: every interactive control gets a real target */
+  .primary-btn,
+  .secondary-btn,
+  .danger-btn,
+  .small-danger,
+  input,
+  select,
+  .day-btn,
+  .wo-day-toggle,
+  .nav-item,
+  .check-row input {
+    min-height: var(--tap);
+  }
+
+  button,
+  .nav-item,
+  a.workout-video-link,
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-height: var(--tap);
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-width: var(--tap);
+    min-height: var(--tap);
+  }
+
+  .form-stack {
+    gap: var(--space-4);
   }
 
   .mobile-nav-toggle {
     position: fixed;
-    top: 16px;
-    left: 16px;
+    top: 14px;
+    left: 14px;
     z-index: 1001;
-    width: 46px;
-    height: 46px;
+    width: var(--tap);
+    height: var(--tap);
     display: grid;
     place-items: center;
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--surface);
     color: var(--ink);
     box-shadow: var(--shadow);
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .mobile-nav-toggle:active {
+    transform: scale(0.92);
   }
 
   .mobile-nav-toggle span,
@@ -138,7 +195,7 @@
     display: block;
     border-radius: 999px;
     background: currentColor;
-    transition: transform 180ms ease, opacity 180ms ease;
+    transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), opacity 180ms ease;
     content: '';
   }
 
@@ -162,19 +219,26 @@
     transform: translateY(-2px) rotate(-90deg);
   }
 
+  /* Overlay: soft blur + fade behind the sliding sidebar for a premium feel */
   .mobile-nav-overlay {
     position: fixed;
     inset: 0;
     z-index: 998;
     display: block;
     pointer-events: none;
-    background: rgba(0, 0, 0, 0);
-    transition: background-color 180ms ease;
+    background: rgba(10, 10, 14, 0);
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+    opacity: 0;
+    transition: background-color 260ms ease, backdrop-filter 260ms ease, opacity 260ms ease;
   }
 
   body.nav-open .mobile-nav-overlay {
     pointer-events: auto;
-    background: rgba(0, 0, 0, 0.56);
+    background: rgba(10, 10, 14, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 1;
   }
 
   .sidebar {
@@ -184,9 +248,10 @@
     width: min(84vw, 320px);
     height: 100dvh;
     max-height: none;
-    border-radius: 0 10px 10px 0;
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+    box-shadow: 24px 0 60px rgba(0, 0, 0, 0.35);
     transform: translateX(-102%);
-    transition: transform 220ms ease;
+    transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
     will-change: transform;
   }
 
@@ -243,6 +308,19 @@
 
 @media (max-width: 600px) {
   .wo-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard/statistics widgets: one card per row instead of a cramped
+     2-up auto-fit grid. */
+  .stats-grid,
+  .summary-grid,
+  .workout-analytics-grid,
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .macro-board div {
     grid-template-columns: 1fr;
   }
 }

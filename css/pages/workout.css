@@ -603,4 +603,234 @@
 .wo-pct-pill { background: color-mix(in srgb, var(--blue) 10%, var(--surface-2)); }
 .wo-pct-pill strong { color: var(--blue); }
 
+/* ── Excel plan sheet: per-day groups ───────────────────────────────────── */
+.wo-excel-days { display: grid; gap: 16px; }
+.wo-excel-day-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  padding: 12px;
+}
+.wo-excel-day-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+}
+.wo-excel-day-index {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent, var(--blue));
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.82rem;
+}
+.wo-excel-day-head strong { display: block; font-size: 0.95rem; }
+.wo-excel-day-head span { font-size: 0.78rem; }
+.wo-excel-day-group .workout-table-wrap { margin: 0; }
+.wo-excel-empty { min-height: auto; padding: 16px; gap: 6px; flex-direction: column; }
+.wo-excel-add-btn { width: auto; margin-top: 10px; }
+
+/* ── Exercise card collapse ─────────────────────────────────────────────── */
+.workout-exercise-card { position: relative; }
+.workout-exercise-head { position: relative; }
+.wo-exercise-head-main { flex: 1; min-width: 0; }
+.wo-exercise-collapse-toggle {
+  display: none;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.9rem;
+  transition: transform 200ms ease;
+}
+.workout-exercise-card.collapsed .wo-exercise-collapse-toggle { transform: rotate(-90deg); }
+
+/* ── Floating action button ─────────────────────────────────────────────── */
+.workout-fab {
+  display: none;
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 20px;
+  height: 56px;
+  background: var(--accent, var(--blue));
+  color: #fff;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.workout-fab:active {
+  transform: scale(0.94);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+.workout-fab-icon { font-size: 1.05rem; line-height: 1; }
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Show the FAB and give it room so it never sits over the last card */
+  .workout-fab {
+    display: inline-flex;
+  }
+  .workout-sections {
+    padding-bottom: 84px;
+  }
+
+  /* ── Weekly planner table -> stacked cards ────────────────────────────── */
+  .workout-planner-table thead {
+    display: none;
+  }
+  .workout-planner-table,
+  .workout-planner-table tbody {
+    display: block;
+    width: 100%;
+  }
+  .workout-planner-table tr {
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: var(--surface-3);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+  }
+  .workout-planner-table tr:last-child {
+    margin-bottom: 0;
+  }
+  .workout-planner-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--line);
+    padding: 10px 0;
+    min-height: 0;
+  }
+  .workout-planner-table td:last-child {
+    border-bottom: 0;
+  }
+  .workout-planner-table td::before {
+    content: attr(data-label);
+    flex: none;
+    margin-right: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .workout-planner-table td > *:not(label) {
+    flex: 1;
+    max-width: 68%;
+  }
+  .workout-planner-table td[data-label='Action'] {
+    justify-content: flex-end;
+  }
+  .workout-planner-table td[data-label='Action']::before {
+    display: none;
+  }
+  .workout-planner-table td[data-label='Action'] button {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* Excel sheet uses the same card technique inside each day group */
+  .workout-excel-table th,
+  .workout-excel-table td {
+    border-right: 0;
+  }
+  .workout-excel-table td {
+    flex-wrap: wrap;
+  }
+  .workout-excel-table td > input,
+  .workout-excel-table td > div {
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+
+  /* ── Exercise cards: collapsible, larger touch targets ────────────────── */
+  .wo-exercise-collapse-toggle {
+    display: flex;
+  }
+  .workout-exercise-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .workout-exercise-card.collapsed .workout-exercise-body {
+    display: none;
+  }
+  .workout-set-row {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 6px;
+  }
+  .wo-set-check {
+    grid-column: 1 / -1;
+    min-height: var(--tap);
+  }
+  .workout-set-row .wo-set-summary {
+    grid-column: 1 / -1;
+  }
+  .workout-set-row input {
+    min-height: var(--tap);
+  }
+
+  body:has(.workout-session-actions) .workout-fab {
+    bottom: 92px;
+  }
+
+  /* ── Sticky session controls ───────────────────────────────────────────── */
+  .workout-session-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 0 -14px -14px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.08);
+  }
+  .workout-session-actions .wo-status-badge {
+    order: -1;
+    flex-basis: 100%;
+    text-align: center;
+  }
+  .workout-session-actions button {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Rest timer card ───────────────────────────────────────────────────── */
+  .workout-rest-timer {
+    flex-wrap: wrap;
+  }
+  .workout-rest-timer button {
+    flex: 1;
+  }
+}

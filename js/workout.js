@@ -27,6 +27,7 @@ let restTimerState = null;
 let restFocusReturn = null;
 let workoutEventsBound = false;
 let sessionClockInterval = null;
+let collapsedExercises = new Set();
 
 function initWorkoutPage() {
   migrateLegacyData();
@@ -417,8 +418,21 @@ function renderWorkoutRoot() {
       </div>
       <div class="workout-analytics-grid">${analyticsBlockHtml()}</div>
     </section>
+
+    ${workoutFabHtml()}
   `;
   updateSessionClock();
+}
+
+function workoutFabHtml() {
+  const label = openSessionId ? 'Add exercise' : 'Start workout';
+  const icon = openSessionId ? '+' : '▶';
+  return `
+    <button type="button" class="workout-fab" data-workout-fab aria-label="${escapeAttr(label)}" title="${escapeAttr(label)}">
+      <span class="workout-fab-icon" aria-hidden="true">${icon}</span>
+      <span class="workout-fab-label">${escapeHtml(label)}</span>
+    </button>
+  `;
 }
 
 function weeklySummaryHtml() {
@@ -449,16 +463,16 @@ function plannerRowHtml(s) {
   const openLabel = openSessionId === s.id ? `Close ${s.day} ${s.type} session` : `${action.toLowerCase()} ${s.day} ${s.type} session`;
   return `
     <tr class="workout-planner-row">
-      <td><strong>${escapeHtml(s.day)}</strong></td>
-      <td class="muted">${escapeHtml(s.date)}</td>
-      <td>
+      <td data-label="Day"><strong>${escapeHtml(s.day)}</strong></td>
+      <td class="muted" data-label="Date">${escapeHtml(s.date)}</td>
+      <td data-label="Workout Type">
         <label class="sr-only" for="${escapeAttr(typeId)}">${escapeHtml(s.day)} workout type</label>
         <select id="${escapeAttr(typeId)}" data-type-for="${escapeAttr(s.id)}" aria-label="${escapeAttr(s.day)} workout type">
           ${WORKOUT_TYPES.map((t) => `<option ${t === s.type ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
         </select>
       </td>
-      <td>${totalEx}</td>
-      <td>
+      <td data-label="Exercises">${totalEx}</td>
+      <td data-label="Progress">
         ${totalEx ? `
           <div class="wo-progress-bar">
             <div class="wo-progress-fill" style="width:${exPct}%"></div>
@@ -466,36 +480,37 @@ function plannerRowHtml(s) {
           <span class="muted" style="font-size:0.72rem">${doneEx}/${totalEx} • ${exPct}%</span>
         ` : '<span class="muted">—</span>'}
       </td>
-      <td>${s.durationMin ? `${s.durationMin} min` : '—'}</td>
-      <td>
+      <td data-label="Duration">${s.durationMin ? `${s.durationMin} min` : '—'}</td>
+      <td data-label="Status">
         <label class="sr-only" for="${escapeAttr(statusId)}">${escapeHtml(s.day)} workout status</label>
         <select id="${escapeAttr(statusId)}" class="wo-status-select ${scls}" data-wo-status-for="${escapeAttr(s.id)}" aria-label="${escapeAttr(s.day)} workout status">
           ${WO_STATUS.map((st) => `<option ${st === s.status ? 'selected' : ''}>${escapeHtml(st)}</option>`).join('')}
         </select>
       </td>
-      <td><button type="button" class="secondary-btn" data-open-session="${escapeAttr(s.id)}" aria-label="${escapeAttr(openLabel)}" title="${escapeAttr(openLabel)}">${openSessionId === s.id ? 'CLOSE' : action}</button></td>
+      <td data-label="Action"><button type="button" class="secondary-btn" data-open-session="${escapeAttr(s.id)}" aria-label="${escapeAttr(openLabel)}" title="${escapeAttr(openLabel)}">${openSessionId === s.id ? 'CLOSE' : action}</button></td>
     </tr>
   `;
 }
 
 function excelPlanTableHtml() {
-  const rows = [];
-  plan().schedule.forEach((s, dayIdx) => {
+  // One compact table per training day (instead of a single 9-column sheet
+  // with rowspan) so the day/type context becomes a heading rather than a
+  // cell — this lets the table collapse cleanly into labeled cards on
+  // mobile without losing the "which day is this?" context.
+  const groups = plan().schedule.map((s, dayIdx) => {
     if (!s.exercises.length) {
-      rows.push(`
-        <tr>
-          <td>${dayIdx + 1}</td>
-          <td><strong>${escapeHtml(s.type)}</strong><br><span class="muted">${escapeHtml(s.day)}</span></td>
-          <td colspan="7" class="muted">
+      return `
+        <div class="wo-excel-day-group">
+          ${excelDayHeadHtml(s, dayIdx)}
+          <div class="empty-state wo-excel-empty">
             No exercises yet —
             <button type="button" class="text-btn" data-excel-add="${escapeAttr(s.id)}" aria-label="Add exercise to ${escapeAttr(s.day)} ${escapeAttr(s.type)}" title="Add exercise">+ Add exercise</button>
-          </td>
-        </tr>
-      `);
-      return;
+          </div>
+        </div>
+      `;
     }
 
-    s.exercises.forEach((ex, exIdx) => {
+    const rows = s.exercises.map((ex) => {
       const actual = (ex.log && ex.log[0] && ex.log[0].reps) || '';
       const nameId = controlId('exercise-name', s.id, ex.id);
       const setsId = controlId('exercise-sets', s.id, ex.id);
@@ -506,19 +521,15 @@ function excelPlanTableHtml() {
       const videoId = controlId('exercise-video', s.id, ex.id);
       const actualId = controlId('exercise-actual-reps', s.id, ex.id);
       const exLabel = `${s.day} ${ex.name || 'exercise'}`;
-      rows.push(`
+      return `
         <tr data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}">
-          ${exIdx === 0 ? `
-            <td rowspan="${s.exercises.length}">${dayIdx + 1}</td>
-            <td rowspan="${s.exercises.length}"><strong>${escapeHtml(s.type)}</strong><br><span class="muted">${escapeHtml(s.day)}</span></td>
-          ` : ''}
-          <td>
+          <td data-label="Exercise">
             <label class="sr-only" for="${escapeAttr(nameId)}">${escapeHtml(exLabel)} name</label>
             <input id="${escapeAttr(nameId)}" type="text" value="${escapeAttr(ex.name)}" aria-label="${escapeAttr(exLabel)} name" data-excel-field="name" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
             ${ex.video ? `<a class="workout-exercise-name-link" href="${escapeAttr(ex.video)}" target="_blank" rel="noopener">${escapeHtml(ex.name)} ▶</a>` : ''}
           </td>
-          <td><label class="sr-only" for="${escapeAttr(setsId)}">${escapeHtml(exLabel)} sets</label><input id="${escapeAttr(setsId)}" type="number" min="1" value="${ex.sets || 3}" placeholder="sets" aria-label="${escapeAttr(exLabel)} sets" data-excel-field="sets" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
-          <td>
+          <td data-label="Sets"><label class="sr-only" for="${escapeAttr(setsId)}">${escapeHtml(exLabel)} sets</label><input id="${escapeAttr(setsId)}" type="number" min="1" value="${ex.sets || 3}" placeholder="sets" aria-label="${escapeAttr(exLabel)} sets" data-excel-field="sets" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td data-label="Reps (min–max)">
             <div style="display:flex;gap:4px;align-items:center">
               <label class="sr-only" for="${escapeAttr(repsMinId)}">${escapeHtml(exLabel)} minimum reps</label>
               <input id="${escapeAttr(repsMinId)}" type="number" min="1" value="${ex.repsMin || ''}" placeholder="min" style="width:54px" aria-label="${escapeAttr(exLabel)} minimum reps" data-excel-field="repsMin" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
@@ -527,28 +538,41 @@ function excelPlanTableHtml() {
               <input id="${escapeAttr(repsMaxId)}" type="number" min="1" value="${ex.repsMax || ''}" placeholder="max" style="width:54px" aria-label="${escapeAttr(exLabel)} maximum reps" data-excel-field="repsMax" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
             </div>
           </td>
-          <td><label class="sr-only" for="${escapeAttr(weightId)}">${escapeHtml(exLabel)} target weight in kilograms</label><input id="${escapeAttr(weightId)}" type="number" step="0.5" min="0" value="${ex.weight || ''}" placeholder="kg" aria-label="${escapeAttr(exLabel)} target weight in kilograms" data-excel-field="weight" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
-          <td><label class="sr-only" for="${escapeAttr(restId)}">${escapeHtml(exLabel)} rest time in seconds</label><input id="${escapeAttr(restId)}" type="number" min="0" value="${ex.rest || 90}" placeholder="sec" aria-label="${escapeAttr(exLabel)} rest time in seconds" data-excel-field="rest" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
-          <td><label class="sr-only" for="${escapeAttr(videoId)}">${escapeHtml(exLabel)} video URL</label><input id="${escapeAttr(videoId)}" type="url" value="${escapeAttr(ex.video || '')}" placeholder="https://" aria-label="${escapeAttr(exLabel)} video URL" data-excel-field="video" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
-          <td><label class="sr-only" for="${escapeAttr(actualId)}">${escapeHtml(exLabel)} completed reps</label><input id="${escapeAttr(actualId)}" type="number" min="0" value="${actual}" placeholder="done" aria-label="${escapeAttr(exLabel)} completed reps" data-excel-field="actual" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td data-label="Weight (kg)"><label class="sr-only" for="${escapeAttr(weightId)}">${escapeHtml(exLabel)} target weight in kilograms</label><input id="${escapeAttr(weightId)}" type="number" step="0.5" min="0" value="${ex.weight || ''}" placeholder="kg" aria-label="${escapeAttr(exLabel)} target weight in kilograms" data-excel-field="weight" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td data-label="Rest (sec)"><label class="sr-only" for="${escapeAttr(restId)}">${escapeHtml(exLabel)} rest time in seconds</label><input id="${escapeAttr(restId)}" type="number" min="0" value="${ex.rest || 90}" placeholder="sec" aria-label="${escapeAttr(exLabel)} rest time in seconds" data-excel-field="rest" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td data-label="Video URL"><label class="sr-only" for="${escapeAttr(videoId)}">${escapeHtml(exLabel)} video URL</label><input id="${escapeAttr(videoId)}" type="url" value="${escapeAttr(ex.video || '')}" placeholder="https://" aria-label="${escapeAttr(exLabel)} video URL" data-excel-field="video" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td data-label="Reps done"><label class="sr-only" for="${escapeAttr(actualId)}">${escapeHtml(exLabel)} completed reps</label><input id="${escapeAttr(actualId)}" type="number" min="0" value="${actual}" placeholder="done" aria-label="${escapeAttr(exLabel)} completed reps" data-excel-field="actual" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
         </tr>
-      `);
-    });
-    rows.push(`
-      <tr class="workout-excel-add-row">
-        <td colspan="9"><button type="button" class="text-btn" data-excel-add="${escapeAttr(s.id)}" aria-label="Add exercise to ${escapeAttr(s.day)} ${escapeAttr(s.type)}" title="Add exercise to ${escapeAttr(s.day)}">+ Add exercise to ${escapeHtml(s.day)}</button></td>
-      </tr>
-    `);
+      `;
+    }).join('');
+
+    return `
+      <div class="wo-excel-day-group">
+        ${excelDayHeadHtml(s, dayIdx)}
+        <div class="workout-table-wrap">
+          <table class="workout-planner-table workout-excel-table">
+            <thead>
+              <tr><th>Exercise</th><th>Sets</th><th>Reps (min–max)</th><th>Weight (kg)</th><th>Rest (sec)</th><th>Video URL</th><th>Reps done</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <button type="button" class="text-btn wo-excel-add-btn" data-excel-add="${escapeAttr(s.id)}" aria-label="Add exercise to ${escapeAttr(s.day)} ${escapeAttr(s.type)}" title="Add exercise to ${escapeAttr(s.day)}">+ Add exercise to ${escapeHtml(s.day)}</button>
+      </div>
+    `;
   });
 
+  return `<div class="wo-excel-days">${groups.join('')}</div>`;
+}
+
+function excelDayHeadHtml(s, dayIdx) {
   return `
-    <div class="workout-table-wrap">
-      <table class="workout-planner-table workout-excel-table">
-        <thead>
-          <tr><th>#</th><th>Day</th><th>Exercise</th><th>Sets</th><th>Reps (min–max)</th><th>Weight (kg)</th><th>Rest (sec)</th><th>Video URL</th><th>Reps done</th></tr>
-        </thead>
-        <tbody>${rows.join('')}</tbody>
-      </table>
+    <div class="wo-excel-day-head">
+      <span class="wo-excel-day-index">${dayIdx + 1}</span>
+      <div>
+        <strong>${escapeHtml(s.type)}</strong>
+        <span class="muted">${escapeHtml(s.day)}</span>
+      </div>
     </div>
   `;
 }
@@ -570,7 +594,7 @@ function sessionPanelHtml(id) {
           <p class="eyebrow">${escapeHtml(s.day)} • ${escapeHtml(s.date)}</p>
           <h2>${escapeHtml(s.type)} session</h2>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div class="workout-session-actions">
           <span class="wo-status-badge ${scls}">${escapeHtml(s.status)}</span>
           <button type="button" class="secondary-btn" data-close-session="1" aria-label="Close ${escapeAttr(s.day)} workout session" title="Close workout session">Close</button>
           ${s.status !== 'Done' ? `
@@ -602,10 +626,14 @@ function exerciseCardHtml(s, ex) {
   const doneSets = logRows.filter(setIsDone).length;
   const feedback = analyzeExercisePerformance(ex) || ex.performance || null;
   const statusId = controlId('exercise-status', s.id, ex.id);
+  const collapsed = collapsedExercises.has(ex.id);
   return `
-    <article class="workout-exercise-card" data-exercise-id="${escapeAttr(ex.id)}">
+    <article class="workout-exercise-card${collapsed ? ' collapsed' : ''}" data-exercise-id="${escapeAttr(ex.id)}">
       <div class="workout-exercise-head">
-        <div>
+        <button type="button" class="wo-exercise-collapse-toggle" data-toggle-exercise="${escapeAttr(ex.id)}" aria-expanded="${collapsed ? 'false' : 'true'}" aria-label="${collapsed ? 'Expand' : 'Collapse'} ${escapeAttr(ex.name)}" title="${collapsed ? 'Expand' : 'Collapse'}">
+          <span aria-hidden="true">▾</span>
+        </button>
+        <div class="wo-exercise-head-main">
           <h3>${ex.video ? `<a class="workout-exercise-name-link" href="${escapeAttr(ex.video)}" target="_blank" rel="noopener">${escapeHtml(ex.name)} ▶</a>` : escapeHtml(ex.name)}</h3>
           <div class="workout-exercise-meta">
             <span>${ex.sets} sets</span>
@@ -624,6 +652,7 @@ function exerciseCardHtml(s, ex) {
           <button type="button" class="small-danger" data-remove-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" aria-label="Remove ${escapeAttr(ex.name)}" title="Remove ${escapeAttr(ex.name)}">Remove</button>
         </div>
       </div>
+      <div class="workout-exercise-body">
       ${ex.notes ? `<p class="muted">${escapeHtml(ex.notes)}</p>` : ''}
 
       <div class="workout-set-rows">
@@ -657,6 +686,7 @@ function exerciseCardHtml(s, ex) {
       <div class="workout-rest-timer" data-rest-timer-for="${escapeAttr(ex.id)}">
         <button type="button" class="secondary-btn" data-start-rest="${escapeAttr(ex.id)}" data-rest-seconds="${ex.rest || 90}" aria-label="Start rest timer for ${escapeAttr(ex.name)}" title="Start rest timer for ${escapeAttr(ex.name)}">Start rest timer</button>
         <strong data-timer-display="${escapeAttr(ex.id)}">${formatTime(ex.rest || 90)}</strong>
+      </div>
       </div>
     </article>
   `;
@@ -1052,6 +1082,44 @@ function onWorkoutClick(e) {
       selected.sort((a, b) => DAY_NAMES_FULL.indexOf(a) - DAY_NAMES_FULL.indexOf(b));
     }
     setTrainingDays(selected);
+    return;
+  }
+
+  const collapseToggle = e.target.closest('[data-toggle-exercise]');
+  if (collapseToggle) {
+    const exId = collapseToggle.dataset.toggleExercise;
+    if (collapsedExercises.has(exId)) collapsedExercises.delete(exId);
+    else collapsedExercises.add(exId);
+    const card = collapseToggle.closest('.workout-exercise-card');
+    if (card) {
+      const nowCollapsed = collapsedExercises.has(exId);
+      card.classList.toggle('collapsed', nowCollapsed);
+      collapseToggle.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+      collapseToggle.setAttribute('aria-label', `${nowCollapsed ? 'Expand' : 'Collapse'} exercise`);
+    }
+    return;
+  }
+
+  const fabBtn = e.target.closest('[data-workout-fab]');
+  if (fabBtn) {
+    if (openSessionId) {
+      const s = plan().schedule.find((x) => x.id === openSessionId);
+      if (s) {
+        const newEx = { id: makeId(), name: 'New exercise', sets: 3, repsMin: 8, repsMax: 12, weight: 0, rest: 90, video: '', notes: '', log: [], exStatus: 'Not Started' };
+        s.exercises.push(newEx);
+        persist();
+        renderWorkoutStats();
+        renderWorkoutRoot();
+        window.requestAnimationFrame(() => {
+          const card = document.querySelector(`[data-exercise-id="${newEx.id}"]`);
+          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      }
+    } else {
+      const p = plan();
+      const next = p.schedule.find((x) => x.status === 'In Progress') || p.schedule.find((x) => x.status === 'Not Started');
+      if (next) openWorkoutSession(next.id);
+    }
     return;
   }
 
