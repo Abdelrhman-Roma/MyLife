@@ -21,6 +21,9 @@ const REST_QUOTES = [
   'One more set.',
 ];
 
+const REST_OPTIONS = [30, 60, 90, 120, 180, 240, 300];
+const REST_OPTION_LABELS = { 30: '30 sec', 60: '60 sec', 90: '90 sec', 120: '2 min', 180: '3 min', 240: '4 min', 300: '5 min' };
+
 let openSessionId = null;
 let sessionTimers = {};
 let restTimerState = null;
@@ -45,6 +48,23 @@ function initWorkoutPage() {
 
 function plan() {
   return currentData.workoutPlan;
+}
+
+// Single source of truth for a freshly-added exercise so every "add exercise"
+// entry point (FAB, per-day + button) stays in sync and the name field never
+// starts pre-filled with placeholder-like text (see excelPlanTableHtml()).
+function createNewExercise() {
+  return { id: makeId(), name: '', sets: 3, repsMin: 8, repsMax: 12, weight: 0, rest: '', video: '', notes: '', log: [], exStatus: 'Not Started' };
+}
+
+// Shared "commit a change and repaint" helper used after every mutation to
+// plan()/currentData so the various click/change handlers don't each repeat
+// the same persist + re-render sequence.
+function refreshWorkout({ art = false } = {}) {
+  persist();
+  if (art) renderArt('workout');
+  renderWorkoutStats();
+  renderWorkoutRoot();
 }
 
 function migrateLegacyData() {
@@ -118,6 +138,12 @@ function lastNDates(n) {
     out.push(d.toISOString().slice(0, 10));
   }
   return out;
+}
+
+function restLabel(rest) {
+  const secs = Number(rest);
+  if (REST_OPTION_LABELS[secs]) return REST_OPTION_LABELS[secs];
+  return secs ? `${secs}s` : 'Not set';
 }
 
 function formatTime(sec) {
@@ -525,7 +551,7 @@ function excelPlanTableHtml() {
         <tr data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}">
           <td data-label="Exercise">
             <label class="sr-only" for="${escapeAttr(nameId)}">${escapeHtml(exLabel)} name</label>
-            <input id="${escapeAttr(nameId)}" type="text" value="${escapeAttr(ex.name)}" aria-label="${escapeAttr(exLabel)} name" data-excel-field="name" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
+            <input id="${escapeAttr(nameId)}" type="text" value="${escapeAttr(ex.name || '')}" placeholder="Enter Exercise Name" aria-label="${escapeAttr(exLabel)} name" data-excel-field="name" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
             ${ex.video ? `<a class="workout-exercise-name-link" href="${escapeAttr(ex.video)}" target="_blank" rel="noopener">${escapeHtml(ex.name)} ▶</a>` : ''}
           </td>
           <td data-label="Sets"><label class="sr-only" for="${escapeAttr(setsId)}">${escapeHtml(exLabel)} sets</label><input id="${escapeAttr(setsId)}" type="number" min="1" value="${ex.sets || 3}" placeholder="sets" aria-label="${escapeAttr(exLabel)} sets" data-excel-field="sets" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
@@ -539,7 +565,13 @@ function excelPlanTableHtml() {
             </div>
           </td>
           <td data-label="Weight (kg)"><label class="sr-only" for="${escapeAttr(weightId)}">${escapeHtml(exLabel)} target weight in kilograms</label><input id="${escapeAttr(weightId)}" type="number" step="0.5" min="0" value="${ex.weight || ''}" placeholder="kg" aria-label="${escapeAttr(exLabel)} target weight in kilograms" data-excel-field="weight" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
-          <td data-label="Rest (sec)"><label class="sr-only" for="${escapeAttr(restId)}">${escapeHtml(exLabel)} rest time in seconds</label><input id="${escapeAttr(restId)}" type="number" min="0" value="${ex.rest || 90}" placeholder="sec" aria-label="${escapeAttr(exLabel)} rest time in seconds" data-excel-field="rest" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
+          <td data-label="Rest Time">
+            <label class="sr-only" for="${escapeAttr(restId)}">${escapeHtml(exLabel)} rest time</label>
+            <select id="${escapeAttr(restId)}" aria-label="${escapeAttr(exLabel)} rest time" data-excel-field="rest" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}">
+              <option value="" ${ex.rest ? '' : 'selected'} disabled>Select rest time</option>
+              ${REST_OPTIONS.map((secs) => `<option value="${secs}" ${Number(ex.rest) === secs ? 'selected' : ''}>${REST_OPTION_LABELS[secs]}</option>`).join('')}
+            </select>
+          </td>
           <td data-label="Video URL"><label class="sr-only" for="${escapeAttr(videoId)}">${escapeHtml(exLabel)} video URL</label><input id="${escapeAttr(videoId)}" type="url" value="${escapeAttr(ex.video || '')}" placeholder="https://" aria-label="${escapeAttr(exLabel)} video URL" data-excel-field="video" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
           <td data-label="Reps done"><label class="sr-only" for="${escapeAttr(actualId)}">${escapeHtml(exLabel)} completed reps</label><input id="${escapeAttr(actualId)}" type="number" min="0" value="${actual}" placeholder="done" aria-label="${escapeAttr(exLabel)} completed reps" data-excel-field="actual" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
         </tr>
@@ -552,7 +584,7 @@ function excelPlanTableHtml() {
         <div class="workout-table-wrap">
           <table class="workout-planner-table workout-excel-table">
             <thead>
-              <tr><th>Exercise</th><th>Sets</th><th>Reps (min–max)</th><th>Weight (kg)</th><th>Rest (sec)</th><th>Video URL</th><th>Reps done</th></tr>
+              <tr><th>Exercise</th><th>Sets</th><th>Reps (min–max)</th><th>Weight (kg)</th><th>Rest Time</th><th>Video URL</th><th>Reps done</th></tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
@@ -639,7 +671,7 @@ function exerciseCardHtml(s, ex) {
             <span>${ex.sets} sets</span>
             <span>${ex.repsMin}–${ex.repsMax} reps</span>
             <span>${ex.weight ? `${ex.weight} kg target` : 'Bodyweight'}</span>
-            <span>${ex.rest || 90}s rest</span>
+            <span>${restLabel(ex.rest)} rest</span>
             <span>${doneSets}/${ex.sets} sets done</span>
           </div>
         </div>
@@ -684,7 +716,7 @@ function exerciseCardHtml(s, ex) {
       ${performanceHistoryHtml(ex)}
 
       <div class="workout-rest-timer" data-rest-timer-for="${escapeAttr(ex.id)}">
-        <button type="button" class="secondary-btn" data-start-rest="${escapeAttr(ex.id)}" data-rest-seconds="${ex.rest || 90}" aria-label="Start rest timer for ${escapeAttr(ex.name)}" title="Start rest timer for ${escapeAttr(ex.name)}">Start rest timer</button>
+        <button type="button" class="secondary-btn" data-start-rest="${escapeAttr(ex.id)}" data-rest-seconds="${ex.rest || 90}" ${ex.rest ? '' : 'title="Using default 90s — set a rest time in the plan sheet above"'} aria-label="Start rest timer for ${escapeAttr(ex.name)}">Start rest timer</button>
         <strong data-timer-display="${escapeAttr(ex.id)}">${formatTime(ex.rest || 90)}</strong>
       </div>
       </div>
@@ -726,10 +758,7 @@ function openWorkoutSession(id) {
   const s = plan().schedule.find((x) => x.id === id);
   if (s && s.status === 'Not Started') s.status = 'In Progress';
   syncScheduleToTodo();
-  persist();
-  renderArt('workout');
-  renderWorkoutStats();
-  renderWorkoutRoot();
+  refreshWorkout({ art: true });
 }
 
 function finishSession(scheduleId) {
@@ -772,12 +801,9 @@ function finishSession(scheduleId) {
   s.status = 'Not Started';
 
   syncScheduleToTodo();
-  persist();
   openSessionId = null;
   delete sessionTimers[scheduleId];
-  renderArt('workout');
-  renderWorkoutStats();
-  renderWorkoutRoot();
+  refreshWorkout({ art: true });
 }
 
 function skipSession(scheduleId) {
@@ -785,10 +811,8 @@ function skipSession(scheduleId) {
   if (!s) return;
   s.status = 'Skipped';
   syncScheduleToTodo();
-  persist();
   openSessionId = null;
-  renderWorkoutStats();
-  renderWorkoutRoot();
+  refreshWorkout();
 }
 
 function startRestTimer(exerciseId, seconds) {
@@ -1105,14 +1129,14 @@ function onWorkoutClick(e) {
     if (openSessionId) {
       const s = plan().schedule.find((x) => x.id === openSessionId);
       if (s) {
-        const newEx = { id: makeId(), name: 'New exercise', sets: 3, repsMin: 8, repsMax: 12, weight: 0, rest: 90, video: '', notes: '', log: [], exStatus: 'Not Started' };
+        const newEx = createNewExercise();
         s.exercises.push(newEx);
-        persist();
-        renderWorkoutStats();
-        renderWorkoutRoot();
+        refreshWorkout();
         window.requestAnimationFrame(() => {
           const card = document.querySelector(`[data-exercise-id="${newEx.id}"]`);
           if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const nameInput = document.getElementById(controlId('exercise-name', s.id, newEx.id));
+          if (nameInput) nameInput.focus();
         });
       }
     } else {
@@ -1159,9 +1183,8 @@ function onWorkoutClick(e) {
     const s = plan().schedule.find((x) => x.id === removeBtn.dataset.schedule);
     if (s) {
       s.exercises = s.exercises.filter((x) => x.id !== removeBtn.dataset.removeExercise);
-      persist();
-      renderWorkoutStats();
-      renderWorkoutRoot();
+      collapsedExercises.delete(removeBtn.dataset.removeExercise);
+      refreshWorkout();
     }
     return;
   }
@@ -1176,11 +1199,15 @@ function onWorkoutClick(e) {
   if (excelAddBtn) {
     const s = plan().schedule.find((x) => x.id === excelAddBtn.dataset.excelAdd);
     if (s) {
-      s.exercises.push({ id: makeId(), name: 'New exercise', sets: 3, repsMin: 8, repsMax: 12, weight: 0, rest: 90, video: '', notes: '', log: [], exStatus: 'Not Started' });
-      persist();
-      renderWorkoutStats();
-      renderWorkoutRoot();
+      const newEx = createNewExercise();
+      s.exercises.push(newEx);
+      refreshWorkout();
+      window.requestAnimationFrame(() => {
+        const nameInput = document.getElementById(controlId('exercise-name', s.id, newEx.id));
+        if (nameInput) nameInput.focus();
+      });
     }
+    return;
   }
 }
 
@@ -1207,10 +1234,7 @@ function onWorkoutChange(e) {
         s.lastCompletedDate = s.completionDate;
       }
       syncScheduleToTodo();
-      persist();
-      renderArt('workout');
-      renderWorkoutStats();
-      renderWorkoutRoot();
+      refreshWorkout({ art: true });
     }
     return;
   }
@@ -1231,9 +1255,7 @@ function onWorkoutChange(e) {
       }
       ex.exStatus = exStatusSel.value;
       if (ex.exStatus === 'Done') saveExercisePerformance(ex, s.date);
-      persist();
-      renderWorkoutStats();
-      renderWorkoutRoot();
+      refreshWorkout();
     }
     return;
   }
@@ -1243,26 +1265,8 @@ function onWorkoutChange(e) {
     const s = plan().schedule.find((x) => x.id === excelInput.dataset.schedule);
     const ex = s && s.exercises.find((x) => x.id === excelInput.dataset.exercise);
     if (!ex) return;
-    const field = excelInput.dataset.excelField;
-    if (field === 'name') ex.name = excelInput.value.trim() || 'Exercise';
-    if (field === 'sets') {
-      ex.sets = Math.max(1, Number(excelInput.value) || 1);
-      ex.log = (ex.log || []).slice(0, ex.sets);
-      updateExerciseStatusFromSets(ex, s.date);
-    }
-    if (field === 'repsMin') ex.repsMin = Number(excelInput.value) || 1;
-    if (field === 'repsMax') ex.repsMax = Number(excelInput.value) || 1;
-    if (field === 'weight') ex.weight = Number(excelInput.value) || 0;
-    if (field === 'rest') ex.rest = Number(excelInput.value) || 90;
-    if (field === 'video') ex.video = excelInput.value.trim();
-    if (field === 'actual') {
-      ex.log = ex.log || [];
-      ex.log[0] = { ...(ex.log[0] || {}), reps: excelInput.value, weight: ex.log[0]?.weight || ex.weight };
-      updateExerciseStatusFromSets(ex, s.date);
-    }
-    persist();
-    renderWorkoutStats();
-    renderWorkoutRoot();
+    if (!applyExcelFieldChange(ex, s, excelInput.dataset.excelField, excelInput)) return;
+    refreshWorkout();
     return;
   }
 
@@ -1279,9 +1283,19 @@ function onWorkoutChange(e) {
   const idx = Number(wInput ? target.dataset.setWeight : (rInput ? target.dataset.setReps : target.dataset.setDone));
   ex.log[idx] = ex.log[idx] || {};
   if (wInput) {
+    if (target.value !== '' && Number(target.value) < 0) {
+      window.alert('Weight cannot be negative.');
+      target.value = ex.log[idx].weight ?? '';
+      return;
+    }
     ex.log[idx].weight = target.value;
     if (!hasSetPerformance(ex.log[idx])) ex.log[idx].done = false;
   } else if (rInput) {
+    if (target.value !== '' && Number(target.value) <= 0) {
+      window.alert('Reps must be greater than 0.');
+      target.value = ex.log[idx].reps ?? '';
+      return;
+    }
     ex.log[idx].reps = target.value;
     if (!hasSetPerformance(ex.log[idx])) ex.log[idx].done = false;
   } else if (target.checked && !hasSetPerformance(ex.log[idx])) {
@@ -1293,7 +1307,83 @@ function onWorkoutChange(e) {
   }
   updateExerciseStatusFromSets(ex, s.date);
   if (s.status === 'Not Started') s.status = 'In Progress';
-  persist();
-  renderWorkoutStats();
-  renderWorkoutRoot();
+  refreshWorkout();
+}
+
+// Validates + applies a single edit made in the "workout plan sheet" table.
+// Returns true when the change was valid and should be persisted/re-rendered,
+// or false (after showing a message and reverting the field) when it wasn't.
+function applyExcelFieldChange(ex, s, field, inputEl) {
+  const raw = inputEl.value;
+  switch (field) {
+    case 'name': {
+      const trimmed = raw.trim();
+      if (!trimmed) {
+        window.alert('Please enter exercise name.');
+        inputEl.value = ex.name || '';
+        return false;
+      }
+      ex.name = trimmed;
+      return true;
+    }
+    case 'sets': {
+      const n = Number(raw);
+      if (raw.trim() === '' || !Number.isFinite(n) || n <= 0) {
+        window.alert('Sets must be greater than 0.');
+        inputEl.value = ex.sets || 1;
+        return false;
+      }
+      ex.sets = Math.max(1, Math.round(n));
+      ex.log = (ex.log || []).slice(0, ex.sets);
+      updateExerciseStatusFromSets(ex, s.date);
+      return true;
+    }
+    case 'repsMin':
+    case 'repsMax': {
+      const n = Number(raw);
+      if (raw.trim() === '' || !Number.isFinite(n) || n <= 0) {
+        window.alert('Reps must be greater than 0.');
+        inputEl.value = ex[field] || '';
+        return false;
+      }
+      ex[field] = Math.round(n);
+      return true;
+    }
+    case 'weight': {
+      if (raw.trim() === '') { ex.weight = 0; return true; }
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0) {
+        window.alert('Weight cannot be negative.');
+        inputEl.value = ex.weight || '';
+        return false;
+      }
+      ex.weight = n;
+      return true;
+    }
+    case 'rest': {
+      if (!raw) {
+        window.alert('Please select rest time.');
+        return false;
+      }
+      ex.rest = Number(raw);
+      return true;
+    }
+    case 'video': {
+      ex.video = raw.trim();
+      return true;
+    }
+    case 'actual': {
+      if (raw !== '' && Number(raw) < 0) {
+        window.alert('Reps cannot be negative.');
+        inputEl.value = (ex.log && ex.log[0] && ex.log[0].reps) || '';
+        return false;
+      }
+      ex.log = ex.log || [];
+      ex.log[0] = { ...(ex.log[0] || {}), reps: raw, weight: ex.log[0]?.weight || ex.weight };
+      updateExerciseStatusFromSets(ex, s.date);
+      return true;
+    }
+    default:
+      return true;
+  }
 }

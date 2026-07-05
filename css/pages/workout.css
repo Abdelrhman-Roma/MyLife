@@ -261,14 +261,20 @@
 .workout-excel-table td { border-right: 1px solid var(--line); }
 .workout-excel-table th:last-child,
 .workout-excel-table td:last-child { border-right: 0; }
-.workout-excel-table td input {
+.workout-excel-table td input,
+.workout-excel-table td select {
   border: 1px solid transparent;
   background: transparent;
 }
 .workout-excel-table td input:hover,
-.workout-excel-table td input:focus {
+.workout-excel-table td input:focus,
+.workout-excel-table td select:hover,
+.workout-excel-table td select:focus {
   border-color: var(--line);
   background: var(--surface-2);
+}
+.workout-excel-table td select:invalid {
+  color: var(--muted);
 }
 .workout-excel-add-row td { border-right: 0; padding-top: 8px; padding-bottom: 8px; }
 .workout-exercise-name-link {
@@ -765,6 +771,7 @@
     flex-wrap: wrap;
   }
   .workout-excel-table td > input,
+  .workout-excel-table td > select,
   .workout-excel-table td > div {
     max-width: 100%;
     flex: 1 1 auto;
