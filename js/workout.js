@@ -753,6 +753,7 @@ function performanceHistoryHtml(ex) {
 }
 
 function openWorkoutSession(id) {
+  clearRestTimer();
   openSessionId = id;
   sessionTimers[id] = sessionTimers[id] || Date.now();
   const s = plan().schedule.find((x) => x.id === id);
@@ -762,6 +763,7 @@ function openWorkoutSession(id) {
 }
 
 function finishSession(scheduleId) {
+  clearRestTimer();
   const s = plan().schedule.find((x) => x.id === scheduleId);
   if (!s) return;
   const startedAt = sessionTimers[scheduleId] || Date.now();
@@ -791,14 +793,11 @@ function finishSession(scheduleId) {
   s.completionDate = new Date().toISOString().slice(0, 10);
   s.lastCompletedDate = s.completionDate;
   s.lastCompletedWorkoutDate = s.date;
+  // Record when this slot should next come around, but don't jump the visible
+  // date or clear logged sets yet — this week's row should keep showing what
+  // was actually done. The rollover to a fresh Not Started week happens in
+  // generateSchedule() once the calendar week actually changes.
   s.nextWorkoutDate = addDays(s.date, 7);
-  s.date = s.nextWorkoutDate;
-
-  s.exercises.forEach((ex) => {
-    ex.log = [];
-    ex.exStatus = 'Not Started';
-  });
-  s.status = 'Not Started';
 
   syncScheduleToTodo();
   openSessionId = null;
@@ -807,6 +806,7 @@ function finishSession(scheduleId) {
 }
 
 function skipSession(scheduleId) {
+  clearRestTimer();
   const s = plan().schedule.find((x) => x.id === scheduleId);
   if (!s) return;
   s.status = 'Skipped';
@@ -1151,6 +1151,7 @@ function onWorkoutClick(e) {
   if (openBtn) {
     const id = openBtn.dataset.openSession;
     if (openSessionId === id) {
+      clearRestTimer();
       openSessionId = null;
       renderWorkoutRoot();
     } else {
@@ -1161,6 +1162,7 @@ function onWorkoutClick(e) {
 
   const closeBtn = e.target.closest('[data-close-session]');
   if (closeBtn) {
+    clearRestTimer();
     openSessionId = null;
     renderWorkoutRoot();
     return;

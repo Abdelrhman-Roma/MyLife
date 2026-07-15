@@ -8,7 +8,6 @@ const SESSION_KEY = 'mylife.session';
 const DATA_PREFIX = 'mylife.data.';
 const THEME_KEY   = 'mylife.theme';
 const PALETTE_KEY = 'mylife.palette';
-const PHOTO_LIBRARY_LIST = Array.isArray(window.PHOTO_LIBRARY) ? window.PHOTO_LIBRARY : (typeof PHOTO_LIBRARY !== 'undefined' ? PHOTO_LIBRARY : []);
 
 const NAV = [
   ['dashboard',   'Dashboard',  'Home'],
@@ -23,8 +22,21 @@ const NAV = [
   ['sleep',       'Sleep',      'Recovery'],
   ['study',       'Study',      'Focus'],
   ['statistics',  'Statistics', 'Insights'],
-  ['settings',    'Settings',   'System'],
-  ['profile',     'Profile',    'Account'],
+];
+
+const NAV_ICONS = {
+  dashboard: '⌂', todo: '✓', habits: '↻', goals: '◎', calendar: '□',
+  workout: '↗', prayer: '✦', nutrition: '◒', water: '≈', sleep: '☾',
+  study: '✎', statistics: '◔', account: '◉',
+};
+
+// Items shown in the account (avatar) dropdown menu — not part of the main nav.
+const ACCOUNT_MENU = [
+  ['account.html',            '👤', 'Profile & Settings'],
+  ['account.html#statistics', '📊', 'Statistics'],
+  ['account.html#appearance', '🎨', 'Appearance'],
+  ['account.html#backup',     '💾', 'Backup'],
+  ['account.html#about',      '❓', 'Help'],
 ];
 
 const PAGES = {
@@ -40,15 +52,7 @@ const PAGES = {
   sleep:      { title: 'Sleep',       kicker: 'Recovery',            accent: 'purple', collection: 'sleep',    fields: [['title','Sleep note','text'],['hours','Hours','number'],['quality','Quality','select',['Low','Good','Great']]], labels: ['hours','quality'] },
   study:      { title: 'Study',       kicker: 'Focus sessions',      accent: 'blue',   collection: 'study',    fields: [['title','Subject','text'],['topic','Topic','text'],['minutes','Minutes','number']], labels: ['topic','minutes'] },
   statistics: { title: 'Statistics',  kicker: 'Calculated insights', accent: 'green' },
-  settings:   { title: 'Settings',    kicker: 'Preferences',         accent: 'orange' },
-  profile:    { title: 'Profile',     kicker: 'Account details',     accent: 'purple' },
-};
-
-const PAGE_IMAGES = {
-  todo: 'todo image page.jpg',
-  habits: 'habit image page.jpg',
-  goals: 'Goals image page.jpg',
-  prayer: 'prayer page image.jpg',
+  account:    { title: 'Profile & Settings', kicker: 'Your account', accent: 'purple' },
 };
 
 let currentUser = null;
@@ -62,7 +66,6 @@ let currentPage = document.body.dataset.page;
 // â”€â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function initAuth() {
   applyTheme(localStorage.getItem(THEME_KEY) || 'light', localStorage.getItem(PALETTE_KEY) || 'palette-1');
-  initAuthImageCarousel();
   if (getSessionUser()) {
     window.location.href = 'pages/dashboard.html';
     return;
@@ -77,22 +80,6 @@ function showAuthPanel(mode) {
   byId('login-panel').classList.toggle('hidden', mode !== 'login');
   byId('register-panel').classList.toggle('hidden', mode !== 'register');
   document.querySelectorAll('.form-message').forEach((el) => (el.textContent = ''));
-}
-
-function initAuthImageCarousel() {
-  const imageEl = byId('auth-hero-image');
-  if (!imageEl) return;
-  const images = (PHOTO_LIBRARY_LIST || []).map(resolvePhotoPath).filter(Boolean);
-  if (!images.length) return;
-  let index = 0;
-  const showImage = () => {
-    imageEl.src = images[index];
-    imageEl.alt = `MYLIFE inspiration ${index + 1}`;
-    index = (index + 1) % images.length;
-  };
-  showImage();
-  if (window.authImageSliderTimer) window.clearInterval(window.authImageSliderTimer);
-  window.authImageSliderTimer = window.setInterval(showImage, 10000);
 }
 
 function login(e) {
@@ -130,6 +117,7 @@ function bootShell(pageKey) {
   currentData = normalizeData(getData(currentUser.email, currentUser.name), currentUser.name);
   persist();
   applyTheme(currentData.settings.theme, currentData.settings.palette);
+  applyAppearance(currentData.settings);
   renderSidebar(pageKey);
   initMobileNav();
   renderTopbar(pageKey);
@@ -148,22 +136,94 @@ function initPage(pageKey) {
 function renderSidebar(pageKey) {
   byId('sidebar').innerHTML = `
     <a class="brand" href="dashboard.html">
-      <img class="brand-logo" src="../assist/Logo/MyLife.png" alt="MYLIFE logo" width="44" height="44" />
+      <span class="brand-logo" aria-hidden="true">M</span>
       <span><strong>MYLIFE</strong><small>Life Tracker</small></span>
     </a>
     <nav class="nav-list">
       ${NAV.map(([key, title, label]) => `
         <a class="nav-item${key === pageKey ? ' active' : ''}" data-accent="${(PAGES[key] && PAGES[key].accent) || 'blue'}" href="${key}.html">
-          <span>${label}</span>
-          <strong>${title}</strong>
+          <span class="nav-icon" aria-hidden="true">${NAV_ICONS[key] || '•'}</span>
+          <strong>${title}<small>${label}</small></strong>
         </a>
       `).join('')}
     </nav>
-    <div class="sidebar-card">
-      <span>Signed in as</span>
-      <strong>${escapeHtml(currentUser.name)}</strong>
+    ${accountWidgetHtml('sidebar', pageKey === 'account')}
+  `;
+  renderMobileAccountTrigger();
+  bindAccountMenu('account-trigger', 'account-menu');
+  bindAccountMenu('account-trigger-m', 'account-menu-m');
+}
+
+// ─── Account avatar + dropdown ─────────────────────────────────────────────
+function accountWidgetHtml(suffix, active) {
+  const triggerId = suffix === 'sidebar' ? 'account-trigger' : `account-trigger-${suffix}`;
+  const menuId     = suffix === 'sidebar' ? 'account-menu'    : `account-menu-${suffix}`;
+  return `
+    <div class="sidebar-account">
+      <button class="sidebar-account-trigger${active ? ' active' : ''}" id="${triggerId}" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="${menuId}">
+        ${accountAvatarHtml()}
+        <span class="sidebar-account-info">
+          <strong>${escapeHtml(currentUser.name)}</strong>
+          <small>${escapeHtml(currentData.profile.headline || 'MyLife member')}</small>
+        </span>
+        <span class="sidebar-account-chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div class="account-menu" id="${menuId}" role="menu" hidden>
+        ${ACCOUNT_MENU.map(([href, icon, label]) => `
+          <a role="menuitem" href="${href}">
+            <span class="account-menu-icon" aria-hidden="true">${icon}</span><span>${label}</span>
+          </a>
+        `).join('')}
+        <button role="menuitem" type="button" class="account-menu-logout" data-menu-logout>
+          <span class="account-menu-icon" aria-hidden="true">🚪</span><span>Logout</span>
+        </button>
+      </div>
     </div>
   `;
+}
+
+function accountAvatarHtml() {
+  return currentData.profile.photo
+    ? `<span class="sidebar-avatar" style="background-image:url('${currentData.profile.photo}')"></span>`
+    : `<span class="sidebar-avatar">${initials(currentUser.name)}</span>`;
+}
+
+function renderMobileAccountTrigger() {
+  const shell = document.querySelector('.app-shell');
+  if (!shell || byId('mobile-account-slot')) return;
+  const slot = document.createElement('div');
+  slot.id = 'mobile-account-slot';
+  slot.className = 'mobile-account-slot';
+  slot.innerHTML = accountWidgetHtml('m', currentPage === 'account');
+  shell.appendChild(slot);
+}
+
+function bindAccountMenu(triggerId, menuId) {
+  const trigger = byId(triggerId);
+  const menu = byId(menuId);
+  if (!trigger || !menu) return;
+  const close = () => {
+    menu.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+    window.setTimeout(() => { if (!menu.classList.contains('open')) menu.hidden = true; }, 220);
+  };
+  const open = () => {
+    menu.hidden = false;
+    requestAnimationFrame(() => menu.classList.add('open'));
+    trigger.setAttribute('aria-expanded', 'true');
+  };
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.classList.contains('open') ? close() : open();
+  });
+  document.addEventListener('click', (e) => {
+    if (menu.classList.contains('open') && !menu.contains(e.target) && e.target !== trigger) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && menu.classList.contains('open')) { close(); trigger.focus(); }
+  });
+  const logoutBtn = menu.querySelector('[data-menu-logout]');
+  if (logoutBtn) logoutBtn.addEventListener('click', logout);
 }
 
 // â”€â”€â”€ Topbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -178,7 +238,7 @@ function renderTopbar(pageKey) {
       <button class="secondary-btn" id="theme-btn" type="button">${currentData.settings.theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
       <button class="secondary-btn" id="export-btn" type="button">Export</button>
       <button class="danger-btn"    id="logout-btn" type="button">Logout</button>
-      <div class="avatar">${initials(currentUser.name)}</div>
+      <div class="avatar" style="${currentData.profile.photo ? `background:url('${currentData.profile.photo}') center/cover;` : ''}">${currentData.profile.photo ? '' : initials(currentUser.name)}</div>
     </div>
   `;
   byId('logout-btn').addEventListener('click', logout);
@@ -188,9 +248,9 @@ function renderTopbar(pageKey) {
 
 // â”€â”€â”€ Art panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderArt(pageKey) {
+  if (!byId('page-art')) return;
   const page   = PAGES[pageKey];
   const counts = getCounts();
-  const pageImage = PAGE_IMAGES[pageKey];
   byId('page-art').className   = `page-art accent-${page.accent}`;
   byId('page-art').innerHTML   = `
     <div class="art-copy">
@@ -199,16 +259,8 @@ function renderArt(pageKey) {
       <p>${artDescription(pageKey)}</p>
     </div>
     <div class="art-board art-${pageKey}">
-      ${pageImage ? pageImageMarkup(pageKey, pageImage) : artMarkup(pageKey, counts)}
+      ${artMarkup(pageKey, counts)}
     </div>
-  `;
-}
-
-function pageImageMarkup(pageKey, fileName) {
-  return `
-    <figure class="page-image-card page-image-${escapeAttr(pageKey)}">
-      <img src="../assist/photos/${escapeAttr(fileName)}" alt="${escapeAttr(PAGES[pageKey].title)} page preview" />
-    </figure>
   `;
 }
 
@@ -226,8 +278,6 @@ function artDescription(pageKey) {
     sleep:      'Sleep quality cards and recovery meters.',
     study:      'Study session panels with subject and topic tracking.',
     statistics: 'Charts and totals calculated from your account data.',
-    settings:   'Switch light or dark mode and set nutrition and health targets.',
-    profile:    'Account profile details for the active user.',
   };
   return map[pageKey] || '';
 }
@@ -405,65 +455,6 @@ function renderForm(pageKey) {
     return;
   }
 
-  if (pageKey === 'settings') {
-    const s = currentData.settings;
-    entryForm.innerHTML = `
-      <div class="form-grid">
-        <label>Theme
-          <select name="theme">
-            <option value="light" ${selected(s.theme, 'light')}>Light</option>
-            <option value="dark"  ${selected(s.theme, 'dark')}>Dark</option>
-          </select>
-        </label>
-        <label>Accent palette
-          <select name="palette">
-            <option value="palette-1" ${selected(s.palette, 'palette-1')}>Palette 1 â€” Blue / Red / Yellow / Beige</option>
-            <option value="palette-2" ${selected(s.palette, 'palette-2')}>Palette 2 â€” Yellow / Green</option>
-            <option value="palette-3" ${selected(s.palette, 'palette-3')}>Palette 3 â€” Teal / Green</option>
-            <option value="palette-4" ${selected(s.palette, 'palette-4')}>Palette 4 â€” Nature / Sage</option>
-            <option value="palette-5" ${selected(s.palette, 'palette-5')}>Palette 5 â€” Brown / Orange</option>
-            <option value="palette-6" ${selected(s.palette, 'palette-6')}>Palette 6 â€” Dark Blue / Red</option>
-            <option value="palette-7" ${selected(s.palette, 'palette-7')}>Palette 7 â€” Black / Teal / Purple</option>
-            <option value="palette-8" ${selected(s.palette, 'palette-8')}>Palette 8 â€” Wine / Green / Cream</option>
-            <option value="palette-9" ${selected(s.palette, 'palette-9')}>Palette 9 â€” Red / Yellow</option>
-            <option value="palette-10" ${selected(s.palette, 'palette-10')}>Palette 10 â€” Black / Blue / Orange</option>
-            <option value="palette-11" ${selected(s.palette, 'palette-11')}>Palette 11 â€” Purple / Pink / Peach</option>
-            <option value="palette-12" ${selected(s.palette, 'palette-12')}>Palette 12 â€” Blue Gradient</option>
-            <option value="palette-13" ${selected(s.palette, 'palette-13')}>Palette 13 â€” Soft Green</option>
-            <option value="palette-14" ${selected(s.palette, 'palette-14')}>Palette 14 â€” Yellow / Green</option>
-            <option value="palette-15" ${selected(s.palette, 'palette-15')}>Palette 15 â€” Navy / Beige / Brown</option>
-            <option value="palette-16" ${selected(s.palette, 'palette-16')}>Palette 16 â€” Nature Green</option>
-            <option value="palette-17" ${selected(s.palette, 'palette-17')}>Palette 17 â€” Cream / Red</option>
-          </select>
-        </label>
-        <label>Water goal (glasses)<input name="waterGoal"     type="number" min="1" value="${s.waterGoal}"     required /></label>
-        <label>Sleep goal (hours)<input  name="sleepGoal"     type="number" min="1" value="${s.sleepGoal}"     required /></label>
-        <label>Calories target<input     name="calorieTarget"  type="number" min="0" value="${s.calorieTarget}" required /></label>
-        <label>Protein target (g)<input  name="proteinTarget"  type="number" min="0" value="${s.proteinTarget}" required /></label>
-        <label>Carbs target (g)<input    name="carbTarget"     type="number" min="0" value="${s.carbTarget}"    required /></label>
-        <label>Fat target (g)<input      name="fatTarget"      type="number" min="0" value="${s.fatTarget}"     required /></label>
-      </div>
-      <button class="primary-btn" type="submit">Save settings</button>
-    `;
-    entryForm.onsubmit = saveSettings;
-    return;
-  }
-
-  if (pageKey === 'profile') {
-    entryForm.innerHTML = `
-      <div class="form-grid">
-        <label>Name<input     name="name"     value="${escapeAttr(currentUser.name)}" required /></label>
-        <label>Email<input    value="${escapeAttr(currentUser.email)}" disabled /></label>
-        <label>Phone<input    name="phone"    value="${escapeAttr(currentData.profile.phone)}" /></label>
-        <label>Location<input name="location" value="${escapeAttr(currentData.profile.location)}" /></label>
-      </div>
-      <label class="full-field">Bio<textarea name="bio">${escapeHtml(currentData.profile.bio)}</textarea></label>
-      <button class="primary-btn" type="submit">Save profile</button>
-    `;
-    entryForm.onsubmit = saveProfile;
-    return;
-  }
-
   entryForm.innerHTML = '<div class="empty-state">Use the sidebar to navigate to a data page.</div>';
   entryForm.onsubmit  = null;
 }
@@ -479,38 +470,6 @@ function renderList(pageKey) {
   if (pageKey === 'nutrition')  return renderNutrition();
   if (pageKey === 'goals')      return renderGoals();
   if (pageKey === 'todo' || pageKey === 'habits') return renderChecklist(pageKey);
-
-  if (pageKey === 'settings') {
-    const s = currentData.settings;
-    byId('data-list').innerHTML = `
-      <article class="data-card stacked">
-        <h3>Current targets</h3>
-        <p>Theme: ${escapeHtml(s.theme)}</p>
-        <p>Palette: ${escapeHtml(s.palette || 'palette-1')}</p>
-        <p>Water: ${s.waterGoal} glasses/day</p>
-        <p>Sleep: ${s.sleepGoal} hours/night</p>
-        <p>Calories: ${s.calorieTarget} kcal â€” Protein: ${s.proteinTarget}g â€” Carbs: ${s.carbTarget}g â€” Fat: ${s.fatTarget}g</p>
-      </article>
-      <article class="data-card stacked">
-        <h3>Inspiration gallery</h3>
-        <div class="photo-gallery">
-          ${(PHOTO_LIBRARY_LIST || []).map((src) => `<img class="photo-tile" src="${src}" alt="Inspiration photo" loading="lazy" />`).join('')}
-        </div>
-      </article>`;
-    return;
-  }
-
-  if (pageKey === 'profile') {
-    byId('data-list').innerHTML = `
-      <article class="data-card stacked">
-        <h3>${escapeHtml(currentUser.name)}</h3>
-        <p>${escapeHtml(currentUser.email)}</p>
-        <p>${escapeHtml(currentData.profile.phone    || 'No phone added')}</p>
-        <p>${escapeHtml(currentData.profile.location || 'No location added')}</p>
-        <p>${escapeHtml(currentData.profile.bio      || 'No bio added')}</p>
-      </article>`;
-    return;
-  }
 
   renderGenericList(pageKey);
 }
@@ -708,36 +667,7 @@ function deleteEntry(pageKey, id) {
   initPage(pageKey);
 }
 
-function saveSettings(e) {
-  e.preventDefault();
-  const form = new FormData(e.currentTarget);
-  Object.assign(currentData.settings, {
-    theme:         String(form.get('theme')),
-    palette:       String(form.get('palette') || 'palette-1'),
-    waterGoal:     Number(form.get('waterGoal')),
-    sleepGoal:     Number(form.get('sleepGoal')),
-    calorieTarget: Number(form.get('calorieTarget')),
-    proteinTarget: Number(form.get('proteinTarget')),
-    carbTarget:    Number(form.get('carbTarget')),
-    fatTarget:     Number(form.get('fatTarget')),
-  });
-  persist();
-  initPage('settings');
-}
-
-function saveProfile(e) {
-  e.preventDefault();
-  const form = new FormData(e.currentTarget);
-  currentUser.name               = String(form.get('name')).trim();
-  currentData.profile.phone      = String(form.get('phone')).trim();
-  currentData.profile.location   = String(form.get('location')).trim();
-  currentData.profile.bio        = String(form.get('bio')).trim();
-  saveUsers(getUsers().map((u) => (u.email === currentUser.email ? currentUser : u)));
-  persist();
-  initPage('profile');
-}
-
-// â”€â”€â”€ Theme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ Theme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function toggleTheme() {
   currentData.settings.theme = currentData.settings.theme === 'dark' ? 'light' : 'dark';
   persist();
@@ -745,7 +675,10 @@ function toggleTheme() {
 }
 
 function applyTheme(theme, palette) {
-  const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
+  let resolvedTheme = theme === 'dark' ? 'dark' : 'light';
+  if (theme === 'auto') {
+    resolvedTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
   const resolvedPalette = palette || localStorage.getItem(PALETTE_KEY) || 'palette-1';
   document.documentElement.dataset.theme = resolvedTheme;
   document.documentElement.dataset.palette = resolvedPalette;
@@ -754,6 +687,15 @@ function applyTheme(theme, palette) {
   document.body.dataset.palette = resolvedPalette;
   localStorage.setItem(THEME_KEY, resolvedTheme);
   localStorage.setItem(PALETTE_KEY, resolvedPalette);
+}
+
+function applyAppearance(s) {
+  const root = document.documentElement;
+  root.dataset.fontSize   = s.fontSize || 'md';
+  root.dataset.radius     = s.radius   || 'md';
+  root.dataset.animations = s.animations === false ? 'off' : 'on';
+  root.dataset.compact    = s.compact ? 'on' : 'off';
+  root.dataset.glass      = s.glass ? 'on' : 'off';
 }
 
 // â”€â”€â”€ Session / storage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -833,11 +775,31 @@ function nutritionTotals() {
 
 function emptyData(name) {
   return {
-    profile:  { phone: '', location: '', bio: `${name} has not added a bio yet.` },
-    settings: { theme: 'light', palette: 'palette-1', waterGoal: 8, sleepGoal: 8, calorieTarget: 2200, proteinTarget: 150, carbTarget: 250, fatTarget: 70 },
+    profile: {
+      photo: null, cover: null, headline: '', phone: '', location: '',
+      bio: `${name} has not added a bio yet.`,
+      username: '', birthday: '', gender: '', country: '', city: '',
+      timezone: '', language: 'English', level: 1, xp: 0,
+      joinedAt: new Date().toISOString(),
+    },
+    settings: {
+      theme: 'light', palette: 'palette-1',
+      waterGoal: 8, sleepGoal: 8, calorieTarget: 2200, proteinTarget: 150, carbTarget: 250, fatTarget: 70,
+      habitGoal: 3, prayerGoal: 5, studyGoal: 120, workoutGoal: 4,
+      fontSize: 'md', radius: 'md', animations: true, compact: false, glass: false,
+    },
+    notifications: {
+      task: true, habit: true, workout: true, study: true, prayer: true,
+      goal: true, water: true, sleep: true, desktop: false, sound: true, email: false,
+      weeklyReview: true, monthlyReview: true,
+    },
+    security: { twoFactor: false, lastPasswordChange: null },
+    achievements: { unlocked: [] },
     tasks:    [], habits: [], goals: [], events: [], workouts: [],
     prayers:  [], meals:  [], water: [], sleep:  [], study:   [],
+    subjects: [], assignments: [], exams: [], projects: [], studyNotes: [],
     workoutPlan: { daysPerWeek: 4, trainingDays: ['Mon','Tue','Thu','Fri'], schedule: [] },
+    pomodoro: { mode: '25/5', workMin: 25, breakMin: 5, sessionsToday: 0, dailyGoal: 8, lastResetDate: '', soundOn: true },
   };
 }
 
@@ -845,9 +807,13 @@ function normalizeData(data, name) {
   const base   = emptyData(name);
   const merged = {
     ...base, ...data,
-    profile:     { ...base.profile,     ...(data.profile     || {}) },
-    settings:    { ...base.settings,    ...(data.settings    || {}) },
-    workoutPlan: { ...base.workoutPlan, ...(data.workoutPlan || {}) },
+    profile:       { ...base.profile,       ...(data.profile       || {}) },
+    settings:      { ...base.settings,      ...(data.settings      || {}) },
+    notifications: { ...base.notifications, ...(data.notifications || {}) },
+    security:      { ...base.security,      ...(data.security      || {}) },
+    achievements:  { ...base.achievements,  ...(data.achievements  || {}) },
+    workoutPlan:   { ...base.workoutPlan,   ...(data.workoutPlan   || {}) },
+    pomodoro:      { ...base.pomodoro,      ...(data.pomodoro      || {}) },
   };
   // Ensure every array key exists
   Object.keys(base).forEach((k) => {
@@ -864,6 +830,12 @@ function normalizeData(data, name) {
   merged.goals    = merged.goals.map((i)    => ({ period: 'Daily', category: 'General', completed: false, ...i }));
   merged.meals    = merged.meals.map((i)    => ({ protein: 0, carbs: 0, fat: 0, ...i }));
   merged.workouts = merged.workouts.map((i) => ({ day: '', title: 'Exercise', weight: 0, reps: 0, sets: 1, note: '', ...i }));
+  merged.study        = merged.study.map((i)        => ({ title: 'Study session', topic: '', subjectId: null, date: '', startTime: '', duration: 30, minutes: 30, priority: 'Medium', difficulty: 'Medium', status: 'Planned', progress: 0, elapsedSeconds: 0, notes: '', completed: false, completedAt: null, ...i }));
+  merged.subjects     = merged.subjects.map((i)     => ({ name: 'Subject', icon: '📘', color: '#3b6ea5', teacher: '', semester: '', creditHours: 0, progress: 0, avgGrade: '', difficulty: 'Medium', notes: '', ...i }));
+  merged.assignments  = merged.assignments.map((i)  => ({ title: 'Assignment', subjectId: null, dueDate: '', priority: 'Medium', estimatedTime: 60, status: 'Not Started', progress: 0, attachments: '', notes: '', reminder: 'None', repeat: 'None', completed: false, ...i }));
+  merged.exams        = merged.exams.map((i)        => ({ subjectId: null, date: '', time: '', room: '', instructor: '', importance: 'Medium', preparation: 0, studyMaterials: '', notes: '', ...i }));
+  merged.projects      = merged.projects.map((i)     => ({ title: 'Project', progress: 0, tasks: [], deadline: '', priority: 'Medium', attachments: '', members: '', notes: '', ...i }));
+  merged.studyNotes   = merged.studyNotes.map((i)   => ({ text: '', color: '#f2d492', pinned: false, archived: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...i }));
   return merged;
 }
 
@@ -904,17 +876,6 @@ function escapeHtml(v) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
-}
-
-function resolvePhotoPath(src) {
-  const raw = String(src || '').trim();
-  if (!raw) return '';
-  const normalized = raw.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '');
-  if (normalized.startsWith('../assist/')) {
-    return window.location.pathname.includes('/pages/') ? normalized : normalized.replace('../', '');
-  }
-  if (normalized.startsWith('assist/')) return normalized;
-  return normalized;
 }
 
 function escapeAttr(v) { return escapeHtml(v); }

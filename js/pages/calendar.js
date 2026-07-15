@@ -1,4 +1,5 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
-  initPage('calendar');
+  if (bootShell('calendar') && typeof initCalendarPage === 'function') {
+    initCalendarPage();
+  }
 });
-

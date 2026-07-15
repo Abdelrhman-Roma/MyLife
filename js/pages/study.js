@@ -1,4 +1,5 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
-  initPage('study');
+  if (bootShell('study') && typeof initStudyPage === 'function') {
+    initStudyPage();
+  }
 });
-

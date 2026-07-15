@@ -691,6 +691,11 @@
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 .workout-fab-icon { font-size: 1.05rem; line-height: 1; }
+.workout-fab-label { line-height: 1; white-space: nowrap; }
+
+/* ── Weekly summary panel ───────────────────────────────────────────────── */
+.workout-weekly-summary .workout-panel-head { align-items: baseline; }
+.workout-weekly-summary strong { color: var(--accent, var(--blue)); font-family: var(--font-mono); }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 

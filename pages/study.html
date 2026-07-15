@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Plan subjects, assignments, exams and study sessions with a focus timer, analytics and achievements." />
     <title>MYLIFE | Study</title>
     <link rel="stylesheet" href="../css/variables.css" />
     <link rel="stylesheet" href="../css/shared.css" />
@@ -16,21 +17,16 @@
         <header class="topbar" id="topbar"></header>
         <section class="page-art" id="page-art"></section>
         <section class="stats-grid" id="stats-grid"></section>
-        <section class="content-grid">
-          <div class="panel">
-            <p class="eyebrow" id="form-kicker"></p>
-            <h2 id="form-title"></h2>
-            <form id="entry-form" class="form-stack" novalidate></form>
-          </div>
-          <div class="panel">
-            <p class="eyebrow">Your data</p>
-            <h2 id="list-title"></h2>
-            <div class="data-list" id="data-list"></div>
+        <section class="study-sections" id="study-root">
+          <div class="std-skeleton" aria-hidden="true">
+            <div class="std-skeleton-bar" style="height:64px"></div>
+            <div class="std-skeleton-bar" style="height:420px"></div>
           </div>
         </section>
       </main>
     </div>
-    <script src="../js/shared.js"></script>
-    <script src="../js/pages/study.js"></script>
+    <script src="../js/shared.js" defer></script>
+    <script src="../js/study.js" defer></script>
+    <script src="../js/pages/study.js" defer></script>
   </body>
 </html>

@@ -34,6 +34,14 @@
   filter: brightness(0.6) saturate(1.05);
 }
 
+.auth-hero-art {
+  background:
+    radial-gradient(circle at 22% 22%, rgba(255,255,255,.34) 0 2px, transparent 3px),
+    radial-gradient(circle at 74% 62%, rgba(255,255,255,.15) 0 2px, transparent 3px),
+    linear-gradient(135deg, color-mix(in srgb, var(--blue) 80%, #081522), color-mix(in srgb, var(--purple) 76%, #111827));
+  background-size: 30px 30px, 44px 44px, auto;
+}
+
 .auth-visual-overlay {
   position: absolute;
   inset: 0;
@@ -52,6 +60,12 @@
   padding: 8px;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
+  display: grid;
+  place-items: center;
+  color: var(--nav);
+  font-family: var(--font-display, Inter, sans-serif);
+  font-size: 2rem;
+  font-weight: 800;
 }
 
 .auth-copy {
