@@ -30,13 +30,25 @@ const NAV_ICONS = {
   study: '✎', statistics: '◔', account: '◉',
 };
 
+// Inline SVG icons (24x24 viewbox, 2px stroke, currentColor) used in the account
+// menu instead of emoji so the icon language stays vector, themeable, and
+// consistent across light/dark/palette modes (per UI/UX design-system guidance).
+const SVG_ICON = {
+  user: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  chart: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+  palette: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="0.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="0.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="0.5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.4-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.3 0 4.2-1.9 4.2-4.2C21.5 6 17.2 2 12 2z"/></svg>',
+  save: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>',
+  help: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  logout: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+};
+
 // Items shown in the account (avatar) dropdown menu — not part of the main nav.
 const ACCOUNT_MENU = [
-  ['account.html',            '👤', 'Profile & Settings'],
-  ['account.html#statistics', '📊', 'Statistics'],
-  ['account.html#appearance', '🎨', 'Appearance'],
-  ['account.html#backup',     '💾', 'Backup'],
-  ['account.html#about',      '❓', 'Help'],
+  ['account.html',            SVG_ICON.user,    'Profile & Settings'],
+  ['account.html#statistics', SVG_ICON.chart,   'Statistics'],
+  ['account.html#appearance', SVG_ICON.palette, 'Appearance'],
+  ['account.html#backup',     SVG_ICON.save,    'Backup'],
+  ['account.html#about',      SVG_ICON.help,    'Help'],
 ];
 
 const PAGES = {
@@ -88,8 +100,16 @@ function login(e) {
   const pwd   = byId('login-password').value;
   const user  = getUsers().find((u) => u.email === email && u.password === pwd);
   if (!user) { byId('login-message').textContent = 'Invalid email or password.'; return; }
-  localStorage.setItem(SESSION_KEY, email);
-  window.location.href = 'pages/dashboard.html';
+  const rememberEl = byId('remember-me');
+  const remember = rememberEl ? rememberEl.checked : true;
+  if (remember) {
+    localStorage.setItem(SESSION_KEY, email);
+    sessionStorage.removeItem(SESSION_KEY);
+  } else {
+    sessionStorage.setItem(SESSION_KEY, email);
+    localStorage.removeItem(SESSION_KEY);
+  }
+  navigateAfterAuth('pages/dashboard.html');
 }
 
 function register(e) {
@@ -106,7 +126,14 @@ function register(e) {
   saveUsers(users);
   saveData(email, emptyData(name));
   localStorage.setItem(SESSION_KEY, email);
-  window.location.href = 'pages/dashboard.html';
+  navigateAfterAuth('pages/dashboard.html');
+}
+
+// Lets a page layer in a richer success transition (button morph, page-veil, etc.)
+// via window.onAuthSuccess without changing what makes login/register succeed.
+function navigateAfterAuth(target) {
+  if (typeof window.onAuthSuccess === 'function') { window.onAuthSuccess(target); }
+  else { window.location.href = target; }
 }
 
 // â”€â”€â”€ Page init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -175,7 +202,7 @@ function accountWidgetHtml(suffix, active) {
           </a>
         `).join('')}
         <button role="menuitem" type="button" class="account-menu-logout" data-menu-logout>
-          <span class="account-menu-icon" aria-hidden="true">🚪</span><span>Logout</span>
+          <span class="account-menu-icon" aria-hidden="true">${SVG_ICON.logout}</span><span>Logout</span>
         </button>
       </div>
     </div>
@@ -765,6 +792,7 @@ function applyAppearance(s) {
 // â”€â”€â”€ Session / storage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function logout() {
   localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
   window.location.href = '../index.html';
 }
 
@@ -781,7 +809,7 @@ function exportData() {
 }
 
 function getSessionUser() {
-  const email = localStorage.getItem(SESSION_KEY);
+  const email = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
   if (!email) return null;
   return getUsers().find((u) => u.email === email) || null;
 }

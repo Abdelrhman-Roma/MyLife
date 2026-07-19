@@ -398,8 +398,8 @@
   display: grid;
   place-items: center;
   gap: 18px;
-  background: radial-gradient(circle at center, #14161c 0%, #05060a 100%);
-  color: #ece4d0;
+  background: radial-gradient(circle at center, #1e293b 0%, #0b1220 100%);
+  color: #e2e8f0;
   text-align: center;
   padding: 24px;
 }

@@ -1,6 +1,17 @@
 :root {
-  --font-body: Inter, Segoe UI, Arial, sans-serif;
+  --font-body: 'IBM Plex Sans', Inter, Segoe UI, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {
@@ -1159,7 +1170,19 @@ label, .stat-card span { font-weight: 650; }
   outline: none;
 }
 
-.account-menu-icon { font-size: 1rem; }
+.account-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.account-menu-icon svg { display: block; }
+
+.account-menu-logout .account-menu-icon { color: var(--red); }
 
 .account-menu-logout { color: var(--red); }
 
