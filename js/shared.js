@@ -689,6 +689,70 @@ function applyTheme(theme, palette) {
   localStorage.setItem(PALETTE_KEY, resolvedPalette);
 }
 
+// ─── Shared confirm modal ───────────────────────────────────────────────
+// Any page can call openModal({...}) — the layer is created on demand so no
+// page markup changes are required.
+function ensureModalLayer() {
+  let layer = byId('modal-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'modal-layer';
+    layer.className = 'modal-layer';
+    layer.hidden = true;
+    document.body.appendChild(layer);
+  }
+  return layer;
+}
+
+function openModal({ title, body, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false, onConfirm, onCancel }) {
+  const layer = ensureModalLayer();
+  layer.hidden = false;
+  layer.innerHTML = `
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <h2>${escapeHtml(title)}</h2>
+        <div class="modal-body">${body}</div>
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" data-modal-cancel>${escapeHtml(cancelLabel)}</button>
+          <button class="${danger ? 'danger-btn' : 'primary-btn'}" type="button" data-modal-confirm>${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    </div>
+  `;
+  requestAnimationFrame(() => layer.querySelector('.modal-backdrop').classList.add('open'));
+  let resolved = false;
+  const onKeydown = (e) => { if (e.key === 'Escape') cancel(); };
+  const cancel = () => {
+    if (resolved) return;
+    resolved = true;
+    document.removeEventListener('keydown', onKeydown);
+    closeModal();
+    if (onCancel) onCancel();
+  };
+  const confirm = () => {
+    if (resolved) return;
+    resolved = true;
+    document.removeEventListener('keydown', onKeydown);
+    closeModal();
+    onConfirm();
+  };
+  layer.querySelector('[data-modal-cancel]').addEventListener('click', cancel);
+  layer.querySelector('[data-modal-confirm]').addEventListener('click', confirm);
+  layer.querySelector('.modal-backdrop').addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-backdrop')) cancel();
+  });
+  document.addEventListener('keydown', onKeydown);
+}
+
+function closeModal() {
+  const layer = byId('modal-layer');
+  if (!layer) return;
+  const backdrop = layer.querySelector('.modal-backdrop');
+  if (!backdrop) { layer.hidden = true; return; }
+  backdrop.classList.remove('open');
+  window.setTimeout(() => { layer.hidden = true; layer.innerHTML = ''; }, 200);
+}
+
 function applyAppearance(s) {
   const root = document.documentElement;
   root.dataset.fontSize   = s.fontSize || 'md';

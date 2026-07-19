@@ -387,39 +387,7 @@
 .backup-grid .secondary-btn,
 .backup-grid .danger-btn { margin-top: 10px; }
 
-/* ── Modal + cropper ──────────────────────────────────────────────────── */
-.modal-layer { position: fixed; inset: 0; z-index: 200; }
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(10, 10, 14, 0.5);
-  padding: 20px;
-  opacity: 0;
-  transition: opacity 200ms ease;
-}
-
-.modal-backdrop.open { opacity: 1; }
-
-.modal-card {
-  width: min(420px, 100%);
-  border-radius: var(--radius-xl);
-  background: var(--surface-elevated, var(--surface));
-  box-shadow: var(--shadow);
-  padding: 24px;
-  transform: scale(0.96) translateY(8px);
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.modal-backdrop.open .modal-card { transform: scale(1) translateY(0); }
-
-.modal-card h2 { margin: 0 0 12px; font-size: var(--fs-h3); }
-.modal-body p { color: var(--muted); margin: 0; }
-
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-
+/* ── Cropper (uses the generic .modal-layer/.modal-card from shared.css) ── */
 .cropper-card { width: min(440px, 100%); }
 
 .cropper-viewport {

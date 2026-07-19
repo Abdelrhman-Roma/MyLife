@@ -5,11 +5,10 @@ const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WORKOUT_TYPES = ['Push Day', 'Pull Day', 'Leg Day', 'Upper Body', 'Lower Body', 'Full Body', 'Cardio', 'Rest Day'];
 
-const EX_STATUS = ['Not Started', 'In Progress', 'Done', 'Skipped'];
 const EX_STATUS_CLASS = { 'Not Started': 'ex-ns', 'In Progress': 'ex-inprogress', 'Done': 'ex-done', 'Skipped': 'ex-skipped' };
 
-const WO_STATUS = ['Not Started', 'In Progress', 'Done', 'Skipped'];
-const WO_STATUS_CLASS = { 'Not Started': 'wo-ns', 'In Progress': 'wo-inprogress', 'Done': 'wo-done', 'Skipped': 'wo-skipped' };
+const WO_STATUS = ['Not Started', 'In Progress', 'Done', 'Skipped', 'Rest Day'];
+const WO_STATUS_CLASS = { 'Not Started': 'wo-ns', 'In Progress': 'wo-inprogress', 'Done': 'wo-done', 'Skipped': 'wo-skipped', 'Rest Day': 'wo-rest' };
 const REST_QUOTES = [
   'Push beyond your limits.',
   'Champions are built one rep at a time.',
@@ -40,9 +39,99 @@ function initWorkoutPage() {
   renderWorkoutRoot();
   bindWorkoutEventsOnce();
 
+  window.addEventListener('beforeunload', (e) => {
+    const s = openSessionId && plan().schedule.find((x) => x.id === openSessionId);
+    if (!s || s.status !== 'In Progress') return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
   const dayId = new URLSearchParams(window.location.search).get('day');
   if (dayId && plan().schedule.some((s) => s.id === dayId)) {
     openWorkoutSession(dayId);
+  }
+}
+
+function isRestDay(s) {
+  return s.type === 'Rest Day';
+}
+
+// Single source of truth for a schedule row's displayed status. Rest Day
+// always wins (it can't have exercises), otherwise the status is whatever
+// the planner/session logic last computed — never a free-form manual value.
+function effectiveWorkoutStatus(s) {
+  if (isRestDay(s)) return 'Rest Day';
+  return s.status || 'Not Started';
+}
+
+// Recomputes a workout's status purely from its exercises, so the planner
+// can never show a status that disagrees with the exercises underneath it.
+// 'Done' (via Complete workout) and 'Skipped' are deliberate, explicit
+// actions — once set, they stay locked until "Reset workout" is used, so
+// finishing early or skipping doesn't get silently overwritten. Everything
+// else (Not Started / In Progress / auto-Done-when-all-exercises-complete)
+// is always recalculated fresh, so unmarking a "Done" exercise immediately
+// drops the workout back out of Done too.
+function recomputeWorkoutStatus(s) {
+  if (isRestDay(s)) { s.status = 'Rest Day'; s.statusLocked = false; return; }
+  if (s.statusLocked) return;
+  const total = s.exercises.length;
+  if (!total) { s.status = 'Not Started'; return; }
+  const done = exerciseDoneCount(s);
+  if (done >= total) {
+    s.status = 'Done';
+    if (!s.completionDate) { s.completionDate = new Date().toISOString().slice(0, 10); s.lastCompletedDate = s.completionDate; }
+  } else if (done > 0 || s.exercises.some((ex) => (ex.log || []).some(setIsDone))) {
+    s.status = 'In Progress';
+  } else {
+    s.status = 'Not Started';
+  }
+}
+
+// Restarts a workout day: clears every exercise's logged sets/status and
+// unlocks the workout status so it goes back to being auto-calculated.
+function resetWorkoutSession(s) {
+  s.exercises.forEach((ex) => {
+    ex.log = [];
+    ex.exStatus = 'Not Started';
+    delete ex.performance;
+  });
+  s.status = 'Not Started';
+  s.statusLocked = false;
+  s.durationMin = 0;
+  s.calories = 0;
+  delete s.completionDate;
+  delete s.lastCompletedDate;
+  if (openSessionId === s.id) { clearRestTimer(); delete sessionTimers[s.id]; }
+}
+
+// Converts a day to Rest Day: clears exercises, timers, progress and status.
+function convertToRestDay(s) {
+  s.type = 'Rest Day';
+  s.exercises = [];
+  s.status = 'Rest Day';
+  s.durationMin = 0;
+  s.calories = 0;
+  collapsedExercises.clear();
+  if (openSessionId === s.id) { clearRestTimer(); openSessionId = null; delete sessionTimers[s.id]; }
+}
+
+function restDayCardHtml() {
+  return `
+    <div class="wo-rest-day-card">
+      <span class="wo-rest-day-icon" aria-hidden="true">🛌</span>
+      <h3>Rest Day</h3>
+      <p>Recovery is part of progress. Enjoy your recovery.</p>
+    </div>
+  `;
+}
+
+function isLikelyValidUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
   }
 }
 
@@ -61,6 +150,7 @@ function createNewExercise() {
 // plan()/currentData so the various click/change handlers don't each repeat
 // the same persist + re-render sequence.
 function refreshWorkout({ art = false } = {}) {
+  plan().schedule.forEach(recomputeWorkoutStatus);
   persist();
   if (art) renderArt('workout');
   renderWorkoutStats();
@@ -78,6 +168,7 @@ function migrateLegacyData() {
   (p.schedule || []).forEach((s) => {
     if (s.status === 'Pending') s.status = 'Not Started';
     if (s.status === 'Completed') s.status = 'Done';
+    if (typeof s.statusLocked !== 'boolean') s.statusLocked = s.status === 'Done' || s.status === 'Skipped';
     if (!s.dayFull && s.day) s.dayFull = DAY_NAMES_FULL[DAY_NAMES.indexOf(s.day)] || s.day;
     if (!s.date && s.dayFull) s.date = dateForDayFull(s.dayFull);
     if (!Array.isArray(s.exercises)) s.exercises = [];
@@ -295,6 +386,7 @@ function generateSchedule(daysPerWeek, trainingDaysFull, weekKey, preserveExerci
       type: (prev && prev.type) || WORKOUT_TYPES[i % WORKOUT_TYPES.length],
       exercises,
       status: 'Not Started',
+      statusLocked: false,
       durationMin: 0,
       calories: 0,
       taskId: (prev && prev.taskId) || null,
@@ -340,15 +432,16 @@ function syncScheduleToTodo() {
 
 function renderWorkoutStats() {
   const p = plan();
-  const total = p.schedule.length;
+  const active = p.schedule.filter((s) => !isRestDay(s));
+  const total = active.length;
   const done = completedWorkoutsThisWeek();
-  const skipped = p.schedule.filter((s) => s.status === 'Skipped');
+  const skipped = active.filter((s) => s.status === 'Skipped');
   const calories = done.reduce((sum, s) => sum + Number(s.calories || 0), 0);
   const duration = done.reduce((sum, s) => sum + Number(s.durationMin || 0), 0);
   const donePct = percent(done.length, total || 1);
 
   let totalEx = 0, doneEx = 0;
-  p.schedule.forEach((s) => {
+  active.forEach((s) => {
     (s.exercises || []).forEach((ex) => {
       totalEx++;
       if (ex.exStatus === 'Done') doneEx++;
@@ -462,7 +555,7 @@ function workoutFabHtml() {
 }
 
 function weeklySummaryHtml() {
-  const total = plan().schedule.length;
+  const total = plan().schedule.filter((s) => !isRestDay(s)).length;
   const done = completedWorkoutsThisWeek().length;
   const remaining = Math.max(0, total - done);
   const pct = percent(done, total || 1);
@@ -482,13 +575,14 @@ function plannerRowHtml(s) {
   const totalEx = s.exercises.length;
   const doneEx = exerciseDoneCount(s);
   const exPct = exerciseProgress(s);
-  const scls = WO_STATUS_CLASS[s.status] || 'wo-ns';
-  const action = s.status === 'Done' ? 'COMPLETE' : (s.status === 'Not Started' ? 'START' : 'OPEN');
+  const status = effectiveWorkoutStatus(s);
+  const scls = WO_STATUS_CLASS[status] || 'wo-rest';
+  const rest = isRestDay(s);
+  const action = rest ? 'REST' : (status === 'Done' ? 'COMPLETE' : (status === 'Not Started' ? 'START' : 'OPEN'));
   const typeId = controlId('workout-type', s.id);
-  const statusId = controlId('workout-status', s.id);
-  const openLabel = openSessionId === s.id ? `Close ${s.day} ${s.type} session` : `${action.toLowerCase()} ${s.day} ${s.type} session`;
+  const openLabel = rest ? `${s.day} is a rest day` : (openSessionId === s.id ? `Close ${s.day} ${s.type} session` : `${action.toLowerCase()} ${s.day} ${s.type} session`);
   return `
-    <tr class="workout-planner-row">
+    <tr class="workout-planner-row${rest ? ' wo-rest-row' : ''}">
       <td data-label="Day"><strong>${escapeHtml(s.day)}</strong></td>
       <td class="muted" data-label="Date">${escapeHtml(s.date)}</td>
       <td data-label="Workout Type">
@@ -497,23 +591,18 @@ function plannerRowHtml(s) {
           ${WORKOUT_TYPES.map((t) => `<option ${t === s.type ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
         </select>
       </td>
-      <td data-label="Exercises">${totalEx}</td>
+      <td data-label="Exercises">${rest ? '—' : totalEx}</td>
       <td data-label="Progress">
-        ${totalEx ? `
+        ${rest ? '<span class="muted">Rest day</span>' : (totalEx ? `
           <div class="wo-progress-bar">
             <div class="wo-progress-fill" style="width:${exPct}%"></div>
           </div>
           <span class="muted" style="font-size:0.72rem">${doneEx}/${totalEx} • ${exPct}%</span>
-        ` : '<span class="muted">—</span>'}
+        ` : '<span class="muted">—</span>')}
       </td>
       <td data-label="Duration">${s.durationMin ? `${s.durationMin} min` : '—'}</td>
-      <td data-label="Status">
-        <label class="sr-only" for="${escapeAttr(statusId)}">${escapeHtml(s.day)} workout status</label>
-        <select id="${escapeAttr(statusId)}" class="wo-status-select ${scls}" data-wo-status-for="${escapeAttr(s.id)}" aria-label="${escapeAttr(s.day)} workout status">
-          ${WO_STATUS.map((st) => `<option ${st === s.status ? 'selected' : ''}>${escapeHtml(st)}</option>`).join('')}
-        </select>
-      </td>
-      <td data-label="Action"><button type="button" class="secondary-btn" data-open-session="${escapeAttr(s.id)}" aria-label="${escapeAttr(openLabel)}" title="${escapeAttr(openLabel)}">${openSessionId === s.id ? 'CLOSE' : action}</button></td>
+      <td data-label="Status"><span class="wo-status-badge ${scls}">${escapeHtml(status)}</span></td>
+      <td data-label="Action"><button type="button" class="secondary-btn" data-open-session="${escapeAttr(s.id)}" ${rest ? 'disabled' : (!totalEx && openSessionId !== s.id ? 'disabled title="Add at least one exercise first"' : '')} aria-label="${escapeAttr(openLabel)}" title="${escapeAttr(openLabel)}">${rest ? 'REST' : (openSessionId === s.id ? 'CLOSE' : action)}</button></td>
     </tr>
   `;
 }
@@ -524,13 +613,23 @@ function excelPlanTableHtml() {
   // cell — this lets the table collapse cleanly into labeled cards on
   // mobile without losing the "which day is this?" context.
   const groups = plan().schedule.map((s, dayIdx) => {
+    if (isRestDay(s)) {
+      return `
+        <div class="wo-excel-day-group">
+          ${excelDayHeadHtml(s, dayIdx)}
+          ${restDayCardHtml()}
+        </div>
+      `;
+    }
+
     if (!s.exercises.length) {
       return `
         <div class="wo-excel-day-group">
           ${excelDayHeadHtml(s, dayIdx)}
           <div class="empty-state wo-excel-empty">
-            No exercises yet —
-            <button type="button" class="text-btn" data-excel-add="${escapeAttr(s.id)}" aria-label="Add exercise to ${escapeAttr(s.day)} ${escapeAttr(s.type)}" title="Add exercise">+ Add exercise</button>
+            <span class="wo-empty-icon" aria-hidden="true">🏋️</span>
+            <p>No exercises added.<br />Create your first exercise.</p>
+            <button type="button" class="secondary-btn" data-excel-add="${escapeAttr(s.id)}" aria-label="Add exercise to ${escapeAttr(s.day)} ${escapeAttr(s.type)}" title="Add exercise">+ Add Exercise</button>
           </div>
         </div>
       `;
@@ -615,6 +714,9 @@ function sessionPanelHtml(id) {
   const scls = WO_STATUS_CLASS[s.status] || 'wo-ns';
   const totalEx = s.exercises.length;
   const doneEx = exerciseDoneCount(s);
+  const skippedEx = s.exercises.filter((ex) => ex.exStatus === 'Skipped').length;
+  const resolvedEx = doneEx + skippedEx;
+  const canFinish = totalEx > 0 && resolvedEx >= totalEx;
   const exPct = exerciseProgress(s);
   const currentExercise = s.exercises.find((ex) => !['Done', 'Skipped'].includes(ex.exStatus || 'Not Started'));
   const elapsed = sessionTimers[id] ? Math.max(0, Math.floor((Date.now() - sessionTimers[id]) / 1000)) : 0;
@@ -630,9 +732,10 @@ function sessionPanelHtml(id) {
           <span class="wo-status-badge ${scls}">${escapeHtml(s.status)}</span>
           <button type="button" class="secondary-btn" data-close-session="1" aria-label="Close ${escapeAttr(s.day)} workout session" title="Close workout session">Close</button>
           ${s.status !== 'Done' ? `
-            <button type="button" class="primary-btn" data-finish-session="${escapeAttr(s.id)}" aria-label="Complete ${escapeAttr(s.day)} workout" title="Complete workout">Complete workout</button>
+            <button type="button" class="primary-btn" data-finish-session="${escapeAttr(s.id)}" ${canFinish ? '' : 'disabled title="Mark or skip every exercise before completing a workout"'} aria-label="Complete ${escapeAttr(s.day)} workout" title="Complete workout">Complete workout</button>
             <button type="button" class="secondary-btn wo-skip-btn" data-skip-session="${escapeAttr(s.id)}" aria-label="Skip ${escapeAttr(s.day)} workout" title="Skip workout">Skip</button>
           ` : ''}
+          ${(doneEx > 0 || s.status === 'Done' || s.status === 'Skipped') ? `<button type="button" class="text-btn" data-reset-workout="${escapeAttr(s.id)}" aria-label="Reset ${escapeAttr(s.day)} workout" title="Reset workout">Reset</button>` : ''}
         </div>
       </div>
 
@@ -657,7 +760,6 @@ function exerciseCardHtml(s, ex) {
   const exCls = EX_STATUS_CLASS[ex.exStatus || 'Not Started'] || 'ex-ns';
   const doneSets = logRows.filter(setIsDone).length;
   const feedback = analyzeExercisePerformance(ex) || ex.performance || null;
-  const statusId = controlId('exercise-status', s.id, ex.id);
   const collapsed = collapsedExercises.has(ex.id);
   return `
     <article class="workout-exercise-card${collapsed ? ' collapsed' : ''}" data-exercise-id="${escapeAttr(ex.id)}">
@@ -676,12 +778,12 @@ function exerciseCardHtml(s, ex) {
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <label class="sr-only" for="${escapeAttr(statusId)}">${escapeHtml(ex.name)} status</label>
-          <select id="${escapeAttr(statusId)}" class="ex-status-select ${exCls}" data-ex-status-for="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" aria-label="${escapeAttr(ex.name)} status">
-            ${EX_STATUS.map((st) => `<option ${st === (ex.exStatus || 'Not Started') ? 'selected' : ''}>${escapeHtml(st)}</option>`).join('')}
-          </select>
+          <span class="ex-status-badge ${exCls}">${escapeHtml(ex.exStatus || 'Not Started')}</span>
           ${ex.video ? `<a class="workout-video-link" href="${escapeAttr(ex.video)}" target="_blank" rel="noopener">▶ Video</a>` : ''}
-          <button type="button" class="small-danger" data-remove-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" aria-label="Remove ${escapeAttr(ex.name)}" title="Remove ${escapeAttr(ex.name)}">Remove</button>
+          ${(ex.exStatus === 'Skipped' || ex.exStatus === 'Done')
+            ? `<button type="button" class="text-btn" data-reset-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" aria-label="Reset ${escapeAttr(ex.name)}" title="Reset exercise">Reset</button>`
+            : `<button type="button" class="text-btn" data-skip-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" aria-label="Skip ${escapeAttr(ex.name)}" title="Skip exercise">Skip</button>`}
+          <button type="button" class="small-danger" data-remove-exercise="${escapeAttr(ex.id)}" data-schedule="${escapeAttr(s.id)}" aria-label="Delete ${escapeAttr(ex.name)}" title="Delete ${escapeAttr(ex.name)}">Delete</button>
         </div>
       </div>
       <div class="workout-exercise-body">
@@ -753,11 +855,11 @@ function performanceHistoryHtml(ex) {
 }
 
 function openWorkoutSession(id) {
+  const s = plan().schedule.find((x) => x.id === id);
+  if (!s || isRestDay(s) || !s.exercises.length) return;
   clearRestTimer();
   openSessionId = id;
   sessionTimers[id] = sessionTimers[id] || Date.now();
-  const s = plan().schedule.find((x) => x.id === id);
-  if (s && s.status === 'Not Started') s.status = 'In Progress';
   syncScheduleToTodo();
   refreshWorkout({ art: true });
 }
@@ -790,6 +892,7 @@ function finishSession(scheduleId) {
 
   s.calories = loggedSetCount ? loggedSetCount * 8 : s.exercises.length * 40;
   s.status = 'Done';
+  s.statusLocked = true;
   s.completionDate = new Date().toISOString().slice(0, 10);
   s.lastCompletedDate = s.completionDate;
   s.lastCompletedWorkoutDate = s.date;
@@ -806,13 +909,22 @@ function finishSession(scheduleId) {
 }
 
 function skipSession(scheduleId) {
-  clearRestTimer();
   const s = plan().schedule.find((x) => x.id === scheduleId);
   if (!s) return;
-  s.status = 'Skipped';
-  syncScheduleToTodo();
-  openSessionId = null;
-  refreshWorkout();
+  openModal({
+    title: 'Skip this workout?',
+    body: `<p>${escapeHtml(s.day)}'s ${escapeHtml(s.type)} session will be marked as skipped. You can reset it later if you change your mind.</p>`,
+    confirmLabel: 'Skip workout',
+    danger: true,
+    onConfirm: () => {
+      clearRestTimer();
+      s.status = 'Skipped';
+      s.statusLocked = true;
+      syncScheduleToTodo();
+      openSessionId = null;
+      refreshWorkout();
+    },
+  });
 }
 
 function startRestTimer(exerciseId, seconds) {
@@ -832,28 +944,81 @@ function startRestTimer(exerciseId, seconds) {
     quoteIndex: Math.floor(Math.random() * REST_QUOTES.length),
     interval: null,
     quoteInterval: null,
+    status: 'running', // running | paused | finished
+    autoContinue: false,
   };
   renderRestOverlay();
-  const addButton = document.querySelector('[data-rest-add]');
-  if (addButton) addButton.focus();
-  const interval = setInterval(() => {
-    if (!restTimerState) return;
+  runRestInterval();
+  const quoteInterval = setInterval(() => {
+    if (!restTimerState || restTimerState.status !== 'running') return;
+    restTimerState.quoteIndex = (restTimerState.quoteIndex + 1) % REST_QUOTES.length;
+    updateRestOverlay(true);
+  }, 4200);
+  restTimerState.quoteInterval = quoteInterval;
+}
+
+function runRestInterval() {
+  if (!restTimerState) return;
+  if (restTimerState.interval) clearInterval(restTimerState.interval);
+  restTimerState.interval = setInterval(() => {
+    if (!restTimerState || restTimerState.status !== 'running') return;
     restTimerState.remaining -= 1;
     updateRestOverlay();
     if (restTimerState.remaining <= 0) finishRestTimer();
   }, 1000);
-  const quoteInterval = setInterval(() => {
-    if (!restTimerState) return;
-    restTimerState.quoteIndex = (restTimerState.quoteIndex + 1) % REST_QUOTES.length;
-    updateRestOverlay(true);
-  }, 4200);
-  restTimerState.interval = interval;
-  restTimerState.quoteInterval = quoteInterval;
+}
+
+function pauseRestTimer() {
+  if (!restTimerState || restTimerState.status !== 'running') return;
+  restTimerState.status = 'paused';
+  if (restTimerState.interval) clearInterval(restTimerState.interval);
+  renderRestOverlay();
+}
+
+function resumeRestTimer() {
+  if (!restTimerState || restTimerState.status !== 'paused') return;
+  restTimerState.status = 'running';
+  runRestInterval();
+  renderRestOverlay();
+}
+
+function adjustRestTimer(deltaSeconds) {
+  if (!restTimerState || restTimerState.status === 'finished') return;
+  restTimerState.remaining += deltaSeconds;
+  restTimerState.total += deltaSeconds;
+  updateRestOverlay();
+}
+
+function skipRestTimer() {
+  if (!restTimerState) return;
+  restTimerState.remaining = 0;
+  finishRestTimer(true);
+}
+
+function requestCancelRestTimer() {
+  if (!restTimerState) return;
+  const wasRunning = restTimerState.status === 'running';
+  if (wasRunning) pauseRestTimer();
+  openModal({
+    title: 'Stop current rest timer?',
+    body: '<p>Your rest countdown will end and you\u2019ll return to the workout.</p>',
+    confirmLabel: 'Stop timer',
+    cancelLabel: 'Resume',
+    danger: true,
+    onConfirm: () => { cancelRestTimer(); },
+    onCancel: () => { if (restTimerState && wasRunning) resumeRestTimer(); },
+  });
+}
+
+function cancelRestTimer() {
+  clearRestTimer();
 }
 
 function clearRestTimer() {
   if (restTimerState && restTimerState.interval) clearInterval(restTimerState.interval);
   if (restTimerState && restTimerState.quoteInterval) clearInterval(restTimerState.quoteInterval);
+  const wrap = restTimerState && document.querySelector(`[data-rest-timer-for="${restTimerState.exerciseId}"]`);
+  if (wrap) wrap.classList.remove('running');
   const overlay = document.querySelector('[data-rest-overlay]');
   if (overlay) overlay.remove();
   if (restFocusReturn && document.contains(restFocusReturn)) restFocusReturn.focus();
@@ -862,22 +1027,49 @@ function clearRestTimer() {
 }
 
 function renderRestOverlay() {
+  if (!restTimerState) return;
   const existing = document.querySelector('[data-rest-overlay]');
   if (existing) existing.remove();
+  const { status, remaining, autoContinue } = restTimerState;
+  const finished = status === 'finished';
+  const paused = status === 'paused';
+
   document.body.insertAdjacentHTML('beforeend', `
     <div class="workout-rest-overlay" data-rest-overlay role="dialog" aria-modal="true" aria-label="Rest timer">
       <div class="workout-rest-backdrop"></div>
-      <section class="workout-rest-stage">
-        <p class="eyebrow">REST TIME</p>
-        <div class="workout-rest-ring" data-rest-ring style="--rest-progress: 100%">
-          <span data-rest-overlay-time>${formatTime(restTimerState.remaining)}</span>
-        </div>
-        <p class="workout-rest-quote" data-rest-quote>${escapeHtml(REST_QUOTES[restTimerState.quoteIndex])}</p>
-        <p class="workout-rest-coach">Control your breathing. Prepare for the next set.</p>
-        <button type="button" class="primary-btn" data-rest-add="+10" aria-label="Add 10 seconds to rest timer" title="Add 10 seconds">+10 SEC</button>
+      <section class="workout-rest-stage ${finished ? 'rest-finished' : ''}">
+        ${finished ? `
+          <p class="eyebrow">TIME'S UP!</p>
+          <div class="workout-rest-ring rest-ring-done" data-rest-ring style="--rest-progress: 100%">
+            <span>✓</span>
+          </div>
+          <p class="workout-rest-quote">Next set ready.</p>
+          <label class="wo-auto-continue">
+            <input type="checkbox" data-rest-auto-continue ${autoContinue ? 'checked' : ''} /> Auto-continue next time
+          </label>
+          <button type="button" class="primary-btn" data-rest-continue autofocus>Continue</button>
+        ` : `
+          <p class="eyebrow">${paused ? 'REST PAUSED' : 'REST TIME'}</p>
+          <div class="workout-rest-ring ${paused ? 'rest-ring-paused' : ''}" data-rest-ring style="--rest-progress: ${percent(Math.max(remaining, 0), restTimerState.total || 1)}%">
+            <span data-rest-overlay-time>${formatTime(Math.max(remaining, 0))}</span>
+          </div>
+          <p class="workout-rest-quote" data-rest-quote>${escapeHtml(REST_QUOTES[restTimerState.quoteIndex])}</p>
+          <p class="workout-rest-coach">Control your breathing. Prepare for the next set.</p>
+          <div class="workout-rest-controls">
+            <button type="button" class="secondary-btn" data-rest-add="10" aria-label="Add 10 seconds">+10 sec</button>
+            <button type="button" class="secondary-btn" data-rest-add="30" aria-label="Add 30 seconds">+30 sec</button>
+            ${paused
+              ? `<button type="button" class="primary-btn" data-rest-resume aria-label="Resume rest timer">Resume</button>`
+              : `<button type="button" class="secondary-btn" data-rest-pause aria-label="Pause rest timer">Pause</button>`}
+            <button type="button" class="secondary-btn" data-rest-skip aria-label="Skip rest">Skip rest</button>
+            <button type="button" class="text-btn" data-rest-cancel aria-label="Cancel rest timer">Cancel timer</button>
+          </div>
+        `}
       </section>
     </div>
   `);
+  const focusTarget = document.querySelector('[data-rest-continue]') || document.querySelector('[data-rest-add]');
+  if (focusTarget) focusTarget.focus();
 }
 
 function updateRestOverlay(animateQuote = false) {
@@ -900,18 +1092,29 @@ function updateRestOverlay(animateQuote = false) {
   }
 }
 
-function finishRestTimer() {
+function finishRestTimer(skipped = false) {
+  if (!restTimerState) return;
+  if (restTimerState.interval) clearInterval(restTimerState.interval);
+  if (restTimerState.quoteInterval) clearInterval(restTimerState.quoteInterval);
+  restTimerState.status = 'finished';
+  const wrap = document.querySelector(`[data-rest-timer-for="${restTimerState.exerciseId}"]`);
+  if (wrap) { wrap.classList.remove('running'); wrap.classList.add('done'); }
+  if (navigator.vibrate) navigator.vibrate(skipped ? 60 : 180);
+  if (restTimerState.autoContinue) {
+    window.setTimeout(() => continueAfterRest(), skipped ? 0 : 700);
+  } else {
+    renderRestOverlay();
+  }
+}
+
+function continueAfterRest() {
   if (!restTimerState) return;
   const exerciseId = restTimerState.exerciseId;
-  const wrap = document.querySelector(`[data-rest-timer-for="${exerciseId}"]`);
   restFocusReturn = null;
-  clearRestTimer();
-  if (wrap) {
-    wrap.classList.remove('running');
-    wrap.classList.add('done');
-  }
+  const overlay = document.querySelector('[data-rest-overlay]');
+  if (overlay) overlay.remove();
+  restTimerState = null;
   focusNextSet(exerciseId);
-  if (navigator.vibrate) navigator.vibrate(180);
   showRestCompleteMessage();
 }
 
@@ -952,13 +1155,14 @@ function updateSessionClock() {
 
 function analyticsBlockHtml() {
   const p = plan();
-  const total = p.schedule.length || 1;
+  const active = p.schedule.filter((s) => !isRestDay(s));
+  const total = active.length || 1;
   const done = completedWorkoutsThisWeek().length;
-  const skipped = p.schedule.filter((s) => s.status === 'Skipped').length;
+  const skipped = active.filter((s) => s.status === 'Skipped').length;
   const weeklyPct = percent(done, total);
 
   let totalEx = 0, doneEx = 0, skippedEx = 0;
-  p.schedule.forEach((s) => {
+  active.forEach((s) => {
     (s.exercises || []).forEach((ex) => {
       totalEx++;
       if (ex.exStatus === 'Done') doneEx++;
@@ -1044,21 +1248,33 @@ function bindWorkoutEventsOnce() {
 }
 
 function onWorkoutDocumentClick(e) {
-  const addRestBtn = e.target.closest('[data-rest-add]');
-  if (!addRestBtn || !restTimerState) return;
-  restTimerState.remaining += 10;
-  restTimerState.total += 10;
-  updateRestOverlay();
+  if (!restTimerState) return;
+
+  const addBtn = e.target.closest('[data-rest-add]');
+  if (addBtn) { adjustRestTimer(Number(addBtn.dataset.restAdd) || 10); return; }
+
+  if (e.target.closest('[data-rest-pause]'))  { pauseRestTimer(); return; }
+  if (e.target.closest('[data-rest-resume]')) { resumeRestTimer(); return; }
+  if (e.target.closest('[data-rest-skip]'))   { skipRestTimer(); return; }
+  if (e.target.closest('[data-rest-cancel]')) { requestCancelRestTimer(); return; }
+  if (e.target.closest('[data-rest-continue]')) { continueAfterRest(); return; }
+
+  const autoToggle = e.target.closest('[data-rest-auto-continue]');
+  if (autoToggle) { restTimerState.autoContinue = autoToggle.checked; return; }
 }
 
 function onWorkoutKeydown(e) {
   if (!restTimerState) return;
   const overlay = document.querySelector('[data-rest-overlay]');
   if (!overlay) return;
+  const modalLayer = byId('modal-layer');
+  if (modalLayer && !modalLayer.hidden) return; // let the confirm modal handle its own Escape/Tab
 
   if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();
+    if (restTimerState.status === 'finished') continueAfterRest();
+    else requestCancelRestTimer();
     return;
   }
 
@@ -1141,7 +1357,7 @@ function onWorkoutClick(e) {
       }
     } else {
       const p = plan();
-      const next = p.schedule.find((x) => x.status === 'In Progress') || p.schedule.find((x) => x.status === 'Not Started');
+      const next = p.schedule.find((x) => !isRestDay(x) && x.status === 'In Progress') || p.schedule.find((x) => !isRestDay(x) && x.status === 'Not Started');
       if (next) openWorkoutSession(next.id);
     }
     return;
@@ -1182,12 +1398,62 @@ function onWorkoutClick(e) {
 
   const removeBtn = e.target.closest('[data-remove-exercise]');
   if (removeBtn) {
-    const s = plan().schedule.find((x) => x.id === removeBtn.dataset.schedule);
-    if (s) {
-      s.exercises = s.exercises.filter((x) => x.id !== removeBtn.dataset.removeExercise);
-      collapsedExercises.delete(removeBtn.dataset.removeExercise);
-      refreshWorkout();
-    }
+    const scheduleId = removeBtn.dataset.schedule;
+    const exId = removeBtn.dataset.removeExercise;
+    const s = plan().schedule.find((x) => x.id === scheduleId);
+    const ex = s && s.exercises.find((x) => x.id === exId);
+    if (!s || !ex) return;
+    openModal({
+      title: 'Delete exercise?',
+      body: `<p><strong>${escapeHtml(ex.name || 'This exercise')}</strong> will be removed. This action cannot be undone.</p>`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: () => {
+        const card = document.querySelector(`[data-exercise-id="${exId}"]`);
+        const finish = () => {
+          s.exercises = s.exercises.filter((x) => x.id !== exId);
+          collapsedExercises.delete(exId);
+          refreshWorkout();
+        };
+        if (card) {
+          card.classList.add('removing');
+          card.addEventListener('transitionend', finish, { once: true });
+          window.setTimeout(finish, 400); // fallback if transitionend doesn't fire
+        } else {
+          finish();
+        }
+      },
+    });
+    return;
+  }
+
+  const skipExBtn = e.target.closest('[data-skip-exercise]');
+  if (skipExBtn) {
+    const s = plan().schedule.find((x) => x.id === skipExBtn.dataset.schedule);
+    const ex = s && s.exercises.find((x) => x.id === skipExBtn.dataset.skipExercise);
+    if (ex) { ex.exStatus = 'Skipped'; refreshWorkout(); }
+    return;
+  }
+
+  const resetExBtn = e.target.closest('[data-reset-exercise]');
+  if (resetExBtn) {
+    const s = plan().schedule.find((x) => x.id === resetExBtn.dataset.schedule);
+    const ex = s && s.exercises.find((x) => x.id === resetExBtn.dataset.resetExercise);
+    if (ex) { ex.log = []; ex.exStatus = 'Not Started'; delete ex.performance; refreshWorkout(); }
+    return;
+  }
+
+  const resetWorkoutBtn = e.target.closest('[data-reset-workout]');
+  if (resetWorkoutBtn) {
+    const s = plan().schedule.find((x) => x.id === resetWorkoutBtn.dataset.resetWorkout);
+    if (!s) return;
+    openModal({
+      title: 'Reset this workout?',
+      body: `<p>All logged sets and progress for ${escapeHtml(s.day)}'s ${escapeHtml(s.type)} will be cleared. This action cannot be undone.</p>`,
+      confirmLabel: 'Reset workout',
+      danger: true,
+      onConfirm: () => { resetWorkoutSession(s); syncScheduleToTodo(); refreshWorkout({ art: true }); },
+    });
     return;
   }
 
@@ -1217,48 +1483,28 @@ function onWorkoutChange(e) {
   const typeSel = e.target.closest('[data-type-for]');
   if (typeSel) {
     const s = plan().schedule.find((x) => x.id === typeSel.dataset.typeFor);
-    if (s) {
-      s.type = typeSel.value;
-      syncScheduleToTodo();
-      persist();
-      renderArt('workout');
-    }
-    return;
-  }
+    if (!s) return;
+    const nextType = typeSel.value;
 
-  const woStatusSel = e.target.closest('[data-wo-status-for]');
-  if (woStatusSel) {
-    const s = plan().schedule.find((x) => x.id === woStatusSel.dataset.woStatusFor);
-    if (s) {
-      s.status = woStatusSel.value;
-      if (s.status === 'Done') {
-        s.completionDate = new Date().toISOString().slice(0, 10);
-        s.lastCompletedDate = s.completionDate;
-      }
-      syncScheduleToTodo();
-      refreshWorkout({ art: true });
+    if (nextType === 'Rest Day' && s.exercises.length) {
+      openModal({
+        title: 'Convert to Rest Day?',
+        body: `<p>This day contains ${s.exercises.length} exercise${s.exercises.length === 1 ? '' : 's'}. Changing to Rest Day will remove ${s.exercises.length === 1 ? 'it' : 'them all'}.</p>`,
+        confirmLabel: 'Convert to Rest Day',
+        danger: true,
+        onConfirm: () => { convertToRestDay(s); syncScheduleToTodo(); refreshWorkout({ art: true }); },
+      });
+      typeSel.value = s.type; // revert the select until/unless confirmed
+      return;
     }
-    return;
-  }
 
-  const exStatusSel = e.target.closest('[data-ex-status-for]');
-  if (exStatusSel) {
-    const s = plan().schedule.find((x) => x.id === exStatusSel.dataset.schedule);
-    const ex = s && s.exercises.find((x) => x.id === exStatusSel.dataset.exStatusFor);
-    if (ex) {
-      if (exStatusSel.value === 'Done') {
-        const totalSets = Math.max(1, Number(ex.sets) || 1);
-        const doneSets = (ex.log || []).filter(setIsDone).length;
-        if (doneSets < totalSets) {
-          exStatusSel.value = ex.exStatus || 'Not Started';
-          window.alert('Please enter weight and reps for every set first.');
-          return;
-        }
-      }
-      ex.exStatus = exStatusSel.value;
-      if (ex.exStatus === 'Done') saveExercisePerformance(ex, s.date);
-      refreshWorkout();
+    if (nextType === 'Rest Day') {
+      convertToRestDay(s);
+    } else {
+      s.type = nextType;
     }
+    syncScheduleToTodo();
+    refreshWorkout({ art: true });
     return;
   }
 
@@ -1308,7 +1554,6 @@ function onWorkoutChange(e) {
     ex.log[idx].done = target.checked;
   }
   updateExerciseStatusFromSets(ex, s.date);
-  if (s.status === 'Not Started') s.status = 'In Progress';
   refreshWorkout();
 }
 
@@ -1322,6 +1567,12 @@ function applyExcelFieldChange(ex, s, field, inputEl) {
       const trimmed = raw.trim();
       if (!trimmed) {
         window.alert('Please enter exercise name.');
+        inputEl.value = ex.name || '';
+        return false;
+      }
+      const dup = s.exercises.some((other) => other.id !== ex.id && other.name.trim().toLowerCase() === trimmed.toLowerCase());
+      if (dup) {
+        window.alert(`${s.day} already has an exercise named "${trimmed}". Use a different name.`);
         inputEl.value = ex.name || '';
         return false;
       }
@@ -1371,7 +1622,13 @@ function applyExcelFieldChange(ex, s, field, inputEl) {
       return true;
     }
     case 'video': {
-      ex.video = raw.trim();
+      const trimmed = raw.trim();
+      if (trimmed && !isLikelyValidUrl(trimmed)) {
+        window.alert('That doesn\u2019t look like a valid video link. Use a full http:// or https:// URL.');
+        inputEl.value = ex.video || '';
+        return false;
+      }
+      ex.video = trimmed;
       return true;
     }
     case 'actual': {

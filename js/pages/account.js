@@ -928,34 +928,4 @@ function saveCroppedPhoto(kind) {
   renderSidebar('account');
 }
 
-// ─── Generic confirm modal ──────────────────────────────────────────────
-function openModal({ title, body, confirmLabel, danger, onConfirm }) {
-  const layer = byId('modal-layer');
-  layer.hidden = false;
-  layer.innerHTML = `
-    <div class="modal-backdrop">
-      <div class="modal-card">
-        <h2>${escapeHtml(title)}</h2>
-        <div class="modal-body">${body}</div>
-        <div class="modal-actions">
-          <button class="secondary-btn" type="button" id="modal-cancel">Cancel</button>
-          <button class="${danger ? 'danger-btn' : 'primary-btn'}" type="button" id="modal-confirm">${escapeHtml(confirmLabel)}</button>
-        </div>
-      </div>
-    </div>
-  `;
-  requestAnimationFrame(() => layer.querySelector('.modal-backdrop').classList.add('open'));
-  byId('modal-cancel').addEventListener('click', closeModal);
-  byId('modal-confirm').addEventListener('click', () => { onConfirm(); closeModal(); });
-  layer.querySelector('.modal-backdrop').addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-backdrop')) closeModal();
-  });
-}
-
-function closeModal() {
-  const layer = byId('modal-layer');
-  const backdrop = layer.querySelector('.modal-backdrop');
-  if (!backdrop) { layer.hidden = true; return; }
-  backdrop.classList.remove('open');
-  window.setTimeout(() => { layer.hidden = true; layer.innerHTML = ''; }, 200);
-}
+// openModal() / closeModal() are provided by shared.js (used across pages).

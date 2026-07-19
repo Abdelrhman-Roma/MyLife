@@ -222,6 +222,7 @@
 .wo-status-select.wo-inprogress { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); }
 .wo-status-select.wo-done     { border-color: var(--green); color: var(--green); background: color-mix(in srgb, var(--green) 10%, var(--surface)); }
 .wo-status-select.wo-skipped  { border-color: var(--red); color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
+.wo-status-select.wo-rest     { border-color: var(--purple); color: var(--purple); background: color-mix(in srgb, var(--purple) 10%, var(--surface)); }
 
 /* Status badge (session panel header) */
 .wo-status-badge {
@@ -237,24 +238,43 @@
 .wo-status-badge.wo-inprogress { background: color-mix(in srgb, var(--blue) 14%, var(--surface)); color: var(--blue); }
 .wo-status-badge.wo-done     { background: color-mix(in srgb, var(--green) 14%, var(--surface)); color: var(--green); }
 .wo-status-badge.wo-skipped  { background: color-mix(in srgb, var(--red) 14%, var(--surface)); color: var(--red); }
+.wo-status-badge.wo-rest     { background: color-mix(in srgb, var(--purple) 14%, var(--surface)); color: var(--purple); }
 
-/* Exercise status select */
-.ex-status-select {
-  appearance: auto;
-  min-width: 108px;
+/* Exercise status badge (read-only — derived from logged sets, see recomputeWorkoutStatus) */
+.ex-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-width: 84px;
+  justify-content: center;
   font-weight: 800;
   border-radius: 999px;
   padding: 5px 10px;
   font-size: 0.76rem;
   border: 1.5px solid var(--line);
+  color: var(--muted);
 }
-.ex-status-select.ex-ns      { color: var(--muted); }
-.ex-status-select.ex-inprogress { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); }
-.ex-status-select.ex-done    { border-color: var(--green); color: var(--green); background: color-mix(in srgb, var(--green) 12%, var(--surface)); }
-.ex-status-select.ex-skipped { border-color: var(--red); color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
+.ex-status-badge.ex-inprogress { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); }
+.ex-status-badge.ex-done    { border-color: var(--green); color: var(--green); background: color-mix(in srgb, var(--green) 12%, var(--surface)); }
+.ex-status-badge.ex-skipped { border-color: var(--red); color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
 
 /* Skip session btn */
 .wo-skip-btn { color: var(--red) !important; border-color: var(--red) !important; }
+
+/* Rest Day */
+.wo-rest-row td { color: var(--muted); }
+.wo-rest-day-card {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  text-align: center;
+  border-radius: var(--radius-lg, 16px);
+  background: color-mix(in srgb, var(--purple) 8%, var(--surface));
+  border: 1px dashed color-mix(in srgb, var(--purple) 35%, var(--line));
+}
+.wo-rest-day-icon { font-size: 2.2rem; }
+.wo-rest-day-card h3 { margin: 4px 0 0; }
+.wo-rest-day-card p { margin: 0; color: var(--muted); }
 
 /* ── Excel plan sheet ───────────────────────────────────────────────────── */
 .workout-excel-table th,
@@ -323,9 +343,20 @@
   padding: 18px;
   display: grid;
   gap: 14px;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, opacity 260ms ease, transform 260ms ease, max-height 320ms ease, margin 320ms ease, padding 320ms ease;
+  max-height: 800px;
+  overflow: hidden;
 }
 .workout-exercise-card:hover { box-shadow: 0 20px 50px rgba(19,70,134,0.13); }
+.workout-exercise-card.removing {
+  opacity: 0;
+  transform: translateX(-24px);
+  max-height: 0;
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+}
 
 .workout-exercise-head {
   display: flex;
@@ -543,10 +574,38 @@
   color: rgba(255,255,255,0.76);
   font-weight: 800;
 }
-.workout-rest-stage [data-rest-add] {
-  min-width: 150px;
-  min-height: 48px;
+.workout-rest-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
+.workout-rest-controls button {
+  min-width: 120px;
+  min-height: 46px;
+}
+.workout-rest-controls [data-rest-cancel] { color: rgba(255,255,255,0.7); min-width: auto; }
+
+.rest-ring-paused { opacity: 0.55; }
+.rest-ring-done {
+  background:
+    radial-gradient(circle, rgba(15,23,42,0.92) 58%, transparent 59%),
+    conic-gradient(var(--green) 100%, rgba(255,255,255,0.14) 0);
+}
+.rest-ring-done span { font-size: clamp(3rem, 8vw, 4.5rem); color: var(--green); }
+
+.rest-finished .workout-rest-quote { color: var(--green); }
+
+.wo-auto-continue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.76);
+  cursor: pointer;
+}
+
 .workout-rest-complete {
   border: 1px solid color-mix(in srgb, var(--green) 38%, var(--line));
   border-radius: 8px;
@@ -641,6 +700,7 @@
 .wo-excel-day-head span { font-size: 0.78rem; }
 .wo-excel-day-group .workout-table-wrap { margin: 0; }
 .wo-excel-empty { min-height: auto; padding: 16px; gap: 6px; flex-direction: column; }
+.wo-empty-icon { font-size: 2rem; opacity: 0.8; }
 .wo-excel-add-btn { width: auto; margin-top: 10px; }
 
 /* ── Exercise card collapse ─────────────────────────────────────────────── */
