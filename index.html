@@ -3,18 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MYLIFE | Login</title>
+    <title>Momentum | Life Tracker</title>
+    <link rel="icon" type="image/png" href="assist/Momentum_Logo-removebg-preview.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/shared.css" />
     <link rel="stylesheet" href="css/pages/auth.css" />
     <link rel="stylesheet" href="css/responsive.css" />
+    <link rel="stylesheet" href="css/momentum.css" />
   </head>
   <body data-page="auth">
     <!-- Desktop-only cursor spotlight; purely decorative -->
     <div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+
+    <div class="auth-lang-switch-wrap" id="auth-lang-switch"></div>
 
     <main class="auth-page" id="auth-page" data-mode="login">
       <section class="auth-visual" aria-hidden="true">
@@ -29,19 +33,20 @@
         <div class="auth-visual-content">
           <div class="auth-brand" id="auth-logo" style="--i:0">
             <span class="auth-brand-mark">M</span>
-            <span class="auth-brand-name">MYLIFE</span>
+            <span class="auth-brand-name">Momentum</span>
           </div>
 
           <div class="auth-visual-copy">
-            <p class="eyebrow reveal" style="--i:1">Private life tracker</p>
-            <h1 class="reveal auth-headline" style="--i:2" data-login-text="Everything about your life,<br />in one calm place." data-register-text="Start building the life<br />you actually want.">Everything about your life,<br />in one calm place.</h1>
+            <p class="eyebrow reveal" style="--i:1" data-i18n="Private life tracker">Private life tracker</p>
+            <h1 class="reveal auth-headline" style="--i:2" data-login-text="Build your life,<br />with momentum." data-register-text="Begin your<br />journey.">Build your life,<br />with momentum.</h1>
             <p class="reveal auth-subline" style="--i:3" data-login-text="Tasks, habits, goals, workouts, nutrition, sleep, prayer and more — private, and yours alone." data-register-text="One account. Thirteen life domains. Zero noise. Your data stays on your device.">Tasks, habits, goals, workouts, nutrition, sleep, prayer and more — private, and yours alone.</p>
           </div>
 
-          <ul class="auth-visual-points reveal" style="--i:4">
-            <li><span class="point-dot" aria-hidden="true"></span>Local-first &amp; private by default</li>
-            <li><span class="point-dot" aria-hidden="true"></span>13 life domains, one dashboard</li>
-            <li><span class="point-dot" aria-hidden="true"></span>Free — no account needed to explore</li>
+            <p class="auth-motto" id="auth-motto" aria-live="polite">Build Better Habits.</p>
+            <ul class="auth-visual-points reveal" style="--i:4">
+            <li><span class="point-dot" aria-hidden="true"></span><span data-i18n="Local-first &amp; private by default">Local-first &amp; private by default</span></li>
+            <li><span class="point-dot" aria-hidden="true"></span><span data-i18n="13 life domains, one dashboard">13 life domains, one dashboard</span></li>
+            <li><span class="point-dot" aria-hidden="true"></span><span data-i18n="Free — no account needed to explore">Free — no account needed to explore</span></li>
           </ul>
         </div>
       </section>
@@ -51,9 +56,9 @@
           <div class="auth-card-glow" aria-hidden="true"></div>
 
           <div id="login-panel" class="auth-panel">
-            <p class="eyebrow reveal" style="--i:0">Welcome back</p>
-            <h2 class="reveal" style="--i:1">Log in</h2>
-            <p class="auth-panel-sub reveal" style="--i:2">Good to see you again — pick up right where you left off.</p>
+            <p class="eyebrow reveal" style="--i:0" data-i18n="Welcome back">Welcome back</p>
+            <h2 class="reveal" style="--i:1" data-i18n="Log in">Log in</h2>
+            <p class="auth-panel-sub reveal" style="--i:2" data-i18n="Good to see you again — pick up right where you left off.">Good to see you again — pick up right where you left off.</p>
 
             <form id="login-form" class="auth-form" novalidate>
               <div class="field reveal" style="--i:3" data-field="email">
@@ -65,7 +70,7 @@
                   placeholder=" "
                   required
                 />
-                <label for="login-email">Email</label>
+                <label for="login-email" data-i18n="Email">Email</label>
                 <span class="field-status" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
               </div>
 
@@ -78,39 +83,39 @@
                   placeholder=" "
                   required
                 />
-                <label for="login-password">Password</label>
+                <label for="login-password" data-i18n="Password">Password</label>
                 <button class="field-eye" type="button" data-eye-for="login-password" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.68 3.68M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
               </div>
-              <p class="capslock-hint" data-capslock-for="login-password" hidden>Caps Lock is on</p>
+              <p class="capslock-hint" data-capslock-for="login-password" hidden data-i18n="Caps Lock is on">Caps Lock is on</p>
 
               <div class="auth-row reveal" style="--i:5">
                 <label class="check-field">
                   <input type="checkbox" id="remember-me" checked />
                   <span class="check-box" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span>Remember me</span>
+                  <span data-i18n="Remember me">Remember me</span>
                 </label>
-                <button class="link-btn" type="button" id="forgot-password">Forgot password?</button>
+                <button class="link-btn" type="button" id="forgot-password" data-i18n="Forgot password?">Forgot password?</button>
               </div>
 
               <p class="form-message reveal" id="login-message" role="alert" style="--i:6"></p>
 
               <button class="auth-submit reveal" type="submit" style="--i:7">
-                <span class="auth-submit-label">Log in</span>
+                <span class="auth-submit-label" data-i18n="Log in">Log in</span>
                 <span class="auth-submit-spinner" aria-hidden="true"></span>
                 <span class="auth-submit-check" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
               </button>
             </form>
 
             <p class="auth-switch reveal" style="--i:8">
-              New to MYLIFE?
-              <button class="text-btn" id="show-register" type="button">Create an account</button>
+              <span>New to Momentum?</span>
+              <button class="text-btn" id="show-register" type="button" data-i18n="Create an account">Create an account</button>
             </p>
           </div>
 
           <div id="register-panel" class="auth-panel hidden">
-            <p class="eyebrow reveal" style="--i:0">New account</p>
-            <h2 class="reveal" style="--i:1">Create your account</h2>
-            <p class="auth-panel-sub reveal" style="--i:2">Takes under a minute. No email verification, no ads, no catch.</p>
+            <p class="eyebrow reveal" style="--i:0" data-i18n="New account">New account</p>
+            <h2 class="reveal" style="--i:1" data-i18n="Create your account">Create your account</h2>
+            <p class="auth-panel-sub reveal" style="--i:2" data-i18n="Takes under a minute. No email verification, no ads, no catch.">Takes under a minute. No email verification, no ads, no catch.</p>
 
             <form id="register-form" class="auth-form" novalidate>
               <div class="field reveal" style="--i:3" data-field="name">
@@ -121,7 +126,7 @@
                   placeholder=" "
                   required
                 />
-                <label for="register-name">Full name</label>
+                <label for="register-name" data-i18n="Full name">Full name</label>
                 <span class="field-status" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
               </div>
 
@@ -134,7 +139,7 @@
                   placeholder=" "
                   required
                 />
-                <label for="register-email">Email</label>
+                <label for="register-email" data-i18n="Email">Email</label>
                 <span class="field-status" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
               </div>
 
@@ -148,10 +153,10 @@
                   placeholder=" "
                   required
                 />
-                <label for="register-password">Password</label>
+                <label for="register-password" data-i18n="Password">Password</label>
                 <button class="field-eye" type="button" data-eye-for="register-password" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.68 3.68M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
               </div>
-              <p class="capslock-hint" data-capslock-for="register-password" hidden>Caps Lock is on</p>
+              <p class="capslock-hint" data-capslock-for="register-password" hidden data-i18n="Caps Lock is on">Caps Lock is on</p>
 
               <div class="strength-meter reveal" style="--i:6" data-strength-for="register-password" aria-hidden="true">
                 <span></span><span></span><span></span><span></span>
@@ -168,22 +173,22 @@
                   placeholder=" "
                   required
                 />
-                <label for="register-confirm">Confirm password</label>
+                <label for="register-confirm" data-i18n="Confirm password">Confirm password</label>
                 <button class="field-eye" type="button" data-eye-for="register-confirm" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.6 21.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.6 21.6 0 0 1-2.68 3.68M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
               </div>
 
               <p class="form-message reveal" id="register-message" role="alert" style="--i:8"></p>
 
               <button class="auth-submit reveal" type="submit" style="--i:9">
-                <span class="auth-submit-label">Create account</span>
+                <span class="auth-submit-label" data-i18n="Create account">Create account</span>
                 <span class="auth-submit-spinner" aria-hidden="true"></span>
                 <span class="auth-submit-check" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
               </button>
             </form>
 
             <p class="auth-switch reveal" style="--i:10">
-              Already have an account?
-              <button class="text-btn" id="show-login" type="button">Back to login</button>
+              <span data-i18n="Already have an account?">Already have an account?</span>
+              <button class="text-btn" id="show-login" type="button" data-i18n="Back to login">Back to login</button>
             </p>
           </div>
         </div>
@@ -192,6 +197,11 @@
 
     <div class="page-veil" id="page-veil" aria-hidden="true"></div>
 
+    <script src="locales/en.js"></script>
+    <script src="locales/ar.js"></script>
+    <script src="locales/fr.js"></script>
+    <script src="locales/de.js"></script>
+    <script src="js/i18n.js"></script>
     <script src="js/shared.js"></script>
     <script src="js/pages/auth.js"></script>
   </body>

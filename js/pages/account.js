@@ -1,4 +1,4 @@
-﻿// MYLIFE — Profile & Settings page controller.
+// MOMENTUM — Profile & Settings page controller.
 // Renders the merged account experience (overview, personal info, appearance,
 // notifications, productivity, statistics, achievements, security, backup, about)
 // on top of the shared shell (sidebar/topbar) from js/shared.js.
@@ -17,23 +17,14 @@ const ACCOUNT_SECTIONS = [
 ];
 
 const PALETTE_SWATCHES = [
-  ['palette-1',  '#3b6ea5', 'Blue Slate'],
-  ['palette-2',  '#ffbf00', 'Sunshine'],
-  ['palette-3',  '#408a71', 'Teal'],
-  ['palette-4',  '#6f8f5c', 'Sage'],
-  ['palette-5',  '#c1793a', 'Amber'],
-  ['palette-6',  '#243b60', 'Midnight'],
-  ['palette-7',  '#5b3a86', 'Violet'],
-  ['palette-8',  '#7a2b3d', 'Wine'],
-  ['palette-9',  '#c1443a', 'Crimson'],
-  ['palette-10', '#1c3f66', 'Harbor'],
-  ['palette-11', '#a565a0', 'Orchid'],
-  ['palette-12', '#3a6dbf', 'Sky'],
-  ['palette-13', '#5f9e78', 'Meadow'],
-  ['palette-14', '#c9a227', 'Gold'],
-  ['palette-15', '#4a4034', 'Espresso'],
-  ['palette-16', '#3f7a4e', 'Forest'],
-  ['palette-17', '#b1503f', 'Clay'],
+  ['deep-space',  '#22d3ee', 'Deep Space'],
+  ['solar-light', '#2563eb', 'Solar Light'],
+  ['earth',       '#34d399', 'Earth'],
+  ['mars',        '#f97316', 'Mars'],
+  ['saturn',      '#facc15', 'Saturn'],
+  ['neptune',     '#2dd4bf', 'Neptune'],
+  ['nebula',      '#c084fc', 'Nebula'],
+  ['galaxy',      '#60a5fa', 'Galaxy'],
 ];
 
 const ACHIEVEMENT_DEFS = [
@@ -67,6 +58,7 @@ function initAccountPage() {
   bindGlobalAccountEvents();
   const initial = (location.hash || '#overview').replace('#', '') || 'overview';
   requestAnimationFrame(() => scrollToSection(initial, true));
+  window.__pageContentReinit = () => { syncAchievements(); renderHero(); renderNav(); renderContent(); };
 }
 
 // ─── Hero ───────────────────────────────────────────────────────────────
@@ -80,10 +72,28 @@ function renderHero() {
     </div>
     <div class="account-hero-body">
       <div class="account-photo-wrap">
-        <button class="account-photo" id="avatar-edit-btn" type="button" aria-label="Change profile photo" style="${p.photo ? `background-image:url('${p.photo}')` : ''}">
+        <button class="account-photo" id="avatar-edit-btn" type="button" aria-label="Profile photo options" aria-haspopup="true" aria-expanded="false" aria-controls="avatar-menu" style="${p.photo ? `background-image:url('${p.photo}')` : ''}">
           ${p.photo ? '' : initials(currentUser.name)}
           <span class="account-photo-edit">✎</span>
         </button>
+        <div class="account-menu avatar-menu" id="avatar-menu" role="menu" hidden>
+          ${p.photo ? `
+            <button role="menuitem" type="button" data-avatar-action="view">
+              <span class="account-menu-icon" aria-hidden="true">${SVG_ICON.eye || ''}</span><span>View photo</span>
+            </button>
+          ` : ''}
+          <button role="menuitem" type="button" data-avatar-action="change">
+            <span class="account-menu-icon" aria-hidden="true">${SVG_ICON.save || ''}</span><span>${p.photo ? 'Change photo' : 'Upload photo'}</span>
+          </button>
+          ${p.photo ? `
+            <button role="menuitem" type="button" class="account-menu-logout" data-avatar-action="remove">
+              <span class="account-menu-icon" aria-hidden="true">${SVG_ICON.logout || ''}</span><span>Remove photo</span>
+            </button>
+          ` : ''}
+          <button role="menuitem" type="button" data-avatar-action="edit-profile">
+            <span class="account-menu-icon" aria-hidden="true">${SVG_ICON.user || ''}</span><span>Edit profile info</span>
+          </button>
+        </div>
       </div>
       <div class="account-hero-info">
         <h1>${escapeHtml(currentUser.name)}</h1>
@@ -198,7 +208,7 @@ function sectionEyebrow(key) {
   const map = {
     overview: 'Snapshot', personal: 'Account details', appearance: 'Look & feel',
     notifications: 'Stay on track', productivity: 'Daily targets', statistics: 'Your numbers',
-    achievements: 'Milestones', security: 'Account safety', backup: 'Your data', about: 'MyLife',
+    achievements: 'Milestones', security: 'Account safety', backup: 'Your data', about: 'Momentum',
   };
   return map[key] || '';
 }
@@ -279,21 +289,39 @@ function personalHtml() {
             ${['Prefer not to say', 'Female', 'Male', 'Other'].map((g) => `<option ${selected(p.gender || 'Prefer not to say', g)}>${g}</option>`).join('')}
           </select>
         </label>
-        <label>Country<input name="country" value="${escapeAttr(p.country)}" /></label>
+        <label class="country-field">Country
+          <div class="country-combobox" data-country-combobox>
+            <input
+              type="text"
+              id="country-search"
+              role="combobox"
+              aria-expanded="false"
+              aria-controls="country-listbox"
+              aria-autocomplete="list"
+              autocomplete="off"
+              placeholder="Search countries…"
+              value="${escapeAttr(p.country)}"
+            />
+            <input type="hidden" name="country" id="country-value" value="${escapeAttr(p.country)}" />
+            <ul class="country-listbox" id="country-listbox" role="listbox" hidden></ul>
+          </div>
+        </label>
         <label>City<input name="city" value="${escapeAttr(p.location || p.city)}" /></label>
         <label>Timezone
           <select name="timezone">${timezoneOptions(p.timezone)}</select>
         </label>
         <label>Language
-          <select name="language">
-            ${['English', 'Arabic', 'French', 'Spanish', 'German'].map((l) => `<option ${selected(p.language || 'English', l)}>${l}</option>`).join('')}
+          <select name="language" id="profile-language-select">
+            ${[['en', 'English'], ['ar', 'العربية'], ['fr', 'Français'], ['de', 'Deutsch']].map(([code, label]) => `<option value="${code}" ${getLang() === code ? 'selected' : ''}>${label}</option>`).join('')}
           </select>
         </label>
       </div>
+      <p class="field-hint">${t('This also changes the interface language everywhere — the same as the switcher in the sidebar.')}</p>
       <label class="full-field">Headline<input name="headline" maxlength="60" value="${escapeAttr(p.headline)}" placeholder="e.g. Data Science Student" /></label>
       <label class="full-field">Bio<textarea name="bio" maxlength="280">${escapeHtml(p.bio)}</textarea></label>
       <div class="form-actions">
         <span class="form-message" id="personal-message"></span>
+        <button class="secondary-btn" type="button" id="personal-cancel">Cancel</button>
         <button class="primary-btn" type="submit">Save changes</button>
       </div>
     </form>
@@ -313,15 +341,23 @@ function appearanceHtml() {
     <div class="appearance-block">
       <h3>Theme</h3>
       <div class="segmented" data-group="theme">
-        ${['light', 'dark', 'auto'].map((t) => `<button type="button" class="segmented-btn ${s.theme === t ? 'active' : ''}" data-value="${t}">${labelize(t)}</button>`).join('')}
+        ${[['light', 'Light'], ['dark', 'Dark'], ['auto', 'Use System']].map(([t, l]) => `<button type="button" class="segmented-btn ${s.theme === t ? 'active' : ''}" data-value="${t}">${l}</button>`).join('')}
       </div>
     </div>
 
     <div class="appearance-block">
-      <h3>Accent palette</h3>
-      <div class="swatch-grid">
+      <h3>Theme Color</h3>
+      <div class="theme-card-grid">
         ${PALETTE_SWATCHES.map(([id, color, name]) => `
-          <button type="button" class="swatch ${s.palette === id ? 'active' : ''}" data-palette="${id}" style="--swatch:${color}" title="${name}" aria-label="${name}"></button>
+          <button type="button" class="theme-card ${s.palette === id ? 'active' : ''}" data-palette="${id}" aria-pressed="${s.palette === id}">
+            <span class="theme-card-preview" data-theme-preview="${id}">
+              <span class="theme-card-dots">
+                <i></i><i></i><i></i>
+              </span>
+            </span>
+            <span class="theme-card-name">${name}</span>
+            <span class="theme-card-check" aria-hidden="true">${SVG_ICON.check || '✓'}</span>
+          </button>
         `).join('')}
       </div>
     </div>
@@ -329,7 +365,7 @@ function appearanceHtml() {
     <div class="appearance-block">
       <h3>Font size</h3>
       <div class="segmented" data-group="fontSize">
-        ${['sm', 'md', 'lg'].map((f) => `<button type="button" class="segmented-btn ${s.fontSize === f ? 'active' : ''}" data-value="${f}">${f.toUpperCase()}</button>`).join('')}
+        ${[['sm', 'S'], ['md', 'M'], ['lg', 'L'], ['xl', 'XL']].map(([f, label]) => `<button type="button" class="segmented-btn ${s.fontSize === f ? 'active' : ''}" data-value="${f}">${label}</button>`).join('')}
       </div>
     </div>
 
@@ -348,14 +384,14 @@ function appearanceHtml() {
   `;
 }
 
-function toggleRow(key, title, desc, checked) {
+function toggleRow(key, title, desc, checked, disabled = false) {
   return `
-    <label class="toggle-row" data-toggle-key="${key}">
+    <label class="toggle-row${disabled ? ' is-disabled' : ''}" data-toggle-key="${key}">
       <span>
         <strong>${escapeHtml(title)}</strong>
         <small>${escapeHtml(desc)}</small>
       </span>
-      <span class="switch"><input type="checkbox" ${checked ? 'checked' : ''} /><i></i></span>
+      <span class="switch"><input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled aria-disabled="true"' : ''} /><i></i></span>
     </label>
   `;
 }
@@ -376,7 +412,7 @@ function notificationsHtml() {
     <div class="toggles">
       ${toggleRow('notif:desktop', 'Desktop notifications', 'Show alerts on this device.', !!n.desktop)}
       ${toggleRow('notif:sound', 'Sound', 'Play a sound with reminders.', !!n.sound)}
-      ${toggleRow('notif:email', 'Email notifications', 'Send a daily recap by email.', !!n.email)}
+      ${toggleRow('notif:email', 'Email notifications', 'Unavailable in local-only mode; it requires a connected email service.', false, true)}
     </div>
   `;
 }
@@ -523,7 +559,7 @@ function securityHtml() {
       <div class="danger-row">
         <div>
           <strong>Delete account</strong>
-          <p class="muted">Permanently remove your account and all MyLife data on this device.</p>
+          <p class="muted">Permanently remove your account and all Momentum data on this device.</p>
         </div>
         <button class="danger-btn" type="button" id="delete-account-btn">Delete account</button>
       </div>
@@ -549,7 +585,7 @@ function backupHtml() {
       </div>
       <div class="data-card stacked">
         <h3>Import / restore data</h3>
-        <p class="muted">Restore from a previously exported MyLife JSON file.</p>
+        <p class="muted">Restore from a previously exported Momentum JSON file.</p>
         <button class="secondary-btn" type="button" id="backup-import-btn">Import data</button>
         <input type="file" id="backup-import-input" accept="application/json" hidden />
       </div>
@@ -560,21 +596,110 @@ function backupHtml() {
       </div>
       <div class="data-card stacked">
         <h3>Clear cache</h3>
-        <p class="muted">Remove all local MyLife data from this browser and sign out.</p>
+        <p class="muted">Remove all local Momentum data from this browser and sign out.</p>
         <button class="danger-btn" type="button" id="backup-clear-btn">Clear cache</button>
       </div>
     </div>
   `;
 }
 
+// ─── Country selector ───────────────────────────────────────────────────
+// Builds the full list from standard ISO 3166-1 codes at runtime (flag via
+// regional-indicator emoji math, name via the browser's built-in
+// Intl.DisplayNames) — no external country-list dependency needed, and
+// names automatically follow the active app language.
+const ISO_COUNTRY_CODES = [
+  'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB','BY','BE','BZ','BJ','BT',
+  'BO','BA','BW','BR','BN','BG','BF','BI','CV','KH','CM','CA','CF','TD','CL','CN','CO','KM','CG','CD',
+  'CR','CI','HR','CU','CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','SZ','ET','FJ','FI',
+  'FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN','HU','IS','IN','ID','IR','IQ',
+  'IE','IL','IT','JM','JP','JO','KZ','KE','KI','KP','KR','KW','KG','LA','LV','LB','LS','LR','LY','LI',
+  'LT','LU','MG','MW','MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN','ME','MA','MZ','MM',
+  'NA','NR','NP','NL','NZ','NI','NE','NG','MK','NO','OM','PK','PW','PA','PG','PY','PE','PH','PL','PT',
+  'QA','RO','RU','RW','KN','LC','VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO',
+  'ZA','SS','ES','LK','SD','SR','SE','CH','SY','TW','TJ','TZ','TH','TL','TG','TO','TT','TN','TR','TM',
+  'TV','UG','UA','AE','GB','US','UY','UZ','VU','VA','VE','VN','YE','ZM','ZW','PS',
+];
+
+function countryFlag(code) {
+  return String.fromCodePoint(...code.toUpperCase().split('').map((c) => 127397 + c.charCodeAt(0)));
+}
+
+function buildCountryList() {
+  let namer;
+  try { namer = new Intl.DisplayNames([getLang() === 'ar' ? 'ar' : getLang()], { type: 'region' }); }
+  catch (_e) { namer = null; }
+  return ISO_COUNTRY_CODES
+    .map((code) => ({ code, flag: countryFlag(code), name: (namer && namer.of(code)) || code }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function bindCountryCombobox() {
+  const wrap = document.querySelector('[data-country-combobox]');
+  if (!wrap) return;
+  const search  = byId('country-search');
+  const hidden  = byId('country-value');
+  const listbox = byId('country-listbox');
+  const countries = buildCountryList();
+  let activeIndex = -1;
+
+  function renderOptions(query) {
+    const q = query.trim().toLowerCase();
+    const matches = (q ? countries.filter((c) => c.name.toLowerCase().includes(q)) : countries).slice(0, 40);
+    listbox.innerHTML = matches.map((c, i) => `
+      <li role="option" id="country-opt-${i}" data-code="${c.code}" data-name="${escapeAttr(c.name)}" class="${c.name === hidden.value ? 'is-selected' : ''}">
+        <span class="country-flag" aria-hidden="true">${c.flag}</span><span>${escapeHtml(c.name)}</span>
+      </li>
+    `).join('') || `<li class="country-empty">${t('No matches')}</li>`;
+    activeIndex = -1;
+  }
+
+  function openList() {
+    listbox.hidden = false;
+    search.setAttribute('aria-expanded', 'true');
+  }
+  function closeList() {
+    listbox.hidden = true;
+    search.setAttribute('aria-expanded', 'false');
+  }
+  function selectOption(li) {
+    if (!li || !li.dataset.code) return;
+    hidden.value = li.dataset.name;
+    search.value = li.dataset.name;
+    closeList();
+  }
+  function moveActive(delta) {
+    const items = Array.from(listbox.querySelectorAll('li[data-code]'));
+    if (!items.length) return;
+    activeIndex = (activeIndex + delta + items.length) % items.length;
+    items.forEach((li, i) => li.classList.toggle('is-active', i === activeIndex));
+    items[activeIndex].scrollIntoView({ block: 'nearest' });
+    search.setAttribute('aria-activedescendant', items[activeIndex].id);
+  }
+
+  search.addEventListener('focus', () => { renderOptions(search.value); openList(); });
+  search.addEventListener('input', () => { renderOptions(search.value); openList(); });
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (listbox.hidden) openList(); moveActive(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); const items = listbox.querySelectorAll('li[data-code]'); if (activeIndex >= 0) selectOption(items[activeIndex]); }
+    else if (e.key === 'Escape') { closeList(); search.blur(); }
+  });
+  listbox.addEventListener('mousedown', (e) => {
+    const li = e.target.closest('li[data-code]');
+    if (li) selectOption(li);
+  });
+  document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) closeList(); });
+}
+
 // ─── About ──────────────────────────────────────────────────────────────
 function aboutHtml() {
   return `
     <div class="about-grid">
-      <div class="data-card stacked"><h3>Version</h3><p>MyLife 2.0.0</p></div>
-      <div class="data-card stacked"><h3>Developer</h3><p>Built and maintained by you, powered by MyLife.</p></div>
+      <div class="data-card stacked"><h3>Version</h3><p>Momentum 1.0.0</p></div>
+      <div class="data-card stacked"><h3>Developer</h3><p>Built and maintained by you, powered by Momentum.</p></div>
       <div class="data-card stacked"><h3>Privacy</h3><p class="muted">All data stays in this browser's local storage — nothing is sent to a server.</p></div>
-      <div class="data-card stacked"><h3>Terms</h3><p class="muted">MyLife is a personal tracking tool provided as-is, for your own use.</p></div>
+      <div class="data-card stacked"><h3>Terms</h3><p class="muted">Momentum is a personal tracking tool provided as-is, for your own use.</p></div>
       <div class="data-card stacked"><h3>Licenses</h3><p class="muted">Built with vanilla HTML, CSS and JavaScript — no third-party runtime dependencies.</p></div>
     </div>
   `;
@@ -584,6 +709,16 @@ function aboutHtml() {
 function bindSectionEvents() {
   const personalForm = byId('personal-form');
   if (personalForm) personalForm.addEventListener('submit', savePersonal);
+  const personalCancel = byId('personal-cancel');
+  if (personalCancel) personalCancel.addEventListener('click', () => {
+    // Profile edits are only written on submit. Re-rendering restores the
+    // persisted values and also resets the country combobox state.
+    renderContent();
+    showToast('Changes discarded.', 'default');
+  });
+
+  const profileLangSelect = byId('profile-language-select');
+  if (profileLangSelect) profileLangSelect.addEventListener('change', () => setLanguage(profileLangSelect.value));
 
   const productivityForm = byId('productivity-form');
   if (productivityForm) productivityForm.addEventListener('submit', saveProductivity);
@@ -600,22 +735,42 @@ function bindSectionEvents() {
     });
   });
 
-  document.querySelectorAll('.swatch').forEach((btn) => {
+  document.querySelectorAll('.theme-card').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentData.settings.palette = btn.dataset.palette;
       persist();
       applyTheme(currentData.settings.theme, currentData.settings.palette);
-      document.querySelectorAll('.swatch').forEach((s) => s.classList.toggle('active', s === btn));
+      document.querySelectorAll('.theme-card').forEach((s) => {
+        s.classList.toggle('active', s === btn);
+        s.setAttribute('aria-pressed', String(s === btn));
+      });
+      showToast(`${btn.querySelector('.theme-card-name').textContent} theme applied`, 'success');
     });
   });
+
+  bindCountryCombobox();
 
   document.querySelectorAll('[data-toggle-key]').forEach((row) => {
     const input = row.querySelector('input[type="checkbox"]');
     input.addEventListener('change', () => handleToggle(row.dataset.toggleKey, input.checked));
   });
 
-  const avatarBtn = byId('avatar-edit-btn');
-  if (avatarBtn) avatarBtn.addEventListener('click', () => byId('avatar-file-input').click());
+  bindAccountMenu('avatar-edit-btn', 'avatar-menu');
+  const avatarMenu = byId('avatar-menu');
+  if (avatarMenu) {
+    avatarMenu.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-avatar-action]');
+      if (!btn) return;
+      const action = btn.dataset.avatarAction;
+      avatarMenu.classList.remove('open');
+      avatarMenu.hidden = true;
+      byId('avatar-edit-btn').setAttribute('aria-expanded', 'false');
+      if (action === 'change') byId('avatar-file-input').click();
+      else if (action === 'remove') removePhoto('avatar');
+      else if (action === 'view') openPhotoViewer(currentData.profile.photo);
+      else if (action === 'edit-profile') scrollToSection('personal');
+    });
+  }
   const avatarInput = byId('avatar-file-input');
   if (avatarInput) avatarInput.addEventListener('change', (e) => onPhotoChosen(e, 'avatar'));
 
@@ -651,6 +806,10 @@ function bindGlobalAccountEvents() {
 // ─── Handlers ───────────────────────────────────────────────────────────
 function savePersonal(e) {
   e.preventDefault();
+  if (!e.currentTarget.checkValidity()) {
+    e.currentTarget.reportValidity();
+    return;
+  }
   const form = new FormData(e.currentTarget);
   const first = String(form.get('firstName') || '').trim();
   const last  = String(form.get('lastName') || '').trim();
@@ -668,7 +827,7 @@ function savePersonal(e) {
     city:      String(form.get('city') || '').trim(),
     location:  String(form.get('city') || '').trim(),
     timezone:  String(form.get('timezone') || ''),
-    language:  String(form.get('language') || 'English'),
+    language:  String(form.get('language') || getLang()),
     headline:  String(form.get('headline') || '').trim(),
     bio:       String(form.get('bio') || '').trim(),
   });
@@ -682,6 +841,10 @@ function savePersonal(e) {
 
 function saveProductivity(e) {
   e.preventDefault();
+  if (!e.currentTarget.checkValidity()) {
+    e.currentTarget.reportValidity();
+    return;
+  }
   const form = new FormData(e.currentTarget);
   ['studyGoal', 'workoutGoal', 'waterGoal', 'sleepGoal', 'habitGoal', 'prayerGoal', 'calorieTarget', 'proteinTarget', 'carbTarget', 'fatTarget']
     .forEach((key) => { currentData.settings[key] = Number(form.get(key)) || 0; });
@@ -702,6 +865,31 @@ function handleSegmented(group, value) {
 }
 
 function handleToggle(key, checked) {
+  if (key === 'notif:desktop' && checked) {
+    if (!('Notification' in window)) {
+      currentData.notifications.desktop = false;
+      persist();
+      renderContent();
+      showToast('Desktop notifications are not supported by this browser.', 'danger');
+      return;
+    }
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then((permission) => {
+        currentData.notifications.desktop = permission === 'granted';
+        persist();
+        renderContent();
+        showToast(permission === 'granted' ? 'Desktop notifications enabled.' : 'Desktop notification permission was not granted.', permission === 'granted' ? 'success' : 'danger');
+      });
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      currentData.notifications.desktop = false;
+      persist();
+      renderContent();
+      showToast('Allow notifications in your browser settings to enable reminders.', 'danger');
+      return;
+    }
+  }
   if (key.startsWith('notif:')) {
     currentData.notifications[key.slice(6)] = checked;
   } else if (key.startsWith('security:')) {
@@ -734,7 +922,7 @@ function changePassword(e) {
 function confirmDeleteAccount() {
   openModal({
     title: 'Delete your account?',
-    body: '<p>This permanently deletes your MyLife account and every entry stored on this device. This cannot be undone.</p>',
+    body: '<p>This permanently deletes your Momentum account and every entry stored on this device. This cannot be undone.</p>',
     confirmLabel: 'Delete account',
     danger: true,
     onConfirm: () => {
@@ -767,16 +955,25 @@ function confirmResetStatistics() {
 function confirmClearCache() {
   openModal({
     title: 'Clear cache?',
-    body: '<p>This removes all MyLife data stored in this browser, including every account, and signs you out.</p>',
+    body: '<p>This removes all Momentum data stored in this browser, including every account, and signs you out.</p>',
     confirmLabel: 'Clear cache',
     danger: true,
-    onConfirm: () => { localStorage.clear(); window.location.href = '../index.html'; },
+    onConfirm: () => {
+      Object.keys(localStorage).filter((key) => key.startsWith('mylife.')).forEach((key) => localStorage.removeItem(key));
+      Object.keys(sessionStorage).filter((key) => key.startsWith('mylife.')).forEach((key) => sessionStorage.removeItem(key));
+      window.location.href = '../index.html';
+    },
   });
 }
 
 function onImportFile(e) {
   const file = e.target.files[0];
   if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('Backup files must be smaller than 5MB.', 'danger');
+    e.target.value = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
     try {
@@ -787,8 +984,9 @@ function onImportFile(e) {
       renderHero();
       renderContent();
       bindScrollSpy();
+      showToast('Backup restored successfully.', 'success');
     } catch {
-      alert('That file could not be read as a MyLife backup.');
+      showToast('That file could not be read as a Momentum backup.', 'danger');
     }
   };
   reader.readAsText(file);
@@ -800,16 +998,35 @@ function onPhotoChosen(e, kind) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { alert('Please choose a JPG, PNG or WEBP image.'); return; }
-  if (file.size > 5 * 1024 * 1024) { alert('Images must be under 5MB.'); return; }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { showToast('Choose a JPG, PNG, or WEBP image.', 'danger'); return; }
+  if (file.size > 5 * 1024 * 1024) { showToast('Images must be smaller than 5MB.', 'danger'); return; }
   const reader = new FileReader();
   reader.onload = () => openCropper(reader.result, kind);
   reader.readAsDataURL(file);
 }
 
+function openPhotoViewer(dataUrl) {
+  if (!dataUrl) return;
+  const layer = ensureModalLayer();
+  layer.hidden = false;
+  layer.innerHTML = `
+    <div class="modal-backdrop">
+      <div class="modal-card photo-viewer-card">
+        <img src="${dataUrl}" alt="Profile photo" />
+        <div class="modal-actions">
+          <button class="secondary-btn" type="button" id="photo-viewer-close">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+  requestAnimationFrame(() => layer.querySelector('.modal-backdrop').classList.add('open'));
+  byId('photo-viewer-close').addEventListener('click', closeModal);
+  layer.querySelector('.modal-backdrop').addEventListener('click', (e) => { if (e.target.classList.contains('modal-backdrop')) closeModal(); });
+}
+
 function openCropper(dataUrl, kind) {
   const isAvatar = kind === 'avatar';
-  const layer = byId('modal-layer');
+  const layer = ensureModalLayer();
   layer.hidden = false;
   layer.innerHTML = `
     <div class="modal-backdrop">
@@ -835,19 +1052,32 @@ function openCropper(dataUrl, kind) {
   `;
   requestAnimationFrame(() => layer.querySelector('.modal-backdrop').classList.add('open'));
   setupCropper(isAvatar);
-  byId('cropper-cancel').addEventListener('click', closeModal);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeCropper();
+  }, { signal: cropperState.controller.signal });
+  byId('cropper-cancel').addEventListener('click', closeCropper);
   byId('cropper-save').addEventListener('click', () => saveCroppedPhoto(kind));
   byId('cropper-rotate').addEventListener('click', () => rotateCropper());
   byId('cropper-remove').addEventListener('click', () => removePhoto(kind));
+  layer.querySelector('.modal-backdrop').addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) closeCropper();
+  });
+}
+
+function closeCropper() {
+  if (cropperState && cropperState.controller) cropperState.controller.abort();
+  cropperState = null;
+  closeModal();
 }
 
 function removePhoto(kind) {
   if (kind === 'avatar') currentData.profile.photo = null;
   else currentData.profile.cover = null;
   persist();
-  closeModal();
+  closeCropper();
   renderHero();
   renderSidebar('account');
+  showToast(kind === 'avatar' ? 'Profile photo removed' : 'Cover image removed', 'default');
 }
 
 function rotateCropper() {
@@ -865,7 +1095,8 @@ function setupCropper(isAvatar) {
   const img = byId('cropper-img');
   const viewport = byId('cropper-viewport');
   const zoomInput = byId('cropper-zoom');
-  cropperState = { x: 0, y: 0, scale: 1, rotate: 0, dragging: false, startX: 0, startY: 0, isAvatar };
+  cropperState = { x: 0, y: 0, scale: 1, rotate: 0, dragging: false, startX: 0, startY: 0, isAvatar, controller: new AbortController() };
+  const options = { signal: cropperState.controller.signal };
 
   img.addEventListener('load', applyCropperTransform);
   if (img.complete) applyCropperTransform();
@@ -883,9 +1114,9 @@ function setupCropper(isAvatar) {
   };
   const end = () => { cropperState.dragging = false; };
 
-  viewport.addEventListener('pointerdown', (e) => start(e.clientX, e.clientY));
-  window.addEventListener('pointermove', (e) => move(e.clientX, e.clientY));
-  window.addEventListener('pointerup', end);
+  viewport.addEventListener('pointerdown', (e) => start(e.clientX, e.clientY), options);
+  window.addEventListener('pointermove', (e) => move(e.clientX, e.clientY), options);
+  window.addEventListener('pointerup', end, options);
 
   zoomInput.addEventListener('input', () => {
     cropperState.scale = Number(zoomInput.value);
@@ -923,9 +1154,10 @@ function saveCroppedPhoto(kind) {
   if (kind === 'avatar') currentData.profile.photo = dataUrl;
   else currentData.profile.cover = dataUrl;
   persist();
-  closeModal();
+  closeCropper();
   renderHero();
   renderSidebar('account');
+  showToast(kind === 'avatar' ? 'Profile photo updated.' : 'Cover image updated.', 'success');
 }
 
 // openModal() / closeModal() are provided by shared.js (used across pages).

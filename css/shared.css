@@ -968,9 +968,9 @@ body[data-page='settings'] { --accent: var(--orange); }
   padding: 20px;
 }
 
-/* ── MYLIFE design-system refresh ─────────────────────────────────────── */
+/* ── MOMENTUM design-system refresh ─────────────────────────────────────── */
 :root {
-  --font-display: "DM Sans", Inter, "Segoe UI", sans-serif;
+  --font-display: var(--font-mono);
   --radius-xs: 10px;
   --radius-xl: 24px;
   --surface-elevated: color-mix(in srgb, var(--surface) 94%, white);
@@ -1231,6 +1231,7 @@ label, .stat-card span { font-weight: 650; }
 :root[data-font-size='sm'] { --fs-h1: 1.4rem; --fs-h2: 1.12rem; --fs-h3: 0.94rem; --fs-body: 0.84rem; --fs-small: 0.74rem; }
 :root[data-font-size='md'] { --fs-h1: clamp(1.32rem, 1.05rem + 1.4vw, 1.7rem); --fs-h2: clamp(1.08rem, 0.95rem + 0.7vw, 1.3rem); --fs-h3: clamp(0.95rem, 0.88rem + 0.35vw, 1.05rem); --fs-body: clamp(0.88rem, 0.84rem + 0.2vw, 0.95rem); --fs-small: clamp(0.76rem, 0.73rem + 0.15vw, 0.82rem); }
 :root[data-font-size='lg'] { --fs-h1: 1.9rem; --fs-h2: 1.42rem; --fs-h3: 1.14rem; --fs-body: 1.02rem; --fs-small: 0.88rem; }
+:root[data-font-size='xl'] { --fs-h1: 2.2rem; --fs-h2: 1.68rem; --fs-h3: 1.32rem; --fs-body: 1.16rem; --fs-small: 1rem; }
 
 :root[data-radius='sharp']  { --radius-xs: 4px;  --radius-sm: 4px;  --radius-md: 6px;  --radius-lg: 8px;  --radius-xl: 10px; }
 :root[data-radius='md']     { --radius-xs: 10px; --radius-sm: 8px;  --radius-md: 10px; --radius-lg: 16px; --radius-xl: 24px; }
@@ -1299,3 +1300,285 @@ label, .stat-card span { font-weight: 650; }
 .modal-body p { color: var(--muted); margin: 0; }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM v2 — motion tokens, elevation, badges/alerts, skeletons,
+   empty states, system-wide stagger reveal, toast component.
+   Lives here (not variables.css) so it layers on top of every palette.
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Motion tokens */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 420ms;
+
+  /* Elevation scale (use instead of one-off box-shadow values) */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 4px 10px rgba(15, 23, 42, 0.07);
+  --shadow-md: var(--shadow-card);
+  --shadow-lg: 0 24px 55px rgba(15, 23, 42, 0.14);
+}
+
+:root[data-theme='dark'] {
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 55px rgba(0, 0, 0, 0.5);
+}
+
+/* Respect the app's own "reduce animations" appearance setting AND the OS
+   preference everywhere these tokens are used for a transition/animation. */
+:root[data-animations='off'] *,
+:root[data-animations='off'] *::before,
+:root[data-animations='off'] *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ── Badges ───────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+  background: color-mix(in srgb, var(--accent, var(--blue)) 14%, var(--surface));
+  color: var(--accent, var(--blue));
+}
+
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.badge-success { background: color-mix(in srgb, var(--green) 16%, var(--surface)); color: var(--green); }
+.badge-warning  { background: color-mix(in srgb, var(--orange) 16%, var(--surface)); color: var(--orange); }
+.badge-danger   { background: color-mix(in srgb, var(--red) 16%, var(--surface)); color: var(--red); }
+.badge-neutral  { background: var(--surface-2); color: var(--muted); }
+
+/* ── Alerts ───────────────────────────────────────────────────────────── */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 15px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  animation: alertIn var(--dur-base) var(--ease-out);
+}
+
+.alert-icon { flex-shrink: 0; margin-top: 1px; }
+.alert-success { border-color: color-mix(in srgb, var(--green) 35%, var(--line)); background: color-mix(in srgb, var(--green) 10%, var(--surface)); color: var(--green); }
+.alert-danger  { border-color: color-mix(in srgb, var(--red) 35%, var(--line));   background: color-mix(in srgb, var(--red) 10%, var(--surface));   color: var(--red); }
+.alert-warning { border-color: color-mix(in srgb, var(--orange) 35%, var(--line)); background: color-mix(in srgb, var(--orange) 10%, var(--surface)); color: var(--orange); }
+
+@keyframes alertIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Skeleton loading (opt-in via .skeleton, used by pages that fetch/compute
+   before first paint; most MOMENTUM reads are synchronous from localStorage,
+   so this is available as a utility rather than forced everywhere) ────── */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: var(--radius-xs);
+  color: transparent !important;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 70%, white) 50%, transparent);
+  animation: skeletonSweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeletonSweep { to { transform: translateX(100%); } }
+
+/* ── Empty states ─────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  border: 1px dashed var(--line);
+  animation: emptyIn var(--dur-slow) var(--ease-out);
+}
+
+.empty-state::before {
+  content: '◌';
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-elevated, var(--surface));
+  box-shadow: var(--shadow-xs);
+  color: var(--accent, var(--blue));
+  font-size: 1.3rem;
+}
+
+@keyframes emptyIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── System-wide stagger reveal for cards & stats ────────────────────────
+   Applies automatically to every list rendered via renderStats()/
+   renderGenericList()/renderChecklist() across all 13 pages — no
+   per-page JS needed. ────────────────────────────────────────────────── */
+.stat-card,
+.data-card {
+  animation: cardIn var(--dur-slow) var(--ease-out) backwards;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.stat-card:nth-child(1), .data-card:nth-child(1) { animation-delay: 0ms; }
+.stat-card:nth-child(2), .data-card:nth-child(2) { animation-delay: 45ms; }
+.stat-card:nth-child(3), .data-card:nth-child(3) { animation-delay: 90ms; }
+.stat-card:nth-child(4), .data-card:nth-child(4) { animation-delay: 135ms; }
+.stat-card:nth-child(5), .data-card:nth-child(5) { animation-delay: 180ms; }
+.stat-card:nth-child(6), .data-card:nth-child(6) { animation-delay: 225ms; }
+.stat-card:nth-child(n+7), .data-card:nth-child(n+7) { animation-delay: 260ms; }
+
+.data-card {
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.data-card:hover { transform: translateY(-2px); }
+
+/* ── Toast (shown via showToast() in shared.js) ──────────────────────── */
+.toast-region {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 10500;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 240px;
+  max-width: 340px;
+  padding: 12px 14px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-elevated, var(--surface));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+  transform: translateX(120%);
+  opacity: 0;
+  animation: toastIn var(--dur-base) var(--ease-out) forwards;
+}
+
+.toast.is-leaving { animation: toastOut var(--dur-base) var(--ease-in-out) forwards; }
+
+.toast-icon { flex-shrink: 0; display: grid; place-items: center; color: var(--accent, var(--blue)); }
+.toast-success .toast-icon { color: var(--green); }
+.toast-danger .toast-icon { color: var(--red); }
+
+@keyframes toastIn { to { transform: translateX(0); opacity: 1; } }
+@keyframes toastOut { to { transform: translateX(120%); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card, .data-card, .alert, .empty-state, .toast { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .skeleton::after { animation: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RTL SUPPORT (Arabic) — most of the layout already mirrors for free
+   because .app-shell, .nav-item, .sidebar-account-trigger etc. use CSS
+   Grid: grid columns automatically read right-to-left once
+   <html dir="rtl"> is set, so the sidebar, nav icons, and account trigger
+   all flip position with zero extra CSS. What's left here is the handful
+   of rules that use physical left/right/text-align instead of logical
+   properties, plus the Arabic font pairing.
+   ══════════════════════════════════════════════════════════════════════ */
+:root[dir='rtl'] {
+  --font-body: 'Noto Sans Arabic', 'IBM Plex Sans', Inter, sans-serif;
+  --font-display: 'Noto Sans Arabic', 'IBM Plex Sans', Inter, sans-serif;
+}
+
+[dir='rtl'] .nav-item { border-left: 0; border-right: 3px solid transparent; padding-left: 0; padding-right: 14px; }
+[dir='rtl'] .nav-item:hover,
+[dir='rtl'] .nav-item.active { border-left-color: transparent; border-right-color: var(--nav-accent, var(--blue)); }
+[dir='rtl'] .nav-item strong { padding-left: 0; padding-right: 0; }
+
+[dir='rtl'] .sidebar-account-trigger,
+[dir='rtl'] .account-menu a,
+[dir='rtl'] .account-menu button { text-align: right; }
+
+[dir='rtl'] .account-menu,
+[dir='rtl'] .avatar-menu { left: auto; right: 0; transform-origin: top right; }
+
+[dir='rtl'] .toast-region { right: auto; left: 18px; }
+[dir='rtl'] .toast { animation-name: toastInRtl; transform: translateX(-120%); }
+[dir='rtl'] .toast.is-leaving { animation-name: toastOutRtl; }
+@keyframes toastInRtl { to { transform: translateX(0); opacity: 1; } }
+@keyframes toastOutRtl { to { transform: translateX(-120%); opacity: 0; } }
+
+@media (max-width: 768px) {
+  [dir='rtl'] .mobile-account-slot { right: auto; left: 14px; }
+  [dir='rtl'] .mobile-account-slot .account-menu { left: 0; right: auto; transform-origin: top left; }
+  [dir='rtl'] .sidebar { border-radius: var(--radius-xl) 0 0 var(--radius-xl); }
+}
+
+[dir='rtl'] .checklist-card-actions,
+[dir='rtl'] .auth-row,
+[dir='rtl'] .modal-actions { flex-direction: row-reverse; }
+
+[dir='rtl'] .empty-state,
+[dir='rtl'] .alert { text-align: right; }
+
+/* ── Language switcher (used in the sidebar account menu + auth page) ──── */
+.lang-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.account-menu-lang { padding: 8px 10px 2px; }
+
+.lang-switch-btn {
+  min-height: 0;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  flex: 1;
+  transition: background var(--dur-fast, 140ms) ease, color var(--dur-fast, 140ms) ease;
+}
+
+.lang-switch-btn[aria-pressed='true'] {
+  background: var(--accent, var(--blue));
+  color: #fff;
+}

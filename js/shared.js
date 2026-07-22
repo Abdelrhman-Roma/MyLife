@@ -1,7 +1,26 @@
-﻿// MYLIFE â€” main application logic
+﻿// MOMENTUM — main application logic
 // Handles auth, routing, data persistence, and page rendering for all standard pages.
 // The Workout page shares this file's sidebar/topbar/art rendering but uses its
 // own custom content renderer (js/workout.js) for the planner/session/analytics UI.
+
+// Page assets live one level up from application pages, but alongside the
+// landing page.  Use the current page to avoid failed requests on index.html.
+const momentumAssetPrefix = document.body.dataset.page === 'auth' ? '' : '../';
+const momentumExtraCss = document.createElement('link');
+momentumExtraCss.rel = 'stylesheet';
+momentumExtraCss.href = `${momentumAssetPrefix}css/momentum-overrides.css`;
+document.head.appendChild(momentumExtraCss);
+const momentumLayoutCss = document.createElement('link');
+momentumLayoutCss.rel = 'stylesheet';
+momentumLayoutCss.href = `${momentumAssetPrefix}css/momentum-layout.css`;
+document.head.appendChild(momentumLayoutCss);
+const momentumThemeCss = document.createElement('link');
+momentumThemeCss.rel = 'stylesheet';
+momentumThemeCss.href = `${momentumAssetPrefix}css/momentum-theme.css`;
+document.head.appendChild(momentumThemeCss);
+const momentumSpaceScript = document.createElement('script');
+momentumSpaceScript.src = `${momentumAssetPrefix}js/space-video.js`;
+document.head.appendChild(momentumSpaceScript);
 
 const USERS_KEY   = 'mylife.users';
 const SESSION_KEY = 'mylife.session';
@@ -24,11 +43,12 @@ const NAV = [
   ['statistics',  'Statistics', 'Insights'],
 ];
 
-const NAV_ICONS = {
-  dashboard: '⌂', todo: '✓', habits: '↻', goals: '◎', calendar: '□',
-  workout: '↗', prayer: '✦', nutrition: '◒', water: '≈', sleep: '☾',
-  study: '✎', statistics: '◔', account: '◉',
-};
+const NAV_ICONS = Object.fromEntries(['dashboard','todo','habits','goals','calendar','workout','prayer','nutrition','water','sleep','study','statistics','account'].map((key, i) => [key, `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="${i % 3 === 0 ? '8' : '6'}"/><path d="M${5 + i % 5} 12h${7 + i % 4}M12 ${5 + i % 5}v${7 + i % 4}"/></svg>`]));
+const PLANET_ASSETS = { dashboard:'jupiter.jpg', todo:'moon.jpg', habits:'mars.jpg', goals:'mars.jpg', calendar:'Milky Way.jpg', workout:'mars.jpg', prayer:'sun.jpg', nutrition:'Neptune.jpg', water:'Uranus.jpg', sleep:'moon.jpg', study:'ISS.jpg', statistics:'jupiter.jpg', account:'jupiter.jpg' };
+// Which of the 3 named brand tiers (earth / mars / jupiter) each page belongs
+// to, per the brand brief — drives the accent glow on that page's hero art.
+// Pages not listed keep the app's existing per-page accent color as-is.
+const PLANET_TIER = { dashboard:'jupiter', statistics:'jupiter', account:'jupiter', workout:'mars', habits:'mars', goals:'mars' };
 
 // Inline SVG icons (24x24 viewbox, 2px stroke, currentColor) used in the account
 // menu instead of emoji so the icon language stays vector, themeable, and
@@ -40,6 +60,8 @@ const SVG_ICON = {
   save: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>',
   help: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
   logout: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  eye: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
 };
 
 // Items shown in the account (avatar) dropdown menu — not part of the main nav.
@@ -71,13 +93,13 @@ let currentUser = null;
 let currentData = null;
 let currentPage = document.body.dataset.page;
 
-// â”€â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Boot ──────────────────────────────────────────────────────────────────────
 // Boot helpers are called by page-specific files in js/pages/.
 
 
-// â”€â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 function initAuth() {
-  applyTheme(localStorage.getItem(THEME_KEY) || 'light', localStorage.getItem(PALETTE_KEY) || 'palette-1');
+  applyTheme(localStorage.getItem(THEME_KEY) || 'light', localStorage.getItem(PALETTE_KEY) || 'deep-space');
   if (getSessionUser()) {
     window.location.href = 'pages/dashboard.html';
     return;
@@ -86,6 +108,8 @@ function initAuth() {
   byId('show-login').addEventListener('click',    () => showAuthPanel('login'));
   byId('login-form').addEventListener('submit',    login);
   byId('register-form').addEventListener('submit', register);
+  const forgotPasswordButton = byId('forgot-password');
+  if (forgotPasswordButton) forgotPasswordButton.addEventListener('click', openPasswordReset);
 }
 
 function showAuthPanel(mode) {
@@ -96,6 +120,10 @@ function showAuthPanel(mode) {
 
 function login(e) {
   e.preventDefault();
+  if (!e.currentTarget.checkValidity()) {
+    e.currentTarget.reportValidity();
+    return;
+  }
   const email = byId('login-email').value.trim().toLowerCase();
   const pwd   = byId('login-password').value;
   const user  = getUsers().find((u) => u.email === email && u.password === pwd);
@@ -114,11 +142,16 @@ function login(e) {
 
 function register(e) {
   e.preventDefault();
+  if (!e.currentTarget.checkValidity()) {
+    e.currentTarget.reportValidity();
+    return;
+  }
   const name     = byId('register-name').value.trim();
   const email    = byId('register-email').value.trim().toLowerCase();
   const password = byId('register-password').value;
   const confirm  = byId('register-confirm').value;
   const users    = getUsers();
+  if (!name) { byId('register-message').textContent = 'Please enter your name.'; return; }
   if (password !== confirm) { byId('register-message').textContent = 'Passwords do not match.'; return; }
   if (users.some((u) => u.email === email)) { byId('register-message').textContent = 'Email already registered.'; return; }
   const user = { id: makeId(), name, email, password, createdAt: new Date().toISOString() };
@@ -136,7 +169,64 @@ function navigateAfterAuth(target) {
   else { window.location.href = target; }
 }
 
-// â”€â”€â”€ Page init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// This is a local-first application: accounts live only in this browser, so
+// password recovery is an explicit local reset rather than an email workflow.
+function openPasswordReset() {
+  const layer = ensureModalLayer();
+  layer.hidden = false;
+  layer.innerHTML = `
+    <div class="modal-backdrop">
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-password-title">
+        <h2 id="reset-password-title">Reset password</h2>
+        <p class="muted">Reset the password for an account stored on this device.</p>
+        <form class="form-stack" id="password-reset-form" novalidate>
+          <label>Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label>New password<input name="password" type="password" autocomplete="new-password" minlength="6" required /></label>
+          <label>Confirm new password<input name="confirm" type="password" autocomplete="new-password" minlength="6" required /></label>
+          <p class="form-message" id="password-reset-message" role="alert"></p>
+          <div class="modal-actions">
+            <button class="secondary-btn" type="button" data-reset-cancel>Cancel</button>
+            <button class="primary-btn" type="submit">Reset password</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  `;
+  const form = byId('password-reset-form');
+  const message = byId('password-reset-message');
+  const cancel = () => closeModal();
+  layer.querySelector('[data-reset-cancel]').addEventListener('click', cancel);
+  layer.querySelector('.modal-backdrop').addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) cancel();
+  });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    const values = new FormData(form);
+    const email = String(values.get('email')).trim().toLowerCase();
+    const password = String(values.get('password'));
+    if (password !== String(values.get('confirm'))) {
+      message.textContent = 'Passwords do not match.';
+      return;
+    }
+    const users = getUsers();
+    const index = users.findIndex((user) => user.email === email);
+    if (index === -1) {
+      message.textContent = 'No local account exists for that email address.';
+      return;
+    }
+    users[index] = { ...users[index], password };
+    saveUsers(users);
+    closeModal();
+    byId('login-message').textContent = 'Password reset. You can now log in.';
+    byId('login-email').value = email;
+    byId('login-password').focus();
+  });
+  requestAnimationFrame(() => layer.querySelector('.modal-backdrop').classList.add('open'));
+  form.querySelector('input[name="email"]').focus();
+}
+
+// ─── Page init ────────────────────────────────────────────────────────────────
 function bootShell(pageKey) {
   currentUser = getSessionUser();
   if (!currentUser) { window.location.href = '../index.html'; return false; }
@@ -154,23 +244,44 @@ function bootShell(pageKey) {
 
 function initPage(pageKey) {
   if (!bootShell(pageKey)) return;
+  renderPageContent(pageKey);
+  window.__pageContentReinit = () => renderPageContent(pageKey);
+}
+
+function renderPageContent(pageKey) {
   renderStats();
   renderForm(pageKey);
   renderList(pageKey);
 }
 
-// â”€â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Re-renders the shared chrome (sidebar/topbar/art) and lets the current
+// page's own content re-render itself — used when the language changes so
+// everything updates instantly with no page refresh.
+function refreshChrome() {
+  if (!currentPage) return;
+  renderSidebar(currentPage);
+  initMobileNav();
+  renderTopbar(currentPage);
+  renderArt(currentPage);
+}
+
+document.addEventListener('mylife:i18n-change', () => {
+  refreshChrome();
+  if (typeof window.__pageContentReinit === 'function') window.__pageContentReinit();
+});
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 function renderSidebar(pageKey) {
   byId('sidebar').innerHTML = `
     <a class="brand" href="dashboard.html">
-      <span class="brand-logo" aria-hidden="true">M</span>
-      <span><strong>MYLIFE</strong><small>Life Tracker</small></span>
+      <span class="brand-logo" aria-hidden="true"></span>
+      <span><strong>Momentum</strong><small>${t('Life Tracker')}</small></span>
     </a>
     <nav class="nav-list">
       ${NAV.map(([key, title, label]) => `
         <a class="nav-item${key === pageKey ? ' active' : ''}" data-accent="${(PAGES[key] && PAGES[key].accent) || 'blue'}" href="${key}.html">
           <span class="nav-icon" aria-hidden="true">${NAV_ICONS[key] || '•'}</span>
-          <strong>${title}<small>${label}</small></strong>
+          <strong>${t(title)}<small>${t(label)}</small></strong>
         </a>
       `).join('')}
     </nav>
@@ -178,7 +289,7 @@ function renderSidebar(pageKey) {
   `;
   renderMobileAccountTrigger();
   bindAccountMenu('account-trigger', 'account-menu');
-  bindAccountMenu('account-trigger-m', 'account-menu-m');
+  bindLanguageSwitchers(byId('sidebar'));
 }
 
 // ─── Account avatar + dropdown ─────────────────────────────────────────────
@@ -191,18 +302,19 @@ function accountWidgetHtml(suffix, active) {
         ${accountAvatarHtml()}
         <span class="sidebar-account-info">
           <strong>${escapeHtml(currentUser.name)}</strong>
-          <small>${escapeHtml(currentData.profile.headline || 'MyLife member')}</small>
+          <small>${escapeHtml(currentData.profile.headline || 'Momentum member')}</small>
         </span>
         <span class="sidebar-account-chevron" aria-hidden="true">⌄</span>
       </button>
       <div class="account-menu" id="${menuId}" role="menu" hidden>
         ${ACCOUNT_MENU.map(([href, icon, label]) => `
           <a role="menuitem" href="${href}">
-            <span class="account-menu-icon" aria-hidden="true">${icon}</span><span>${label}</span>
+            <span class="account-menu-icon" aria-hidden="true">${icon}</span><span>${t(label)}</span>
           </a>
         `).join('')}
+        <div class="account-menu-lang" role="none">${languageSwitcherHtml()}</div>
         <button role="menuitem" type="button" class="account-menu-logout" data-menu-logout>
-          <span class="account-menu-icon" aria-hidden="true">${SVG_ICON.logout}</span><span>Logout</span>
+          <span class="account-menu-icon" aria-hidden="true">${SVG_ICON.logout}</span><span>${t('Logout')}</span>
         </button>
       </div>
     </div>
@@ -217,12 +329,17 @@ function accountAvatarHtml() {
 
 function renderMobileAccountTrigger() {
   const shell = document.querySelector('.app-shell');
-  if (!shell || byId('mobile-account-slot')) return;
-  const slot = document.createElement('div');
-  slot.id = 'mobile-account-slot';
-  slot.className = 'mobile-account-slot';
+  if (!shell) return;
+  let slot = byId('mobile-account-slot');
+  if (!slot) {
+    slot = document.createElement('div');
+    slot.id = 'mobile-account-slot';
+    slot.className = 'mobile-account-slot';
+    shell.appendChild(slot);
+  }
   slot.innerHTML = accountWidgetHtml('m', currentPage === 'account');
-  shell.appendChild(slot);
+  bindAccountMenu('account-trigger-m', 'account-menu-m');
+  bindLanguageSwitchers(slot);
 }
 
 function bindAccountMenu(triggerId, menuId) {
@@ -253,13 +370,13 @@ function bindAccountMenu(triggerId, menuId) {
   if (logoutBtn) logoutBtn.addEventListener('click', logout);
 }
 
-// â”€â”€â”€ Topbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Topbar ───────────────────────────────────────────────────────────────────
 function renderTopbar(pageKey) {
   const page = PAGES[pageKey];
   byId('topbar').innerHTML = `
     <div>
-      <p class="eyebrow">${escapeHtml(page.kicker)}</p>
-      <h1>${escapeHtml(page.title)}</h1>
+      <p class="eyebrow">Mission Control / ${escapeHtml(page.kicker)}</p>
+      <h1>${pageKey === 'dashboard' ? 'Mission Control' : escapeHtml(page.title)}</h1>
     </div>
     <div class="topbar-actions">
       <button class="secondary-btn" id="theme-btn" type="button">${currentData.settings.theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
@@ -273,27 +390,29 @@ function renderTopbar(pageKey) {
   byId('theme-btn').addEventListener('click',  toggleTheme);
 }
 
-// â”€â”€â”€ Art panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Art panel ────────────────────────────────────────────────────────────────
 function renderArt(pageKey) {
   if (!byId('page-art')) return;
   const page   = PAGES[pageKey];
   const counts = getCounts();
   byId('page-art').className   = `page-art accent-${page.accent}`;
+  if (PLANET_TIER[pageKey]) byId('page-art').dataset.tier = PLANET_TIER[pageKey];
+  else delete byId('page-art').dataset.tier;
   byId('page-art').innerHTML   = `
     <div class="art-copy">
-      <p class="eyebrow">${escapeHtml(page.kicker)}</p>
-      <h2>${pageKey === 'dashboard' ? `Welcome back, ${escapeHtml(firstName(currentUser.name))}.` : escapeHtml(page.title)}</h2>
-      <p>${artDescription(pageKey)}</p>
+      <p class="eyebrow">${escapeHtml(t(page.kicker))}</p>
+      <h2>${pageKey === 'dashboard' ? t('Welcome back, {name}.', { name: escapeHtml(firstName(currentUser.name)) }) : escapeHtml(t(page.title))}</h2>
+      <p>${t(artDescription(pageKey))}</p>
     </div>
     <div class="art-board art-${pageKey}">
-      ${artMarkup(pageKey, counts)}
+       <img src="../assist/images/${PLANET_ASSETS[pageKey] || 'Earth.jpg'}" width="220" height="220" alt="" aria-hidden="true" decoding="async" />
     </div>
   `;
 }
 
 function artDescription(pageKey) {
   const map = {
-    dashboard:  'Your hub â€” tasks, habits, goals, workouts, nutrition, and more, all in one place.',
+    dashboard:  'Your hub — tasks, habits, goals, workouts, nutrition, and more, all in one place.',
     todo:       'Check completed tasks and watch the statistics update instantly.',
     habits:     'Build streaks by checking habits every day.',
     goals:      'Create daily, weekly, monthly, and yearly goals with categories.',
@@ -361,17 +480,17 @@ function workoutArtBoard() {
   return `
     <div class="workout-hero-board">
       <div class="workout-hero-card">
-        <p class="eyebrow">This week</p>
-        <strong>${done}/${total} workouts done</strong>
-        <p>${percent(done, total || 1)}% of your weekly plan complete${today ? ` — today is ${escapeHtml(today)}` : ''}.</p>
+        <p class="eyebrow">${t('This week')}</p>
+        <strong>${done}/${total} ${t('workouts done')}</strong>
+        <p>${percent(done, total || 1)}% ${t('of your weekly plan complete')}${today ? ` — ${t('today is')} ${escapeHtml(t(today))}` : ''}.</p>
       </div>
       <div class="workout-track-list">
         ${upcoming.length ? upcoming.map((s) => `
           <div class="workout-track-item">
-            <span>${escapeHtml(s.day)} • ${escapeHtml(s.type || 'Workout')}</span>
-            <b>${escapeHtml(s.status)}</b>
+            <span>${escapeHtml(t(s.day))} • ${escapeHtml(t(s.type || 'Workout'))}</span>
+            <b>${escapeHtml(t(s.status))}</b>
           </div>
-        `).join('') : '<div class="workout-track-item"><span>No plan yet</span><b>Set up days →</b></div>'}
+        `).join('') : `<div class="workout-track-item"><span>${t('No plan yet')}</span><b>${t('Set up days →')}</b></div>`}
       </div>
     </div>
   `;
@@ -389,7 +508,7 @@ function initMobileNav() {
     toggle.id = 'mobile-nav-toggle';
     toggle.className = 'mobile-nav-toggle';
     toggle.type = 'button';
-    toggle.setAttribute('aria-label', 'Open navigation');
+    toggle.setAttribute('aria-label', t('Open navigation'));
     toggle.setAttribute('aria-controls', 'sidebar');
     toggle.setAttribute('aria-expanded', 'false');
     toggle.innerHTML = '<span aria-hidden="true"></span>';
@@ -409,13 +528,13 @@ function initMobileNav() {
   const closeNav = () => {
     document.body.classList.remove('nav-open');
     toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-label', 'Open navigation');
+    toggle.setAttribute('aria-label', t('Open navigation'));
     overlay.hidden = true;
   };
   const openNav = () => {
     document.body.classList.add('nav-open');
     toggle.setAttribute('aria-expanded', 'true');
-    toggle.setAttribute('aria-label', 'Close navigation');
+    toggle.setAttribute('aria-label', t('Close navigation'));
     overlay.hidden = false;
   };
 
@@ -442,14 +561,14 @@ function macroBoard(rows) {
   `).join('')}</div>`;
 }
 
-// â”€â”€â”€ Stats strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Stats strip ──────────────────────────────────────────────────────────────
 function renderStats() {
   const counts = getCounts();
   const stats = [
-    ['Tasks done',    `${counts.completedTasks}/${counts.tasks}`,   percent(counts.completedTasks, counts.tasks || 1)],
-    ['Habits done',   `${counts.completedHabits}/${counts.habits}`, percent(counts.completedHabits, counts.habits || 1)],
-    ['Goal progress', `${counts.completedGoals}/${counts.goals}`,   percent(counts.completedGoals, counts.goals || 1)],
-    ['Water',         `${counts.water}/${currentData.settings.waterGoal}`, percent(counts.water, currentData.settings.waterGoal)],
+    [t('Tasks done'),    `${counts.completedTasks}/${counts.tasks}`,   percent(counts.completedTasks, counts.tasks || 1)],
+    [t('Habits done'),   `${counts.completedHabits}/${counts.habits}`, percent(counts.completedHabits, counts.habits || 1)],
+    [t('Goal progress'), `${counts.completedGoals}/${counts.goals}`,   percent(counts.completedGoals, counts.goals || 1)],
+    [t('Water'),         `${counts.water}/${currentData.settings.waterGoal}`, percent(counts.water, currentData.settings.waterGoal)],
   ];
   byId('stats-grid').innerHTML = stats.map(([label, value, width]) => `
     <article class="stat-card">
@@ -460,7 +579,7 @@ function renderStats() {
   `).join('');
 }
 
-// â”€â”€â”€ Form panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Form panel ───────────────────────────────────────────────────────────────
 function renderForm(pageKey) {
   const page = PAGES[pageKey];
   const formTitle = byId('form-title');
@@ -470,27 +589,27 @@ function renderForm(pageKey) {
   // Guard: these elements don't exist on the workout page (handled by workout.js)
   if (!formTitle || !formKicker || !entryForm) return;
 
-  formTitle.textContent  = page.title;
-  formKicker.textContent = page.collection ? 'Add entry' : 'Manage';
+  formTitle.textContent  = t(page.title);
+  formKicker.textContent = page.collection ? t('Add entry') : t('Manage');
 
   if (page.collection) {
     entryForm.innerHTML = `
       <div class="form-grid">${page.fields.map(fieldHtml).join('')}</div>
-      <button class="primary-btn" type="submit">Add ${escapeHtml(page.title)}</button>
+      <button class="primary-btn" type="submit">${t('Add {title}', { title: escapeHtml(t(page.title)) })}</button>
     `;
     entryForm.onsubmit = (e) => addEntry(e, pageKey);
     return;
   }
 
-  entryForm.innerHTML = '<div class="empty-state">Use the sidebar to navigate to a data page.</div>';
+  entryForm.innerHTML = `<div class="empty-state">${t('Use the sidebar to navigate to a data page.')}</div>`;
   entryForm.onsubmit  = null;
 }
 
-// â”€â”€â”€ List panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── List panel ───────────────────────────────────────────────────────────────
 function renderList(pageKey) {
   const listTitle = byId('list-title');
   if (!listTitle) return; // workout page has its own layout
-  listTitle.textContent = PAGES[pageKey].title;
+  listTitle.textContent = t(PAGES[pageKey].title);
 
   if (pageKey === 'dashboard')  return renderDashboard();
   if (pageKey === 'statistics') return renderStatistics();
@@ -505,7 +624,7 @@ function renderGenericList(pageKey) {
   const page  = PAGES[pageKey];
   const items = currentData[page.collection] || [];
   if (!items.length) {
-    byId('data-list').innerHTML = `<div class="empty-state">No ${escapeHtml(page.title.toLowerCase())} records yet. Add your first one above.</div>`;
+    byId('data-list').innerHTML = `<div class="empty-state">${t('No {title} records yet. Add your first one above.', { title: escapeHtml(t(page.title).toLowerCase()) })}</div>`;
     return;
   }
   byId('data-list').innerHTML = items.map((item) => cardHtml(item, page)).join('');
@@ -516,7 +635,7 @@ function renderChecklist(pageKey) {
   const page  = PAGES[pageKey];
   const items = currentData[page.collection] || [];
   if (!items.length) {
-    byId('data-list').innerHTML = `<div class="empty-state">No ${escapeHtml(page.title.toLowerCase())} records yet. Add your first one above.</div>`;
+    byId('data-list').innerHTML = `<div class="empty-state">${t('No {title} records yet. Add your first one above.', { title: escapeHtml(t(page.title).toLowerCase()) })}</div>`;
     return;
   }
   byId('data-list').innerHTML = items.map((item) => `
@@ -525,10 +644,10 @@ function renderChecklist(pageKey) {
         <input type="checkbox" data-toggle="${escapeAttr(item.id)}" ${item.completed ? 'checked' : ''} />
         <span>${escapeHtml(item.title)}</span>
       </label>
-      <p>${page.labels.map((k) => item[k] !== undefined ? `${labelize(k)}: ${escapeHtml(String(item[k]))}` : '').filter(Boolean).join(' Â· ')}</p>
+      <p>${page.labels.map((k) => item[k] !== undefined ? `${t(labelize(k))}: ${escapeHtml(String(item[k]))}` : '').filter(Boolean).join(' · ')}</p>
       <div class="checklist-card-actions">
-        ${item.workoutScheduleId ? `<a class="text-btn workout-start-link" href="workout.html?day=${escapeAttr(item.workoutScheduleId)}">Start Workout â†’</a>` : ''}
-        <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">Delete</button>
+        ${item.workoutScheduleId ? `<a class="text-btn workout-start-link" href="workout.html?day=${escapeAttr(item.workoutScheduleId)}">${t('Start Workout →')}</a>` : ''}
+        <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">${t('Delete')}</button>
       </div>
     </article>
   `).join('');
@@ -545,10 +664,10 @@ function renderGoals() {
     const periodItems = items.filter((item) => item.period === period);
     return `
       <section class="group-card">
-        <h3>${period} goals</h3>
+        <h3>${t(period)} ${t('goals')}</h3>
         ${periodItems.length
           ? periodItems.map(goalCard).join('')
-          : '<p class="muted">No goals in this period yet.</p>'}
+          : `<p class="muted">${t('No goals in this period yet.')}</p>`}
       </section>
     `;
   }).join('');
@@ -565,8 +684,8 @@ function goalCard(item) {
         <input type="checkbox" data-toggle="${escapeAttr(item.id)}" ${item.completed ? 'checked' : ''} />
         <span>${escapeHtml(item.title)}</span>
       </label>
-      <p>Category: ${escapeHtml(item.category || 'â€”')} Â· Deadline: ${escapeHtml(item.deadline || 'â€”')}</p>
-      <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">Delete</button>
+      <p>${t('Category')}: ${escapeHtml(item.category || '—')} · ${t('Deadline')}: ${escapeHtml(item.deadline || '—')}</p>
+      <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">${t('Delete')}</button>
     </article>
   `;
 }
@@ -576,14 +695,14 @@ function renderNutrition() {
   const items  = currentData.meals;
   byId('data-list').innerHTML = `
     <div class="summary-grid">
-      ${nutritionSummaryCard('Calories', totals.calories, currentData.settings.calorieTarget)}
-      ${nutritionSummaryCard('Protein',  totals.protein,  currentData.settings.proteinTarget, 'g')}
-      ${nutritionSummaryCard('Carbs',    totals.carbs,    currentData.settings.carbTarget,    'g')}
-      ${nutritionSummaryCard('Fat',      totals.fat,      currentData.settings.fatTarget,     'g')}
+      ${nutritionSummaryCard(t('Calories'), totals.calories, currentData.settings.calorieTarget)}
+      ${nutritionSummaryCard(t('Protein'),  totals.protein,  currentData.settings.proteinTarget, 'g')}
+      ${nutritionSummaryCard(t('Carbs'),    totals.carbs,    currentData.settings.carbTarget,    'g')}
+      ${nutritionSummaryCard(t('Fat'),      totals.fat,      currentData.settings.fatTarget,     'g')}
     </div>
     ${items.length
       ? items.map((item) => cardHtml(item, PAGES.nutrition)).join('')
-      : '<div class="empty-state">No meals yet. Log calories, protein, carbs, and fat above.</div>'}
+      : `<div class="empty-state">${t('No meals yet. Log calories, protein, carbs, and fat above.')}</div>`}
   `;
   bindDeleteButtons('nutrition');
 }
@@ -599,16 +718,21 @@ function nutritionSummaryCard(label, value, target, suffix = '') {
 function renderDashboard() {
   const counts = getCounts();
   byId('data-list').innerHTML = `
+    <section class="mission-status" aria-label="Momentum progress">
+      <div><p class="eyebrow">Current destination</p><h2>Earth orbit</h2><p>Level 3 · 640 / 1,000 XP</p></div>
+      <div class="meter" aria-label="64% to next level"><i style="width:64%"></i></div>
+      <strong>7-Day Orbit</strong>
+    </section>
     <div class="summary-grid">
-      ${nutritionSummaryCard('Task completion',  counts.completedTasks,  counts.tasks  || 1)}
-      ${nutritionSummaryCard('Habit completion', counts.completedHabits, counts.habits || 1)}
-      ${nutritionSummaryCard('Goal completion',  counts.completedGoals,  counts.goals  || 1)}
-      ${nutritionSummaryCard('Water today',      counts.water,           currentData.settings.waterGoal, ' gl')}
+      ${nutritionSummaryCard(t('Task completion'),  counts.completedTasks,  counts.tasks  || 1)}
+      ${nutritionSummaryCard(t('Habit completion'), counts.completedHabits, counts.habits || 1)}
+      ${nutritionSummaryCard(t('Goal completion'),  counts.completedGoals,  counts.goals  || 1)}
+      ${nutritionSummaryCard(t('Water today'),      counts.water,           currentData.settings.waterGoal, ' gl')}
     </div>
     ${['tasks', 'habits', 'goals', 'meals', 'study', 'sleep'].map((key) => `
       <article class="data-card stacked">
-        <h3>${labelize(key)}</h3>
-        <p>${(currentData[key] || []).length} records</p>
+        <h3>${t(labelize(key))}</h3>
+        <p>${(currentData[key] || []).length} ${t('records')}</p>
         <small>${latestText(key)}</small>
       </article>
     `).join('')}
@@ -620,29 +744,30 @@ function renderStatistics() {
   const n      = nutritionTotals();
   byId('data-list').innerHTML = `
     <div class="summary-grid">
-      ${nutritionSummaryCard('Tasks done',   counts.completedTasks,  counts.tasks  || 1)}
-      ${nutritionSummaryCard('Habits done',  counts.completedHabits, counts.habits || 1)}
-      ${nutritionSummaryCard('Goals done',   counts.completedGoals,  counts.goals  || 1)}
-      ${nutritionSummaryCard('Calories',     n.calories,             currentData.settings.calorieTarget)}
+      ${nutritionSummaryCard(t('Tasks done'),   counts.completedTasks,  counts.tasks  || 1)}
+      ${nutritionSummaryCard(t('Habits done'),  counts.completedHabits, counts.habits || 1)}
+      ${nutritionSummaryCard(t('Goals done'),   counts.completedGoals,  counts.goals  || 1)}
+      ${nutritionSummaryCard(t('Calories'),     n.calories,             currentData.settings.calorieTarget)}
     </div>
     ${Object.entries(counts).map(([key, value]) => `
       <article class="data-card stat-line">
-        <h3>${labelize(key)}</h3>
+        <h3>${t(labelize(key))}</h3>
         <strong>${value}</strong>
       </article>
     `).join('')}
   `;
 }
 
-// â”€â”€â”€ Field builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Field builder ────────────────────────────────────────────────────────────
 function fieldHtml([name, label, type, options]) {
   if (type === 'textarea') {
-    return `<label class="full-field">${escapeHtml(label)}<textarea name="${name}"></textarea></label>`;
+    return `<label class="full-field">${escapeHtml(t(label))}<textarea name="${name}"></textarea></label>`;
   }
   if (type === 'select') {
-    return `<label>${escapeHtml(label)}<select name="${name}" required>${options.map((o) => `<option>${escapeHtml(o)}</option>`).join('')}</select></label>`;
+    return `<label>${escapeHtml(t(label))}<select name="${name}" required>${options.map((o) => `<option>${escapeHtml(t(o))}</option>`).join('')}</select></label>`;
   }
-  return `<label>${escapeHtml(label)}<input name="${name}" type="${type}" required /></label>`;
+  const numericAttrs = type === 'number' ? ' min="0" step="any"' : '';
+  return `<label>${escapeHtml(t(label))}<input name="${name}" type="${type}"${numericAttrs} required /></label>`;
 }
 
 function cardHtml(item, page) {
@@ -650,16 +775,20 @@ function cardHtml(item, page) {
     <article class="data-card">
       <div>
         <h3>${escapeHtml(item.title)}</h3>
-        <p>${page.labels.map((k) => item[k] !== undefined ? `${labelize(k)}: ${escapeHtml(String(item[k]))}` : '').filter(Boolean).join(' Â· ')}</p>
+        <p>${page.labels.map((k) => item[k] !== undefined ? `${t(labelize(k))}: ${escapeHtml(String(item[k]))}` : '').filter(Boolean).join(' · ')}</p>
       </div>
-      <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">Delete</button>
+      <button class="small-danger" data-delete="${escapeAttr(item.id)}" type="button">${t('Delete')}</button>
     </article>
   `;
 }
 
-// â”€â”€â”€ CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── CRUD ─────────────────────────────────────────────────────────────────────
 function addEntry(e, pageKey) {
   e.preventDefault();
+  if (!e.currentTarget.checkValidity()) {
+    e.currentTarget.reportValidity();
+    return;
+  }
   const page = PAGES[pageKey];
   const form = new FormData(e.currentTarget);
   const item = { id: makeId(), completed: false };
@@ -692,9 +821,42 @@ function deleteEntry(pageKey, id) {
   currentData[col] = currentData[col].filter((item) => item.id !== id);
   persist();
   initPage(pageKey);
+  showToast(t('Deleted'), 'danger');
 }
 
-// â”€â”€â”€ Theme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toast ──────────────────────────────────────────────────────────────
+// showToast(message, variant) — variant: 'default' | 'success' | 'danger'
+// Any page can call this without extra markup; the region is created lazily.
+const TOAST_ICONS = {
+  success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  danger:  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  default: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+};
+
+function ensureToastRegion() {
+  let region = document.querySelector('.toast-region');
+  if (!region) {
+    region = document.createElement('div');
+    region.className = 'toast-region';
+    region.setAttribute('aria-live', 'polite');
+    document.body.appendChild(region);
+  }
+  return region;
+}
+
+function showToast(message, variant = 'default', duration = 2600) {
+  const region = ensureToastRegion();
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${variant}`;
+  toast.innerHTML = `<span class="toast-icon" aria-hidden="true">${TOAST_ICONS[variant] || TOAST_ICONS.default}</span><span>${escapeHtml(message)}</span>`;
+  region.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('is-leaving');
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+  }, duration);
+}
+
+// ─── Theme ────────────────────────────────────────────────────────────────
 function toggleTheme() {
   currentData.settings.theme = currentData.settings.theme === 'dark' ? 'light' : 'dark';
   persist();
@@ -706,7 +868,7 @@ function applyTheme(theme, palette) {
   if (theme === 'auto') {
     resolvedTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   }
-  const resolvedPalette = palette || localStorage.getItem(PALETTE_KEY) || 'palette-1';
+  const resolvedPalette = palette || localStorage.getItem(PALETTE_KEY) || 'deep-space';
   document.documentElement.dataset.theme = resolvedTheme;
   document.documentElement.dataset.palette = resolvedPalette;
   document.documentElement.style.colorScheme = resolvedTheme;
@@ -731,7 +893,7 @@ function ensureModalLayer() {
   return layer;
 }
 
-function openModal({ title, body, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false, onConfirm, onCancel }) {
+function openModal({ title, body, confirmLabel = t('Confirm'), cancelLabel = t('Cancel'), danger = false, onConfirm, onCancel }) {
   const layer = ensureModalLayer();
   layer.hidden = false;
   layer.innerHTML = `
@@ -789,7 +951,7 @@ function applyAppearance(s) {
   root.dataset.glass      = s.glass ? 'on' : 'off';
 }
 
-// â”€â”€â”€ Session / storage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Session / storage ────────────────────────────────────────────────────────
 function logout() {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
@@ -803,7 +965,7 @@ function exportData() {
   );
   const a = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = `mylife-${currentUser.email}.json`;
+  a.download = `momentum-${currentUser.email}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -825,7 +987,7 @@ function getData(email, name) {
   try {
     const saved = localStorage.getItem(DATA_PREFIX + email);
     if (saved) return JSON.parse(saved);
-  } catch { /* corrupt data â€” fall through */ }
+  } catch { /* corrupt data — fall through */ }
   const data = emptyData(name);
   saveData(email, data);
   return data;
@@ -834,7 +996,7 @@ function getData(email, name) {
 function saveData(email, data) { localStorage.setItem(DATA_PREFIX + email, JSON.stringify(data)); }
 function persist() { saveData(currentUser.email, currentData); }
 
-// â”€â”€â”€ Data helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Data helpers ─────────────────────────────────────────────────────────────
 function getCounts() {
   return {
     tasks:           currentData.tasks.length,
@@ -875,7 +1037,7 @@ function emptyData(name) {
       joinedAt: new Date().toISOString(),
     },
     settings: {
-      theme: 'light', palette: 'palette-1',
+      theme: 'dark', palette: 'deep-space',
       waterGoal: 8, sleepGoal: 8, calorieTarget: 2200, proteinTarget: 150, carbTarget: 250, fatTarget: 70,
       habitGoal: 3, prayerGoal: 5, studyGoal: 120, workoutGoal: 4,
       fontSize: 'md', radius: 'md', animations: true, compact: false, glass: false,
@@ -931,10 +1093,10 @@ function normalizeData(data, name) {
   return merged;
 }
 
-// â”€â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Utilities ────────────────────────────────────────────────────────────────
 function latestText(key) {
   const items = currentData[key] || [];
-  return items.length ? `Latest: ${escapeHtml(items[items.length - 1].title || 'â€”')}` : 'No records yet';
+  return items.length ? `Latest: ${escapeHtml(items[items.length - 1].title || '—')}` : 'No records yet';
 }
 
 function selected(actual, expected) { return actual === expected ? 'selected' : ''; }

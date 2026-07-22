@@ -1,0 +1,32 @@
+/* Late theme bridge: this file loads after the visual layer, so it must use
+   semantic tokens rather than replacing the active palette with dark values. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+body { background: var(--bg) !important; color: var(--ink) !important; }
+.sidebar, .topbar { background: var(--nav) !important; color: var(--on-nav) !important; }
+.brand strong, .brand small, .nav-item, .nav-icon { color: var(--on-nav) !important; }
+.nav-item { color: var(--nav-muted) !important; }
+.nav-item:hover, .nav-item.active { color: var(--on-nav) !important; }
+.nav-item:hover { background: color-mix(in srgb, var(--blue) 14%, transparent) !important; }
+.nav-item.active { background: color-mix(in srgb, var(--blue) 22%, transparent) !important; border-color: color-mix(in srgb, var(--blue) 38%, transparent) !important; box-shadow: inset 3px 0 var(--blue) !important; }
+.sidebar-avatar, .avatar { background: linear-gradient(135deg, var(--blue), var(--purple)) !important; color: var(--bg) !important; }
+.panel, .data-card, .entry-form, .stats-grid > *, .calendar-panel, .study-card, .workout-card {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+}
+.data-card h3, .panel h2, .topbar h1 { color: var(--ink) !important; }
+.secondary-btn { background: var(--surface-2) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+.danger-btn { background: var(--danger-bg) !important; color: var(--red) !important; border-color: var(--red) !important; }
+.entry-form label, .entry-form input, .entry-form select, .entry-form textarea { color: var(--ink) !important; }
+.entry-form input, .entry-form select, .entry-form textarea { background: var(--surface-3) !important; border-color: var(--line) !important; }
+.meter { background: color-mix(in srgb, var(--ink) 10%, transparent) !important; }
+.meter i { background: linear-gradient(90deg, var(--blue), var(--purple)) !important; }
+.page-art, .page-art[data-tier="mars"], .page-art[data-tier="jupiter"] { background: linear-gradient(115deg, var(--surface-2), var(--surface)) !important; box-shadow: var(--shadow) !important; }
+.page-art .art-board img, .page-art[data-tier="mars"] .art-board img, .page-art[data-tier="jupiter"] .art-board img { box-shadow: 0 0 90px var(--focus-ring) !important; }
+.page-art .eyebrow, .page-art[data-tier="mars"] .eyebrow, .page-art[data-tier="jupiter"] .eyebrow { color: var(--blue) !important; }
+.auth-card-wrap { background: color-mix(in srgb, var(--bg) 70%, transparent) !important; }
+.auth-card { background: var(--surface) !important; }
+.field input { background: var(--surface-3) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+.field label, .text-btn { color: var(--blue) !important; }
+.page-veil { background: var(--bg) !important; }

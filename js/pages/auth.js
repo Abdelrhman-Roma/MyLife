@@ -7,13 +7,16 @@
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
 const MIN_LOADING_MS = 420;
-
 document.addEventListener('DOMContentLoaded', () => {
   // Registered before initAuth() so these fire first on 'submit'.
   wireSubmitLoading('login-form', 'login-message');
   wireSubmitLoading('register-form', 'register-message');
 
   initAuth(); // shared.js — attaches the authoritative login/register handlers
+
+  const langSlot = document.getElementById('auth-lang-switch');
+  if (langSlot) { langSlot.innerHTML = languageSwitcherHtml(); bindLanguageSwitchers(langSlot); }
+  applyTranslations(document);
 
   wirePasswordToggles();
   wireCapsLockHints();
@@ -22,6 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
   wireCursorGlow();
   wireCardTilt();
   wireFieldLiveValidation();
+  wireMotivationalMotto();
+
+  document.addEventListener('mylife:i18n-change', () => {
+    const page = document.getElementById('auth-page');
+    applyAuthMode((page && page.dataset.mode) || 'login');
+  });
 
   window.onAuthSuccess = handleAuthSuccess;
 });
@@ -36,6 +45,13 @@ function wireSubmitLoading(formId, msgId) {
   let loadingStartedAt = 0;
 
   form.addEventListener('submit', () => {
+    // The form deliberately uses novalidate so shared.js can provide the
+    // authoritative validation. Do not leave the submit button spinning when
+    // that validation rejects incomplete or malformed input.
+    if (!form.checkValidity()) {
+      setButtonState(btn, 'idle');
+      return;
+    }
     loadingStartedAt = Date.now();
     setButtonState(btn, 'loading');
   });
@@ -111,7 +127,7 @@ function wirePasswordToggles() {
       const showing = input.type === 'text';
       input.type = showing ? 'password' : 'text';
       btn.classList.toggle('is-visible', !showing);
-      btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+      btn.setAttribute('aria-label', showing ? t('Show password') : t('Hide password'));
       input.focus({ preventScroll: true });
     });
   });
@@ -154,23 +170,36 @@ function wireStrengthMeter() {
   });
 }
 
-// ─── Login ⇄ Register: swap headline/subline personality + aurora mode ─
-function wireModeSwitch() {
+function applyAuthMode(mode) {
   const page = document.getElementById('auth-page');
   const headline = document.querySelector('.auth-headline');
   const subline = document.querySelector('.auth-subline');
+  if (page) page.dataset.mode = mode;
+  document.body.dataset.authMode = mode;
+  if (headline) headline.innerHTML = t(headline.dataset[mode + 'Text'] || headline.innerHTML);
+  if (subline) subline.textContent = t(subline.dataset[mode + 'Text'] || subline.textContent);
+  replayReveal(document.querySelector(`#${mode}-panel`));
+}
 
-  const applyMode = (mode) => {
-    if (page) page.dataset.mode = mode;
-    if (headline) headline.innerHTML = headline.dataset[mode + 'Text'] || headline.innerHTML;
-    if (subline) subline.textContent = subline.dataset[mode + 'Text'] || subline.textContent;
-    replayReveal(document.querySelector(`#${mode}-panel`));
-  };
+function wireMotivationalMotto() {
+  const motto = document.getElementById('auth-motto');
+  if (!motto || prefersReducedMotion) return;
+  const lines = ['Build Better Habits.', 'Stay Consistent.', 'Progress Beats Perfection.', 'Unlock Your Potential.', 'Become Better Than Yesterday.'];
+  let current = 0;
+  window.setInterval(() => {
+    let next = current;
+    while (next === current) next = Math.floor(Math.random() * lines.length);
+    motto.classList.add('is-changing');
+    window.setTimeout(() => { motto.textContent = lines[next]; current = next; motto.classList.remove('is-changing'); }, 180);
+  }, 10000);
+}
 
+// ─── Login ⇄ Register: swap headline/subline personality + aurora mode ─
+function wireModeSwitch() {
   const showRegister = document.getElementById('show-register');
   const showLogin = document.getElementById('show-login');
-  if (showRegister) showRegister.addEventListener('click', () => applyMode('register'));
-  if (showLogin) showLogin.addEventListener('click', () => applyMode('login'));
+  if (showRegister) showRegister.addEventListener('click', () => applyAuthMode('register'));
+  if (showLogin) showLogin.addEventListener('click', () => applyAuthMode('login'));
 }
 
 function replayReveal(panel) {

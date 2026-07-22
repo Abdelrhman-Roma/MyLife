@@ -1,4 +1,4 @@
-﻿/* MYLIFE — Profile & Settings page styles. Built on top of the shared
+/* MOMENTUM — Profile & Settings page styles. Built on top of the shared
    design tokens in variables.css / shared.css (radius, spacing, shadows,
    accent colors, type scale) so it inherits theme, palette and appearance
    changes automatically. */
@@ -49,6 +49,33 @@
 
 .account-photo-wrap {
   margin-top: -52px;
+  position: relative;
+}
+
+.avatar-menu {
+  top: calc(100% + 10px);
+  bottom: auto;
+  left: 0;
+  right: auto;
+  min-width: 190px;
+  transform-origin: top left;
+  transform: translateY(-6px) scale(0.97);
+}
+
+.avatar-menu.open { transform: translateY(0) scale(1); }
+
+.photo-viewer-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 14px;
+  text-align: center;
+}
+
+.photo-viewer-card img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius-lg, 16px);
 }
 
 .account-photo {
@@ -232,6 +259,46 @@
 .appearance-block:last-child { margin-bottom: 0; }
 .appearance-block h3 { margin: 0 0 10px; font-size: 0.88rem; font-weight: 700; }
 
+.country-field { position: relative; }
+
+.country-combobox { position: relative; }
+
+.country-listbox {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--line);
+  background: var(--surface-elevated, var(--surface));
+  box-shadow: var(--shadow-lg, 0 24px 55px rgba(0, 0, 0, .3));
+}
+
+.country-listbox li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.86rem;
+}
+
+.country-listbox li:hover,
+.country-listbox li.is-active { background: var(--surface-2); }
+.country-listbox li.is-selected { color: var(--blue); font-weight: 700; }
+.country-listbox .country-empty { color: var(--muted); cursor: default; }
+.country-listbox .country-empty:hover { background: transparent; }
+.country-flag { font-size: 1.05rem; line-height: 1; }
+
+[dir='rtl'] .country-listbox { text-align: right; }
+
 .segmented {
   display: inline-flex;
   padding: 4px;
@@ -258,26 +325,6 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-.swatch-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
-  gap: 10px;
-  max-width: 480px;
-}
-
-.swatch {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  background: var(--swatch);
-  cursor: pointer;
-  transition: transform 140ms ease, border-color 140ms ease;
-}
-
-.swatch:hover { transform: scale(1.08); }
-.swatch.active { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface-elevated, #fff) inset; }
-
 .toggles { display: grid; gap: 4px; }
 
 .toggle-row {
@@ -291,6 +338,8 @@
 }
 
 .toggle-row:last-child { border-bottom: 0; }
+.toggle-row.is-disabled { cursor: not-allowed; opacity: 0.58; }
+.toggle-row.is-disabled .switch input { cursor: not-allowed; }
 
 .toggle-row strong { display: block; font-size: 0.88rem; }
 .toggle-row small { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }

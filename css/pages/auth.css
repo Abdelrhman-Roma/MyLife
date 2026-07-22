@@ -680,3 +680,23 @@
 :root[data-animations='off'] .auth-brand { animation: none !important; opacity: 1 !important; transform: none !important; filter: none !important; }
 :root[data-animations='off'] .aurora-blob,
 :root[data-animations='off'] .auth-card-glow { animation: none !important; }
+
+/* ── RTL (Arabic) — mirror the field icon / floating-label / eye-toggle
+   positions; the split layout and stagger direction don't need changes. */
+[dir='rtl'] .field-icon { margin-right: 0; margin-left: 10px; }
+[dir='rtl'] .field label { left: auto; right: 42px; }
+[dir='rtl'] .field-password input { padding-right: 14px; padding-left: 34px; }
+[dir='rtl'] .field-eye { right: auto; left: 10px; }
+[dir='rtl'] .capslock-hint { flex-direction: row-reverse; justify-content: flex-end; }
+[dir='rtl'] .link-btn::after { left: 100%; right: 0; }
+[dir='rtl'] .link-btn:hover::after { left: 0; }
+
+/* ── Language switcher ────────────────────────────────────────────────── */
+.auth-lang-switch-wrap {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 50;
+}
+
+[dir='rtl'] .auth-lang-switch-wrap { right: auto; left: 18px; }

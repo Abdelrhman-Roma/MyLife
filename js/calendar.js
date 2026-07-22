@@ -1,4 +1,4 @@
-﻿// MYLIFE — Calendar page logic (refactor)
+// MOMENTUM — Calendar page logic (refactor)
 // Reuses bootShell(), persist(), currentData, escapeHtml(), escapeAttr(), makeId(),
 // selected(), labelize() and percent() from shared.js. Self-contained: does not
 // modify shared.js or any global stylesheet.
@@ -781,6 +781,10 @@ function duplicateCalendarEvent(id) {
 
 function handleQuickAdd(e) {
   e.preventDefault();
+  if (!e.currentTarget.checkValidity()) {
+    e.currentTarget.reportValidity();
+    return;
+  }
   ensureNotificationPermission();
   const fd = new FormData(e.currentTarget);
   const title = String(fd.get('title') || '').trim();
@@ -857,6 +861,10 @@ function renderEventModal() {
   if (delBtn) delBtn.addEventListener('click', () => { deleteCalendarEvent(editing.id); closeEventModal(); });
   overlay.querySelector('[data-cal-event-form]').addEventListener('submit', (e) => {
     e.preventDefault();
+    if (!e.currentTarget.checkValidity()) {
+      e.currentTarget.reportValidity();
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     const title = String(fd.get('title') || '').trim();
     if (!title && !linked) return;

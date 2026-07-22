@@ -1,4 +1,4 @@
-// MYLIFE - Workout page logic
+// MOMENTUM - Workout page logic
 // Reuses bootShell(), persist(), currentData, escapeHtml(), escapeAttr(), makeId(), and percent() from shared.js.
 
 const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

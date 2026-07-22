@@ -1,4 +1,4 @@
-﻿// MYLIFE — Study page logic
+// MOMENTUM — Study page logic
 // Reuses bootShell(), persist(), currentData, escapeHtml(), escapeAttr(), makeId(),
 // selected(), labelize(), percent() from shared.js. Self-contained: does not
 // modify any global stylesheet.
