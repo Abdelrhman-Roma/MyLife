@@ -47,7 +47,13 @@ function t(str, vars) {
 function formatDateLocalized(date, opts = { month: 'short', day: 'numeric', year: 'numeric' }) {
   const lang = getLang();
   try {
-    return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-US', opts).format(new Date(date));
+    const locale = {
+      ar: 'ar-EG',
+      de: 'de-DE',
+      en: 'en-US',
+      fr: 'fr-FR',
+    }[lang] || 'en-US';
+    return new Intl.DateTimeFormat(locale, opts).format(new Date(date));
   } catch (_e) {
     return String(date);
   }

@@ -1,4 +1,6 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
-  initPage('todo');
+document.addEventListener('DOMContentLoaded', () => {
+  if (bootShell('todo') && typeof initTodoPage === 'function') {
+    initTodoPage();
+    window.__pageContentReinit = initTodoPage;
+  }
 });
-

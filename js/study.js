@@ -22,6 +22,8 @@ const PRIORITIES   = ['Low', 'Medium', 'High'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const SESSION_STATUSES    = ['Planned', 'In Progress', 'Paused', 'Completed'];
 const ASSIGNMENT_STATUSES = ['Not Started', 'In Progress', 'Completed'];
+const RESOURCE_TYPES = ['Link', 'Article', 'Video', 'PDF', 'Book', 'Slides', 'Other'];
+const RESOURCE_TYPE_ICON = { Link: '🔗', Article: '📰', Video: '🎬', PDF: '📄', Book: '📚', Slides: '📊', Other: '🔖' };
 const STUDY_REMINDER_OPTIONS = [
   ['None', 'No reminder'], ['5', '5 minutes before'], ['15', '15 minutes before'],
   ['30', '30 minutes before'], ['60', '1 hour before'], ['1440', '1 day before'],
@@ -236,6 +238,7 @@ function renderStudyRoot(stats) {
     ${assignmentsHtml()}
     ${examsHtml()}
     ${projectsHtml()}
+    ${resourcesHtml()}
     <div class="std-two-col">
       ${studyCalendarHtml()}
       ${notesHtml()}
@@ -293,7 +296,7 @@ function headerHtml() {
         <div class="std-quickadd-wrap" data-std-quickadd-wrap>
           <button class="primary-btn" type="button" data-std-quickadd-toggle>+ Quick Add</button>
           <div class="std-quickadd-dropdown">
-            ${['session', 'subject', 'assignment', 'exam', 'project', 'note'].map((t) => `<button type="button" data-std-add="${t}">${ENTITY_META[t].icon} ${ENTITY_META[t].label}</button>`).join('')}
+            ${['session', 'subject', 'assignment', 'exam', 'project', 'resource', 'note'].map((t) => `<button type="button" data-std-add="${t}">${ENTITY_META[t].icon} ${ENTITY_META[t].label}</button>`).join('')}
           </div>
         </div>
         <div class="std-export-wrap" data-std-export-wrap>
@@ -493,6 +496,7 @@ const ENTITY_META = {
   exam:       { icon: '🧾', label: 'Exam', collection: 'exams' },
   project:    { icon: '📁', label: 'Project', collection: 'projects' },
   note:       { icon: '🗒', label: 'Note', collection: 'studyNotes' },
+  resource:   { icon: '🔗', label: 'Resource', collection: 'resources' },
 };
 
 const ENTITY_FIELDS = {
@@ -557,6 +561,13 @@ const ENTITY_FIELDS = {
     ['text', 'Note', 'textarea'],
     ['color', 'Color', 'color'],
   ],
+  resource: [
+    ['title', 'Title', 'text'],
+    ['subjectId', 'Subject', 'subjects'],
+    ['type', 'Type', 'select', RESOURCE_TYPES],
+    ['url', 'Link (URL)', 'text'],
+    ['notes', 'Notes', 'textarea'],
+  ],
 };
 
 // ─── Subjects ───────────────────────────────────────────────────────────────
@@ -607,6 +618,49 @@ function assignmentsHtml() {
         ${items.length ? items.map(assignmentRowHtml).join('') : '<div class="empty-state">No assignments tracked yet.</div>'}
       </div>
     </section>
+  `;
+}
+
+function resourcesHtml() {
+  const f = studyState.filters;
+  const items = (currentData.resources || [])
+    .filter((r) => f.subjectId === 'all' || r.subjectId === f.subjectId)
+    .filter((r) => matchesSearch([r.title, r.notes, r.url]))
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  return `
+    <section class="panel std-resources">
+      <div class="std-panel-head">
+        <div><p class="eyebrow">Resources</p><h2>Resources</h2></div>
+        <button class="secondary-btn" type="button" data-std-add="resource">+ Resource</button>
+      </div>
+      <div class="std-resource-list">
+        ${items.length ? items.map(resourceRowHtml).join('') : '<div class="empty-state">No resources saved yet. Add links, articles, or materials per subject.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+function resourceRowHtml(r) {
+  const icon = RESOURCE_TYPE_ICON[r.type] || RESOURCE_TYPE_ICON.Other;
+  const hasLink = /^https?:\/\//i.test(r.url || '');
+  return `
+    <article class="std-resource-row">
+      <div class="std-resource-icon" aria-hidden="true">${icon}</div>
+      <div class="std-resource-main" data-std-edit="resource:${r.id}" role="button" tabindex="0">
+        <div class="std-session-top">
+          <strong>${escapeHtml(r.title || 'Untitled resource')}</strong>
+          <span class="std-chip">${subjectLabel(r.subjectId)}</span>
+        </div>
+        <div class="std-session-meta">
+          <span class="std-chip">${escapeHtml(r.type || 'Other')}</span>
+          ${hasLink ? `<a class="std-resource-link" href="${escapeAttr(r.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open \u2197</a>` : ''}
+        </div>
+      </div>
+      <div class="std-actions">
+        <button class="std-icon-btn" type="button" data-std-edit="resource:${r.id}" title="Edit" aria-label="Edit">\u270e</button>
+        <button class="std-icon-btn std-icon-danger" type="button" data-std-delete="resource:${r.id}" title="Delete" aria-label="Delete">\u2715</button>
+      </div>
+    </article>
   `;
 }
 
@@ -1188,6 +1242,7 @@ function exportStudyJson() {
   const payload = {
     study: currentData.study, subjects: currentData.subjects, assignments: currentData.assignments,
     exams: currentData.exams, projects: currentData.projects, studyNotes: currentData.studyNotes,
+    resources: currentData.resources,
   };
   downloadBlob(JSON.stringify(payload, null, 2), 'mylife-study.json', 'application/json');
 }

@@ -51,7 +51,14 @@ const SOURCE_MODULE_META = {
                getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; } },
   habit:     { category: 'habit', label: 'Habit',   page: 'habits.html',    completable: true,
                getCollection: () => currentData.habits || [],
-               getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; } },
+               getCompleted: (i) => !!i.completed,
+               setCompleted: (i, v) => {
+                 i.completed = v;
+                 const today = todayISO();
+                 i.completions = i.completions || [];
+                 if (v && !i.completions.includes(today)) i.completions.push(today);
+                 if (!v) i.completions = i.completions.filter((d) => d !== today);
+               } },
   goals:     { category: 'goal',  label: 'Goal',    page: 'goals.html',     completable: true,
                getCollection: () => currentData.goals || [],
                getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; } },
@@ -210,6 +217,9 @@ function materializeSourceEvent(sourceModule, item, defaults) {
     return;
   }
   if (ev.title !== title) { ev.title = title; ev.updatedAt = nowStamp(); }
+  if (defaults.date && ev.date !== defaults.date) { ev.date = defaults.date; ev.updatedAt = nowStamp(); }
+  if (defaults.repeatRule && ev.repeatRule !== defaults.repeatRule) { ev.repeatRule = defaults.repeatRule; ev.updatedAt = nowStamp(); }
+  if (defaults.startTime !== undefined && ev.startTime !== defaults.startTime) { ev.startTime = defaults.startTime; ev.updatedAt = nowStamp(); }
   if (meta.completable) {
     const srcCompleted = !!meta.getCompleted(item);
     if (ev.completed !== srcCompleted) {
@@ -221,7 +231,13 @@ function materializeSourceEvent(sourceModule, item, defaults) {
 }
 
 function reconcileSourceLinkedEvents() {
-  (currentData.tasks || []).forEach((t) => materializeSourceEvent('tasks', t, { title: t.title || 'Task', date: todayISO(), repeatRule: 'Daily', priority: t.priority }));
+  (currentData.tasks || []).forEach((t) => materializeSourceEvent('tasks', t, {
+    title: t.title || 'Task',
+    date: t.dueDate || todayISO(),
+    repeatRule: t.recurring ? (t.recurring.freq || 'Daily') : (t.dueDate ? 'None' : 'Daily'),
+    priority: t.priority,
+    startTime: t.time || '',
+  }));
   (currentData.habits || []).forEach((h) => materializeSourceEvent('habit', h, { title: h.title || 'Habit', date: todayISO(), repeatRule: 'Daily' }));
   (currentData.prayers || []).forEach((p) => materializeSourceEvent('prayer', p, { title: p.title || 'Prayer', date: todayISO(), repeatRule: 'Daily', startTime: p.time }));
   (currentData.goals || []).forEach((g) => materializeSourceEvent('goals', g, { title: g.title || 'Goal', date: g.deadline || todayISO(), repeatRule: g.deadline ? 'None' : 'Daily' }));
@@ -339,6 +355,7 @@ function navigateCalendar(dir) {
   let next;
   if (calState.view === 'month') next = addMonthsClamped(d, dir);
   else if (calState.view === 'week') next = addDays(d, dir * 7);
+  else if (calState.view === 'agenda') next = addDays(d, dir * 30);
   else next = addDays(d, dir);
   calState.selected = toISO(next);
   refreshCalendar();
@@ -405,6 +422,8 @@ function renderCalendarRoot(stats) {
       <div class="cal-main">
         ${calState.view === 'month'
           ? monthGridHtml()
+          : calState.view === 'agenda'
+          ? agendaHtml()
           : timeGridHtml(calState.view === 'week' ? weekDaysFor(calState.selected) : [calState.selected])}
       </div>
       <aside class="cal-side">
@@ -434,6 +453,7 @@ function renderCalendarRoot(stats) {
 function controlsHtml() {
   const label = calState.view === 'month' ? monthLabel(calState.selected)
     : calState.view === 'week' ? weekRangeLabel(calState.selected)
+    : calState.view === 'agenda' ? agendaRangeLabel(calState.selected)
     : dayLabel(calState.selected);
   return `
     <div class="panel cal-controls">
@@ -445,7 +465,7 @@ function controlsHtml() {
       </div>
       <div class="cal-controls-right">
         <div class="cal-view-switch" role="tablist">
-          ${['month', 'week', 'day'].map((v) => `<button class="cal-view-btn${calState.view === v ? ' active' : ''}" data-cal-view="${v}" type="button" role="tab" aria-selected="${calState.view === v}">${labelize(v)}</button>`).join('')}
+          ${['month', 'week', 'day', 'agenda'].map((v) => `<button class="cal-view-btn${calState.view === v ? ' active' : ''}" data-cal-view="${v}" type="button" role="tab" aria-selected="${calState.view === v}">${labelize(v)}</button>`).join('')}
         </div>
         <div class="cal-search-wrap">
           <input type="search" id="cal-search-input" placeholder="Search events…" value="${escapeAttr(calState.search)}" aria-label="Search events" />
@@ -481,6 +501,49 @@ function buildMonthCells(anchorIso) {
       events: getVisibleEventsForDate(iso),
     };
   });
+}
+
+function agendaRangeLabel(anchorIso) {
+  const start = parseISO(anchorIso);
+  const end = addDays(start, 29);
+  return `${CAL_MONTH_NAMES_SHORT[start.getMonth()]} ${start.getDate()} \u2013 ${CAL_MONTH_NAMES_SHORT[end.getMonth()]} ${end.getDate()}`;
+}
+
+function agendaHtml() {
+  const start = parseISO(calState.selected);
+  const days = Array.from({ length: 30 }, (_, i) => toISO(addDays(start, i)));
+  const groups = days
+    .map((iso) => ({ iso, items: getVisibleEventsForDate(iso) }))
+    .filter((g) => g.items.length);
+
+  if (!groups.length) {
+    return `
+      <div class="panel cal-agenda">
+        <div class="empty-state">Nothing scheduled in the next 30 days.</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="panel cal-agenda">
+      ${groups.map((g) => {
+        const d = parseISO(g.iso);
+        const isToday = g.iso === todayISO();
+        return `
+          <div class="cal-agenda-group">
+            <div class="cal-agenda-date${isToday ? ' is-today' : ''}" data-cal-day="${g.iso}">
+              <span class="cal-agenda-weekday">${CAL_DAY_NAMES_SHORT[d.getDay()]}</span>
+              <strong>${CAL_MONTH_NAMES_SHORT[d.getMonth()]} ${d.getDate()}</strong>
+              ${isToday ? '<span class="cal-badge cal-agenda-today-badge">Today</span>' : ''}
+            </div>
+            <div class="cal-agenda-items">
+              ${g.items.map(scheduleItemHtml).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function monthGridHtml() {

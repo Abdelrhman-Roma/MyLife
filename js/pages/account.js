@@ -40,10 +40,6 @@ const ACHIEVEMENT_DEFS = [
   ['perfectionist','⚑', 'Perfectionist',   'Complete every task, habit and goal you\u2019ve added.', (c) => c.tasks + c.habits + c.goals > 0 && c.completedTasks === c.tasks && c.completedHabits === c.habits && c.completedGoals === c.goals, (c) => (c.tasks + c.habits + c.goals) ? (c.completedTasks + c.completedHabits + c.completedGoals) / (c.tasks + c.habits + c.goals) : 0],
 ];
 
-function totalActions(c) {
-  return c.completedTasks + c.completedHabits + c.completedGoals + c.workouts + c.prayers + c.study + c.sleep + c.water;
-}
-
 let cropperState = null;
 
 document.addEventListener('DOMContentLoaded', initAccountPage);
@@ -55,7 +51,6 @@ function initAccountPage() {
   renderNav();
   renderContent();
   bindScrollSpy();
-  bindGlobalAccountEvents();
   const initial = (location.hash || '#overview').replace('#', '') || 'overview';
   requestAnimationFrame(() => scrollToSection(initial, true));
   window.__pageContentReinit = () => { syncAchievements(); renderHero(); renderNav(); renderContent(); };
@@ -67,12 +62,12 @@ function renderHero() {
   const xpInfo = levelInfo(p);
   const score = productivityScore();
   byId('account-hero').innerHTML = `
-    <div class="account-cover" id="account-cover" style="${p.cover ? `background-image:url('${p.cover}')` : ''}">
+    <div class="account-cover" id="account-cover">
       <button class="cover-edit-btn" id="cover-edit-btn" type="button">🖼️ Change cover</button>
     </div>
     <div class="account-hero-body">
       <div class="account-photo-wrap">
-        <button class="account-photo" id="avatar-edit-btn" type="button" aria-label="Profile photo options" aria-haspopup="true" aria-expanded="false" aria-controls="avatar-menu" style="${p.photo ? `background-image:url('${p.photo}')` : ''}">
+        <button class="account-photo" id="avatar-edit-btn" type="button" aria-label="Profile photo options" aria-haspopup="true" aria-expanded="false" aria-controls="avatar-menu">
           ${p.photo ? '' : initials(currentUser.name)}
           <span class="account-photo-edit">✎</span>
         </button>
@@ -117,32 +112,14 @@ function renderHero() {
     <input type="file" id="avatar-file-input" accept="image/png,image/jpeg,image/webp" hidden />
     <input type="file" id="cover-file-input" accept="image/png,image/jpeg,image/webp" hidden />
   `;
+  setSafeImageBackground(byId('account-cover'), p.cover);
+  setSafeImageBackground(byId('avatar-edit-btn'), p.photo);
+  bindProfilePhotoControls();
 }
 
-function levelInfo(p) {
-  const xp = Number(p.xp) || computeXp();
-  const span = 500;
-  const level = Math.floor(xp / span) + 1;
-  const into = xp % span;
-  return { xp, level, into, span, pct: Math.round((into / span) * 100) };
-}
-
-function computeXp() {
-  const c = getCounts();
-  return totalActions(c) * 10;
-}
-
-function productivityScore() {
-  const c = getCounts();
-  const s = currentData.settings;
-  const parts = [
-    percent(c.completedTasks, c.tasks || 1),
-    percent(c.completedHabits, c.habits || 1),
-    percent(c.completedGoals, c.goals || 1),
-    percent(c.water, s.waterGoal || 1),
-    percent(c.sleep, s.sleepGoal || 1),
-  ];
-  return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+function setSafeImageBackground(element, dataUrl) {
+  if (!element || !isSafeImageDataUrl(dataUrl)) return;
+  element.style.backgroundImage = `url("${dataUrl}")`;
 }
 
 function formatDate(iso) {
@@ -755,30 +732,6 @@ function bindSectionEvents() {
     input.addEventListener('change', () => handleToggle(row.dataset.toggleKey, input.checked));
   });
 
-  bindAccountMenu('avatar-edit-btn', 'avatar-menu');
-  const avatarMenu = byId('avatar-menu');
-  if (avatarMenu) {
-    avatarMenu.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-avatar-action]');
-      if (!btn) return;
-      const action = btn.dataset.avatarAction;
-      avatarMenu.classList.remove('open');
-      avatarMenu.hidden = true;
-      byId('avatar-edit-btn').setAttribute('aria-expanded', 'false');
-      if (action === 'change') byId('avatar-file-input').click();
-      else if (action === 'remove') removePhoto('avatar');
-      else if (action === 'view') openPhotoViewer(currentData.profile.photo);
-      else if (action === 'edit-profile') scrollToSection('personal');
-    });
-  }
-  const avatarInput = byId('avatar-file-input');
-  if (avatarInput) avatarInput.addEventListener('change', (e) => onPhotoChosen(e, 'avatar'));
-
-  const coverBtn = byId('cover-edit-btn');
-  if (coverBtn) coverBtn.addEventListener('click', () => byId('cover-file-input').click());
-  const coverInput = byId('cover-file-input');
-  if (coverInput) coverInput.addEventListener('change', (e) => onPhotoChosen(e, 'cover'));
-
   const deleteBtn = byId('delete-account-btn');
   if (deleteBtn) deleteBtn.addEventListener('click', confirmDeleteAccount);
 
@@ -799,8 +752,41 @@ function bindSectionEvents() {
   if (clearBtn) clearBtn.addEventListener('click', confirmClearCache);
 }
 
-function bindGlobalAccountEvents() {
-  window.addEventListener('resize', () => { /* reserved for future responsive tweaks */ });
+// The profile hero is replaced whenever a photo is saved or removed. Keep its
+// controls bound here, with the markup they control, so upload/change actions
+// continue to work after the first update.
+function bindProfilePhotoControls() {
+  bindAccountMenu('avatar-edit-btn', 'avatar-menu');
+  const avatarMenu = byId('avatar-menu');
+  if (avatarMenu) {
+    avatarMenu.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-avatar-action]');
+      if (!btn) return;
+      const action = btn.dataset.avatarAction;
+      avatarMenu.classList.remove('open');
+      avatarMenu.hidden = true;
+      byId('avatar-edit-btn').setAttribute('aria-expanded', 'false');
+      if (action === 'change') openPhotoPicker('avatar-file-input');
+      else if (action === 'remove') removePhoto('avatar');
+      else if (action === 'view') openPhotoViewer(currentData.profile.photo);
+      else if (action === 'edit-profile') scrollToSection('personal');
+    });
+  }
+  const avatarInput = byId('avatar-file-input');
+  if (avatarInput) avatarInput.addEventListener('change', (e) => onPhotoChosen(e, 'avatar'));
+
+  const coverBtn = byId('cover-edit-btn');
+  if (coverBtn) coverBtn.addEventListener('click', () => openPhotoPicker('cover-file-input'));
+  const coverInput = byId('cover-file-input');
+  if (coverInput) coverInput.addEventListener('change', (e) => onPhotoChosen(e, 'cover'));
+}
+
+function openPhotoPicker(inputId) {
+  const input = byId(inputId);
+  if (!input) return;
+  // Allow selecting the same image again after cancelling or replacing it.
+  input.value = '';
+  input.click();
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────
@@ -901,17 +887,17 @@ function handleToggle(key, checked) {
   persist();
 }
 
-function changePassword(e) {
+async function changePassword(e) {
   e.preventDefault();
   const form = new FormData(e.currentTarget);
   const current = String(form.get('current') || '');
   const next    = String(form.get('next') || '');
   const confirm = String(form.get('confirm') || '');
   const msg = byId('password-message');
-  if (current !== currentUser.password) { msg.textContent = 'Current password is incorrect.'; return; }
+  if (!(await verifyPassword(currentUser, current))) { msg.textContent = 'Current password is incorrect.'; return; }
   if (next.length < 6) { msg.textContent = 'New password must be at least 6 characters.'; return; }
   if (next !== confirm) { msg.textContent = 'New passwords do not match.'; return; }
-  currentUser.password = next;
+  if (!(await setPassword(currentUser, next))) { msg.textContent = 'Your browser cannot securely update the local password.'; return; }
   currentData.security.lastPasswordChange = new Date().toISOString();
   saveUsers(getUsers().map((u) => (u.email === currentUser.email ? currentUser : u)));
   persist();
@@ -1006,7 +992,7 @@ function onPhotoChosen(e, kind) {
 }
 
 function openPhotoViewer(dataUrl) {
-  if (!dataUrl) return;
+  if (!isSafeImageDataUrl(dataUrl)) return;
   const layer = ensureModalLayer();
   layer.hidden = false;
   layer.innerHTML = `
@@ -1025,6 +1011,10 @@ function openPhotoViewer(dataUrl) {
 }
 
 function openCropper(dataUrl, kind) {
+  if (!isSafeImageDataUrl(dataUrl)) {
+    showToast('That image could not be processed safely.', 'danger');
+    return;
+  }
   const isAvatar = kind === 'avatar';
   const layer = ensureModalLayer();
   layer.hidden = false;

@@ -27,6 +27,7 @@ const SESSION_KEY = 'mylife.session';
 const DATA_PREFIX = 'mylife.data.';
 const THEME_KEY   = 'mylife.theme';
 const PALETTE_KEY = 'mylife.palette';
+const PASSWORD_ITERATIONS = 100000;
 
 const NAV = [
   ['dashboard',   'Dashboard',  'Home'],
@@ -92,6 +93,7 @@ const PAGES = {
 let currentUser = null;
 let currentData = null;
 let currentPage = document.body.dataset.page;
+let statsPeriod = 'week'; // 'week' | 'month' | 'year' — drives the Statistics page trend charts
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 // Boot helpers are called by page-specific files in js/pages/.
@@ -118,7 +120,7 @@ function showAuthPanel(mode) {
   document.querySelectorAll('.form-message').forEach((el) => (el.textContent = ''));
 }
 
-function login(e) {
+async function login(e) {
   e.preventDefault();
   if (!e.currentTarget.checkValidity()) {
     e.currentTarget.reportValidity();
@@ -126,8 +128,8 @@ function login(e) {
   }
   const email = byId('login-email').value.trim().toLowerCase();
   const pwd   = byId('login-password').value;
-  const user  = getUsers().find((u) => u.email === email && u.password === pwd);
-  if (!user) { byId('login-message').textContent = 'Invalid email or password.'; return; }
+  const user  = getUsers().find((u) => u.email === email);
+  if (!user || !(await verifyPassword(user, pwd))) { byId('login-message').textContent = 'Invalid email or password.'; return; }
   const rememberEl = byId('remember-me');
   const remember = rememberEl ? rememberEl.checked : true;
   if (remember) {
@@ -140,7 +142,7 @@ function login(e) {
   navigateAfterAuth('pages/dashboard.html');
 }
 
-function register(e) {
+async function register(e) {
   e.preventDefault();
   if (!e.currentTarget.checkValidity()) {
     e.currentTarget.reportValidity();
@@ -154,7 +156,11 @@ function register(e) {
   if (!name) { byId('register-message').textContent = 'Please enter your name.'; return; }
   if (password !== confirm) { byId('register-message').textContent = 'Passwords do not match.'; return; }
   if (users.some((u) => u.email === email)) { byId('register-message').textContent = 'Email already registered.'; return; }
-  const user = { id: makeId(), name, email, password, createdAt: new Date().toISOString() };
+  const user = { id: makeId(), name, email, createdAt: new Date().toISOString() };
+  if (!(await setPassword(user, password))) {
+    byId('register-message').textContent = 'Your browser cannot securely create a local account.';
+    return;
+  }
   users.push(user);
   saveUsers(users);
   saveData(email, emptyData(name));
@@ -199,7 +205,7 @@ function openPasswordReset() {
   layer.querySelector('.modal-backdrop').addEventListener('click', (event) => {
     if (event.target.classList.contains('modal-backdrop')) cancel();
   });
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.checkValidity()) { form.reportValidity(); return; }
     const values = new FormData(form);
@@ -215,7 +221,12 @@ function openPasswordReset() {
       message.textContent = 'No local account exists for that email address.';
       return;
     }
-    users[index] = { ...users[index], password };
+    const updatedUser = { ...users[index] };
+    if (!(await setPassword(updatedUser, password))) {
+      message.textContent = 'Your browser cannot securely reset a local password.';
+      return;
+    }
+    users[index] = updatedUser;
     saveUsers(users);
     closeModal();
     byId('login-message').textContent = 'Password reset. You can now log in.';
@@ -231,12 +242,16 @@ function bootShell(pageKey) {
   currentUser = getSessionUser();
   if (!currentUser) { window.location.href = '../index.html'; return false; }
   currentPage = pageKey;
-  currentData = normalizeData(getData(currentUser.email, currentUser.name), currentUser.name);
-  persist();
+  const storedData = getData(currentUser.email, currentUser.name);
+  currentData = normalizeData(storedData, currentUser.name);
+  // Avoid a synchronous storage write on every page visit; retain the existing
+  // migration behavior when normalization actually adds or repairs data.
+  if (JSON.stringify(currentData) !== JSON.stringify(storedData)) persist();
   applyTheme(currentData.settings.theme, currentData.settings.palette);
   applyAppearance(currentData.settings);
   renderSidebar(pageKey);
   initMobileNav();
+  initNavShortcuts();
   renderTopbar(pageKey);
   renderArt(pageKey);
   return true;
@@ -271,25 +286,64 @@ document.addEventListener('mylife:i18n-change', () => {
 });
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
+const SIDEBAR_COLLAPSE_KEY = 'mylife.sidebarCollapsed';
+// First 9 NAV entries get a number shortcut (Alt+1..Alt+9) — 12 pages total,
+// so the least-used 3 (sleep/study/statistics) are reachable via the nav
+// itself rather than a shortcut key running out of single digits.
+const NAV_SHORTCUT_COUNT = 9;
+
 function renderSidebar(pageKey) {
-  byId('sidebar').innerHTML = `
-    <a class="brand" href="dashboard.html">
+  const collapsed = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+  const sidebar = byId('sidebar');
+  sidebar.classList.toggle('collapsed', collapsed);
+  document.body.classList.toggle('sidebar-collapsed', collapsed);
+  sidebar.innerHTML = `
+    <a class="brand" href="dashboard.html" title="${t('Momentum \u2014 Dashboard')}">
       <span class="brand-logo" aria-hidden="true"></span>
       <span><strong>Momentum</strong><small>${t('Life Tracker')}</small></span>
     </a>
     <nav class="nav-list">
-      ${NAV.map(([key, title, label]) => `
-        <a class="nav-item${key === pageKey ? ' active' : ''}" data-accent="${(PAGES[key] && PAGES[key].accent) || 'blue'}" href="${key}.html">
+      ${NAV.map(([key, title, label], i) => {
+        const shortcut = i < NAV_SHORTCUT_COUNT ? `Alt+${i + 1}` : '';
+        return `
+        <a class="nav-item${key === pageKey ? ' active' : ''}" data-accent="${(PAGES[key] && PAGES[key].accent) || 'blue'}" href="${key}.html" title="${escapeAttr(t(title))}${shortcut ? ` (${shortcut})` : ''}">
           <span class="nav-icon" aria-hidden="true">${NAV_ICONS[key] || '•'}</span>
           <strong>${t(title)}<small>${t(label)}</small></strong>
+          ${shortcut ? `<kbd class="nav-shortcut" aria-hidden="true">${i + 1}</kbd>` : ''}
         </a>
-      `).join('')}
+      `;
+      }).join('')}
     </nav>
+    <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" aria-label="${collapsed ? t('Expand sidebar') : t('Collapse sidebar')}" title="${collapsed ? t('Expand sidebar') : t('Collapse sidebar')}">
+      <span aria-hidden="true">${collapsed ? '\u203a' : '\u2039'}</span>
+    </button>
     ${accountWidgetHtml('sidebar', pageKey === 'account')}
   `;
+  byId('sidebar-collapse-btn').addEventListener('click', toggleSidebarCollapse);
   renderMobileAccountTrigger();
   bindAccountMenu('account-trigger', 'account-menu');
   bindLanguageSwitchers(byId('sidebar'));
+}
+
+function toggleSidebarCollapse() {
+  const collapsed = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+  localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '0' : '1');
+  renderSidebar(currentPage);
+}
+
+let navShortcutsBound = false;
+function initNavShortcuts() {
+  if (navShortcutsBound) return;
+  navShortcutsBound = true;
+  document.addEventListener('keydown', (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    const n = Number(e.key);
+    if (!Number.isInteger(n) || n < 1 || n > NAV_SHORTCUT_COUNT) return;
+    const target = NAV[n - 1];
+    if (!target) return;
+    e.preventDefault();
+    window.location.href = `${target[0]}.html`;
+  });
 }
 
 // ─── Account avatar + dropdown ─────────────────────────────────────────────
@@ -563,6 +617,8 @@ function macroBoard(rows) {
 
 // ─── Stats strip ──────────────────────────────────────────────────────────────
 function renderStats() {
+  const grid = byId('stats-grid');
+  if (!grid) return; // Dashboard has its own hero/ring stats instead of the generic strip
   const counts = getCounts();
   const stats = [
     [t('Tasks done'),    `${counts.completedTasks}/${counts.tasks}`,   percent(counts.completedTasks, counts.tasks || 1)],
@@ -570,7 +626,7 @@ function renderStats() {
     [t('Goal progress'), `${counts.completedGoals}/${counts.goals}`,   percent(counts.completedGoals, counts.goals || 1)],
     [t('Water'),         `${counts.water}/${currentData.settings.waterGoal}`, percent(counts.water, currentData.settings.waterGoal)],
   ];
-  byId('stats-grid').innerHTML = stats.map(([label, value, width]) => `
+  grid.innerHTML = stats.map(([label, value, width]) => `
     <article class="stat-card">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(String(value))}</strong>
@@ -715,47 +771,335 @@ function nutritionSummaryCard(label, value, target, suffix = '') {
   </article>`;
 }
 
+const MOTIVATION_LINES = [
+  'Small steps, repeated daily, outrun big leaps taken rarely.',
+  'You don\u2019t need a perfect day \u2014 you need a done day.',
+  'Momentum is built one checkbox at a time.',
+  'Discipline is choosing between what you want now and what you want most.',
+  'Progress hides in the boring, repeated stuff.',
+  'The plan doesn\u2019t need to be exciting. It needs to be followed.',
+  'Show up today. That\u2019s the whole job.',
+];
+
+function dayOfYear(d = new Date()) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+
+function todayWeekdayShort() {
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
+}
+
+function todaysWorkoutInfo() {
+  const schedule = (currentData.workoutPlan && currentData.workoutPlan.schedule) || [];
+  const today = todayWeekdayShort();
+  const slot = schedule.find((s) => s.day === today);
+  if (!slot) return { label: t('No session scheduled'), sub: t('Rest day'), pct: 0 };
+  if (slot.type === 'Rest Day') {
+    return { label: t('Rest day'), sub: t('Recovery'), pct: 100 };
+  }
+  const done = slot.status === 'Done';
+  const exCount = (slot.exercises || []).length;
+  return {
+    label: escapeHtml(slot.type || t('Workout')),
+    sub: done ? t('Completed') : `${exCount} ${t('exercises')} \u00b7 ${escapeHtml(slot.status || t('Not started'))}`,
+    pct: done ? 100 : (slot.status === 'In Progress' ? 50 : 0),
+  };
+}
+
+function upcomingEventsHtml() {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const upcoming = (currentData.events || [])
+    .filter((e) => !e.date || e.date >= todayIso)
+    .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || ''))
+    .slice(0, 5);
+  if (!upcoming.length) {
+    return `<div class="empty-state">${t('Nothing on the calendar yet. Add an event to see it here.')}</div>`;
+  }
+  return `<div class="dash-event-list">${upcoming.map((e) => `
+    <div class="dash-event-row">
+      <div class="dash-event-date">
+        <strong>${escapeHtml((e.date || '').slice(5) || '\u2014')}</strong>
+      </div>
+      <div class="dash-event-body">
+        <p>${escapeHtml(e.title || t('Untitled event'))}</p>
+        <small>${escapeHtml(e.time || '')}</small>
+      </div>
+    </div>
+  `).join('')}</div>`;
+}
+
+function recentActivityHtml() {
+  // Best-effort feed: the data model doesn't store timestamps on every entry,
+  // so this uses insertion order (arrays are appended to) across domains as a
+  // reasonable proxy for "recent", newest first.
+  const sources = [
+    ['tasks', 'title', t('Task added')],
+    ['habits', 'title', t('Habit added')],
+    ['goals', 'title', t('Goal added')],
+    ['events', 'title', t('Event added')],
+    ['meals', 'title', t('Meal logged')],
+    ['study', 'title', t('Study session logged')],
+    ['sleep', 'title', t('Sleep logged')],
+    ['prayers', 'title', t('Prayer logged')],
+  ];
+  const items = [];
+  sources.forEach(([key, field, label]) => {
+    const arr = currentData[key] || [];
+    arr.slice(-2).forEach((entry) => items.push({ label, text: entry[field] || '' }));
+  });
+  const recent = items.slice(-6).reverse();
+  if (!recent.length) {
+    return `<div class="empty-state">${t('Your recent activity will show up here as you use MyLife.')}</div>`;
+  }
+  return `<ul class="dash-activity-list">${recent.map((r) => `
+    <li><span class="dash-activity-dot" aria-hidden="true"></span><span><strong>${escapeHtml(r.label)}</strong>${r.text ? ` \u2014 ${escapeHtml(r.text)}` : ''}</span></li>
+  `).join('')}</ul>`;
+}
+
+function dashCard(key, label, accent, value, target, sub, href) {
+  const pct = percent(value, target || 1);
+  return `
+    <a class="dash-card" data-accent="${accent}" href="${href}">
+      ${progressRingSvg(pct, accent, 52)}
+      <div class="dash-card-body">
+        <h3>${escapeHtml(label)}</h3>
+        <p>${sub}</p>
+      </div>
+    </a>
+  `;
+}
+
 function renderDashboard() {
   const counts = getCounts();
+  const s = currentData.settings;
+  const lvl = levelInfo(currentData.profile);
+  const score = productivityScore();
+  const hour = new Date().getHours();
+  const greeting = hour < 5 ? t('Still up?') : hour < 12 ? t('Good morning') : hour < 18 ? t('Good afternoon') : t('Good evening');
+  const wo = todaysWorkoutInfo();
+  const eventsToday = (currentData.events || []).filter((e) => e.date === new Date().toISOString().slice(0, 10)).length;
+  const quote = MOTIVATION_LINES[dayOfYear() % MOTIVATION_LINES.length];
+
   byId('data-list').innerHTML = `
-    <section class="mission-status" aria-label="Momentum progress">
-      <div><p class="eyebrow">Current destination</p><h2>Earth orbit</h2><p>Level 3 · 640 / 1,000 XP</p></div>
-      <div class="meter" aria-label="64% to next level"><i style="width:64%"></i></div>
-      <strong>7-Day Orbit</strong>
+    <section class="dash-hero" aria-label="${t('Overview')}">
+      <div class="dash-hero-greeting">
+        <p class="eyebrow">${escapeHtml(greeting)}, ${escapeHtml(firstName(currentUser.name))}</p>
+        <h2>${t('Level {level}', { level: lvl.level })} <span class="dash-hero-xp">${lvl.into} / ${lvl.span} XP</span></h2>
+        <p class="dash-hero-quote">\u201c${escapeHtml(quote)}\u201d</p>
+      </div>
+      <div class="dash-hero-rings">
+        <div class="dash-hero-ring">
+          ${progressRingSvg(lvl.pct, 'blue', 72)}
+          <span>${lvl.pct}%</span>
+          <small>${t('To next level')}</small>
+        </div>
+        <div class="dash-hero-ring">
+          ${progressRingSvg(score, 'green', 72)}
+          <span>${score}%</span>
+          <small>${t('Productivity')}</small>
+        </div>
+      </div>
     </section>
-    <div class="summary-grid">
-      ${nutritionSummaryCard(t('Task completion'),  counts.completedTasks,  counts.tasks  || 1)}
-      ${nutritionSummaryCard(t('Habit completion'), counts.completedHabits, counts.habits || 1)}
-      ${nutritionSummaryCard(t('Goal completion'),  counts.completedGoals,  counts.goals  || 1)}
-      ${nutritionSummaryCard(t('Water today'),      counts.water,           currentData.settings.waterGoal, ' gl')}
-    </div>
-    ${['tasks', 'habits', 'goals', 'meals', 'study', 'sleep'].map((key) => `
-      <article class="data-card stacked">
-        <h3>${t(labelize(key))}</h3>
-        <p>${(currentData[key] || []).length} ${t('records')}</p>
-        <small>${latestText(key)}</small>
-      </article>
-    `).join('')}
+
+    <section class="dash-quick-actions" aria-label="${t('Quick actions')}">
+      <a class="dash-quick-action" href="todo.html"><span aria-hidden="true">+</span>${t('Add task')}</a>
+      <a class="dash-quick-action" href="habits.html"><span aria-hidden="true">+</span>${t('Add habit')}</a>
+      <a class="dash-quick-action" href="calendar.html"><span aria-hidden="true">+</span>${t('Add event')}</a>
+      <a class="dash-quick-action" href="workout.html"><span aria-hidden="true">\u25b6</span>${t('Start workout')}</a>
+      <a class="dash-quick-action" href="water.html"><span aria-hidden="true">+</span>${t('Log water')}</a>
+    </section>
+
+    <section class="dash-section" aria-label="${t('Today')}">
+      <h3 class="dash-section-title">${t('Today')}</h3>
+      <div class="dash-grid">
+        ${dashCard('tasks', t('Tasks'), 'blue', counts.completedTasks, counts.tasks, `${counts.completedTasks}/${counts.tasks || 0} ${t('done')}`, 'todo.html')}
+        ${dashCard('habits', t('Habits'), 'green', counts.completedHabits, counts.habits, `${counts.completedHabits}/${counts.habits || 0} ${t('done')}`, 'habits.html')}
+        ${dashCard('goals', t('Goals'), 'purple', counts.completedGoals, counts.goals, `${counts.completedGoals}/${counts.goals || 0} ${t('done')}`, 'goals.html')}
+        <a class="dash-card" data-accent="mars" href="workout.html">
+          ${progressRingSvg(wo.pct, 'orange', 52)}
+          <div class="dash-card-body"><h3>${t('Workout')}</h3><p>${wo.label} \u2014 ${wo.sub}</p></div>
+        </a>
+        ${dashCard('prayer', t('Prayer'), 'green', counts.prayers, s.prayerGoal, `${counts.prayers}/${s.prayerGoal || 0} ${t('today')}`, 'prayer.html')}
+        ${dashCard('study', t('Study'), 'blue', counts.study, s.studyGoal ? Math.round(s.studyGoal / 30) : 1, `${counts.study} ${t('sessions')}`, 'study.html')}
+        <a class="dash-card" data-accent="orange" href="calendar.html">
+          ${progressRingSvg(percent(eventsToday, Math.max(eventsToday, 1)), 'orange', 52)}
+          <div class="dash-card-body"><h3>${t('Calendar')}</h3><p>${eventsToday} ${t('events today')}</p></div>
+        </a>
+        ${dashCard('water', t('Water'), 'blue', counts.water, s.waterGoal, `${counts.water}/${s.waterGoal || 0} ${t('glasses')}`, 'water.html')}
+        ${dashCard('sleep', t('Sleep'), 'purple', counts.sleep, s.sleepGoal, `${counts.sleep} ${t('records')}`, 'sleep.html')}
+      </div>
+    </section>
+
+    <section class="dash-columns">
+      <div class="dash-section">
+        <h3 class="dash-section-title">${t('Upcoming events')}</h3>
+        ${upcomingEventsHtml()}
+      </div>
+      <div class="dash-section">
+        <h3 class="dash-section-title">${t('Recent activity')}</h3>
+        ${recentActivityHtml()}
+      </div>
+    </section>
   `;
+}
+
+// ─── Minimal date helpers, namespaced to avoid clashing with the different
+// addDays()/toISO() signatures already used by calendar.js and workout.js
+// (which are never loaded alongside this file's stats functions, but sharing
+// generic names across scripts loaded in the same page is asking for bugs).
+function statIso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function statAddDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function statParseIso(s) { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); }
+
+// Buckets `entries` (each with a `.date` ISO string) into counts per period.
+// Returns { labels: string[], values: number[] } spanning the trailing
+// window for the given period (7 days / 8 weeks / 12 months).
+function bucketByPeriod(entries, dateField, period) {
+  const today = new Date();
+  if (period === 'week') {
+    const days = Array.from({ length: 7 }, (_, i) => statAddDays(today, i - 6));
+    const labels = days.map((d) => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]);
+    const isoSet = days.map(statIso);
+    const values = isoSet.map((iso) => entries.filter((e) => (e[dateField] || '').slice(0, 10) === iso).length);
+    return { labels, values };
+  }
+  if (period === 'month') {
+    const weeks = Array.from({ length: 8 }, (_, i) => statAddDays(today, (i - 7) * 7));
+    const labels = weeks.map((d) => `${d.getMonth() + 1}/${d.getDate()}`);
+    const values = weeks.map((start) => {
+      const from = statIso(start);
+      const to = statIso(statAddDays(start, 6));
+      return entries.filter((e) => {
+        const iso = (e[dateField] || '').slice(0, 10);
+        return iso && iso >= from && iso <= to;
+      }).length;
+    });
+    return { labels, values };
+  }
+  // year: trailing 12 months
+  const months = Array.from({ length: 12 }, (_, i) => new Date(today.getFullYear(), today.getMonth() - (11 - i), 1));
+  const labels = months.map((d) => ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]);
+  const values = months.map((m) => entries.filter((e) => {
+    const iso = e[dateField];
+    if (!iso) return false;
+    const d = statParseIso(iso);
+    return d.getFullYear() === m.getFullYear() && d.getMonth() === m.getMonth();
+  }).length);
+  return { labels, values };
+}
+
+function statsBarChartSvg(labels, values, colorVar = 'blue') {
+  const w = 640, h = 160, pad = 24, gap = 8;
+  const max = Math.max(1, ...values);
+  const bw = (w - pad * 2 - gap * (values.length - 1)) / values.length;
+  const bars = values.map((v, i) => {
+    const bh = Math.max(2, (v / max) * (h - pad - 20));
+    const x = pad + i * (bw + gap);
+    const y = h - pad - bh;
+    return `
+      <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="4" fill="var(--${colorVar})" opacity="${v ? 1 : 0.25}">
+        <title>${labels[i]}: ${v}</title>
+      </rect>
+      <text x="${(x + bw / 2).toFixed(1)}" y="${h - 6}" text-anchor="middle" class="stats-chart-label">${escapeHtml(labels[i])}</text>
+    `;
+  }).join('');
+  return `<svg class="stats-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Bar chart">${bars}</svg>`;
+}
+
+function comparisonBarsHtml() {
+  const c = getCounts();
+  const rows = [
+    ['Tasks',  percent(c.completedTasks, c.tasks || 1), 'blue'],
+    ['Habits', percent(c.completedHabits, c.habits || 1), 'green'],
+    ['Goals',  percent(c.completedGoals, c.goals || 1), 'purple'],
+    ['Water',  percent(c.water, currentData.settings.waterGoal), 'blue'],
+    ['Sleep',  percent(c.sleep, currentData.settings.sleepGoal), 'purple'],
+    ['Prayer', percent(c.prayers, currentData.settings.prayerGoal), 'green'],
+  ];
+  return `<div class="stats-compare">${rows.map(([label, pct, color]) => `
+    <div class="stats-compare-row">
+      <span class="stats-compare-label">${t(label)}</span>
+      <div class="stats-compare-track"><div class="stats-compare-fill" style="--w:${pct}%; --c:var(--${color})"></div></div>
+      <span class="stats-compare-pct">${pct}%</span>
+    </div>
+  `).join('')}</div>`;
+}
+
+function statsInsightsHtml() {
+  const c = getCounts();
+  const s = currentData.settings;
+  const rates = [
+    ['Tasks', percent(c.completedTasks, c.tasks || 1)],
+    ['Habits', percent(c.completedHabits, c.habits || 1)],
+    ['Goals', percent(c.completedGoals, c.goals || 1)],
+    ['Water', percent(c.water, s.waterGoal)],
+    ['Sleep', percent(c.sleep, s.sleepGoal)],
+    ['Prayer', percent(c.prayers, s.prayerGoal)],
+  ];
+  const strongest = rates.reduce((a, b) => (b[1] > a[1] ? b : a), rates[0]);
+  const weakest = rates.reduce((a, b) => (b[1] < a[1] ? b : a), rates[0]);
+  const insights = [];
+  insights.push(`Your strongest area right now is <strong>${t(strongest[0])}</strong> at ${strongest[1]}% of goal.`);
+  if (weakest[0] !== strongest[0]) {
+    insights.push(`<strong>${t(weakest[0])}</strong> is furthest from its goal at ${weakest[1]}% \u2014 a good place to focus next.`);
+  }
+  const upcoming = (currentData.events || []).filter((e) => e.date >= new Date().toISOString().slice(0, 10)).length;
+  if (upcoming) insights.push(`You have <strong>${upcoming}</strong> upcoming event${upcoming === 1 ? '' : 's'} on the calendar.`);
+  const openGoals = (currentData.goals || []).filter((g) => !g.completed).length;
+  if (openGoals) insights.push(`<strong>${openGoals}</strong> goal${openGoals === 1 ? ' is' : 's are'} still open.`);
+  const lvl = levelInfo(currentData.profile);
+  insights.push(`You're ${lvl.pct}% of the way to Level ${lvl.level + 1}.`);
+  return `<ul class="stats-insights">${insights.map((i) => `<li>${i}</li>`).join('')}</ul>`;
 }
 
 function renderStatistics() {
   const counts = getCounts();
-  const n      = nutritionTotals();
+  const lvl = levelInfo(currentData.profile);
+  const studyBuckets = bucketByPeriod(currentData.study || [], 'date', statsPeriod);
+  const workoutBuckets = bucketByPeriod(currentData.workouts || [], 'date', statsPeriod);
+
   byId('data-list').innerHTML = `
-    <div class="summary-grid">
-      ${nutritionSummaryCard(t('Tasks done'),   counts.completedTasks,  counts.tasks  || 1)}
-      ${nutritionSummaryCard(t('Habits done'),  counts.completedHabits, counts.habits || 1)}
-      ${nutritionSummaryCard(t('Goals done'),   counts.completedGoals,  counts.goals  || 1)}
-      ${nutritionSummaryCard(t('Calories'),     n.calories,             currentData.settings.calorieTarget)}
-    </div>
-    ${Object.entries(counts).map(([key, value]) => `
-      <article class="data-card stat-line">
-        <h3>${t(labelize(key))}</h3>
-        <strong>${value}</strong>
-      </article>
-    `).join('')}
+    <section class="stats-period-bar" aria-label="${t('Time period')}">
+      ${['week', 'month', 'year'].map((p) => `<button type="button" class="stats-period-btn${statsPeriod === p ? ' active' : ''}" data-stats-period="${p}">${t(labelize(p))}</button>`).join('')}
+    </section>
+
+    <section class="dash-grid stats-today-grid" aria-label="${t('Today vs goal')}">
+      ${dashCard('tasks', t('Tasks'), 'blue', counts.completedTasks, counts.tasks, `${counts.completedTasks}/${counts.tasks || 0}`, 'todo.html')}
+      ${dashCard('habits', t('Habits'), 'green', counts.completedHabits, counts.habits, `${counts.completedHabits}/${counts.habits || 0}`, 'habits.html')}
+      ${dashCard('goals', t('Goals'), 'purple', counts.completedGoals, counts.goals, `${counts.completedGoals}/${counts.goals || 0}`, 'goals.html')}
+      ${dashCard('water', t('Water'), 'blue', counts.water, currentData.settings.waterGoal, `${counts.water}/${currentData.settings.waterGoal || 0}`, 'water.html')}
+      ${dashCard('sleep', t('Sleep'), 'purple', counts.sleep, currentData.settings.sleepGoal, `${counts.sleep} ${t('records')}`, 'sleep.html')}
+      ${dashCard('level', t('Level'), 'green', lvl.into, lvl.span, `${t('Level')} ${lvl.level} \u00b7 ${lvl.pct}%`, 'account.html')}
+    </section>
+
+    <section class="dash-columns">
+      <div class="panel stats-chart-card">
+        <h3>${t('Study sessions')}</h3>
+        ${studyBuckets.values.some(Boolean) ? statsBarChartSvg(studyBuckets.labels, studyBuckets.values, 'blue') : `<div class="empty-state">${t('Log a study session to see this chart.')}</div>`}
+      </div>
+      <div class="panel stats-chart-card">
+        <h3>${t('Workouts')}</h3>
+        ${workoutBuckets.values.some(Boolean) ? statsBarChartSvg(workoutBuckets.labels, workoutBuckets.values, 'orange') : `<div class="empty-state">${t('Finish a workout session to see this chart.')}</div>`}
+      </div>
+    </section>
+
+    <section class="dash-columns">
+      <div class="panel">
+        <h3>${t('Completion comparison')}</h3>
+        ${comparisonBarsHtml()}
+      </div>
+      <div class="panel">
+        <h3>${t('Insights')}</h3>
+        ${statsInsightsHtml()}
+      </div>
+    </section>
   `;
+
+  document.querySelectorAll('[data-stats-period]').forEach((btn) => btn.addEventListener('click', () => {
+    statsPeriod = btn.dataset.statsPeriod;
+    renderStatistics();
+  }));
 }
 
 // ─── Field builder ────────────────────────────────────────────────────────────
@@ -791,7 +1135,7 @@ function addEntry(e, pageKey) {
   }
   const page = PAGES[pageKey];
   const form = new FormData(e.currentTarget);
-  const item = { id: makeId(), completed: false };
+  const item = { id: makeId(), completed: false, createdAt: new Date().toISOString() };
   page.fields.forEach(([name, , type]) => {
     const val = form.get(name);
     item[name] = type === 'number' ? Number(val) : String(val || '');
@@ -805,7 +1149,10 @@ function addEntry(e, pageKey) {
 function toggleComplete(pageKey, id) {
   const col  = PAGES[pageKey].collection;
   const item = currentData[col].find((entry) => entry.id === id);
-  if (item) item.completed = !item.completed;
+  if (item) {
+    item.completed = !item.completed;
+    item.completedAt = item.completed ? new Date().toISOString() : null;
+  }
   persist();
   initPage(pageKey);
 }
@@ -895,11 +1242,12 @@ function ensureModalLayer() {
 
 function openModal({ title, body, confirmLabel = t('Confirm'), cancelLabel = t('Cancel'), danger = false, onConfirm, onCancel }) {
   const layer = ensureModalLayer();
+  const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   layer.hidden = false;
   layer.innerHTML = `
     <div class="modal-backdrop">
-      <div class="modal-card">
-        <h2>${escapeHtml(title)}</h2>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h2 id="modal-title">${escapeHtml(title)}</h2>
         <div class="modal-body">${body}</div>
         <div class="modal-actions">
           <button class="secondary-btn" type="button" data-modal-cancel>${escapeHtml(cancelLabel)}</button>
@@ -908,14 +1256,28 @@ function openModal({ title, body, confirmLabel = t('Confirm'), cancelLabel = t('
       </div>
     </div>
   `;
-  requestAnimationFrame(() => layer.querySelector('.modal-backdrop').classList.add('open'));
+  requestAnimationFrame(() => {
+    layer.querySelector('.modal-backdrop').classList.add('open');
+    layer.querySelector('[data-modal-cancel]').focus();
+  });
   let resolved = false;
-  const onKeydown = (e) => { if (e.key === 'Escape') cancel(); };
+  const onKeydown = (e) => {
+    if (e.key === 'Escape') { cancel(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = [...layer.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  const restoreFocus = () => { if (returnFocus && returnFocus.isConnected) returnFocus.focus(); };
   const cancel = () => {
     if (resolved) return;
     resolved = true;
     document.removeEventListener('keydown', onKeydown);
     closeModal();
+    restoreFocus();
     if (onCancel) onCancel();
   };
   const confirm = () => {
@@ -923,6 +1285,7 @@ function openModal({ title, body, confirmLabel = t('Confirm'), cancelLabel = t('
     resolved = true;
     document.removeEventListener('keydown', onKeydown);
     closeModal();
+    restoreFocus();
     onConfirm();
   };
   layer.querySelector('[data-modal-cancel]').addEventListener('click', cancel);
@@ -977,7 +1340,10 @@ function getSessionUser() {
 }
 
 function getUsers() {
-  try { return JSON.parse(localStorage.getItem(USERS_KEY) || '[]'); }
+  try {
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    return Array.isArray(users) ? users : [];
+  }
   catch { return []; }
 }
 
@@ -996,6 +1362,57 @@ function getData(email, name) {
 function saveData(email, data) { localStorage.setItem(DATA_PREFIX + email, JSON.stringify(data)); }
 function persist() { saveData(currentUser.email, currentData); }
 
+// Passwords are never kept as plaintext for newly-created or migrated local
+// accounts. This is defense in depth only: a local-only static app cannot
+// protect data from someone who controls the browser profile.
+async function derivePasswordHash(password, salt) {
+  if (!window.crypto || !window.crypto.subtle || !window.TextEncoder) return null;
+  try {
+    const encoded = new TextEncoder();
+    const key = await window.crypto.subtle.importKey('raw', encoded.encode(password), 'PBKDF2', false, ['deriveBits']);
+    const bits = await window.crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: Uint8Array.from(atob(salt), (char) => char.charCodeAt(0)), iterations: PASSWORD_ITERATIONS, hash: 'SHA-256' },
+      key,
+      256
+    );
+    return btoa(String.fromCharCode(...new Uint8Array(bits)));
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function setPassword(user, password) {
+  if (!window.crypto || !window.crypto.getRandomValues) return false;
+  const salt = new Uint8Array(16);
+  window.crypto.getRandomValues(salt);
+  const passwordSalt = btoa(String.fromCharCode(...salt));
+  const passwordHash = await derivePasswordHash(password, passwordSalt);
+  if (!passwordHash) return false;
+  user.passwordSalt = passwordSalt;
+  user.passwordHash = passwordHash;
+  user.passwordVersion = 1;
+  delete user.password;
+  return true;
+}
+
+function secureStringEquals(left, right) {
+  if (typeof left !== 'string' || typeof right !== 'string' || left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
+}
+
+async function verifyPassword(user, password) {
+  if (user.passwordHash && user.passwordSalt) {
+    const hash = await derivePasswordHash(password, user.passwordSalt);
+    return !!hash && secureStringEquals(hash, user.passwordHash);
+  }
+  // Backward-compatible one-time migration for accounts created before v1.
+  if (!secureStringEquals(password, user.password || '')) return false;
+  if (await setPassword(user, password)) saveUsers(getUsers().map((candidate) => candidate.email === user.email ? user : candidate));
+  return true;
+}
+
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 function getCounts() {
   return {
@@ -1013,6 +1430,37 @@ function getCounts() {
     sleep:           currentData.sleep.length,
     study:           currentData.study.length,
   };
+}
+
+// ─── Level / XP / productivity (shared across Dashboard + Account pages) ──
+function totalActions(c) {
+  return c.completedTasks + c.completedHabits + c.completedGoals + c.workouts + c.prayers + c.study + c.sleep + c.water;
+}
+
+function computeXp() {
+  const c = getCounts();
+  return totalActions(c) * 10;
+}
+
+function levelInfo(p) {
+  const xp = Number(p.xp) || computeXp();
+  const span = 500;
+  const level = Math.floor(xp / span) + 1;
+  const into = xp % span;
+  return { xp, level, into, span, pct: Math.round((into / span) * 100) };
+}
+
+function productivityScore() {
+  const c = getCounts();
+  const s = currentData.settings;
+  const parts = [
+    percent(c.completedTasks, c.tasks || 1),
+    percent(c.completedHabits, c.habits || 1),
+    percent(c.completedGoals, c.goals || 1),
+    percent(c.water, s.waterGoal || 1),
+    percent(c.sleep, s.sleepGoal || 1),
+  ];
+  return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
 }
 
 function nutritionTotals() {
@@ -1051,7 +1499,8 @@ function emptyData(name) {
     achievements: { unlocked: [] },
     tasks:    [], habits: [], goals: [], events: [], workouts: [],
     prayers:  [], meals:  [], water: [], sleep:  [], study:   [],
-    subjects: [], assignments: [], exams: [], projects: [], studyNotes: [],
+    subjects: [], assignments: [], exams: [], projects: [], studyNotes: [], resources: [],
+    bodyMeasurements: [], progressPhotos: [],
     workoutPlan: { daysPerWeek: 4, trainingDays: ['Mon','Tue','Thu','Fri'], schedule: [] },
     pomodoro: { mode: '25/5', workMin: 25, breakMin: 5, sessionsToday: 0, dailyGoal: 8, lastResetDate: '', soundOn: true },
   };
@@ -1079,8 +1528,23 @@ function normalizeData(data, name) {
     status: 'Pending', exercises: [], durationMin: 0, calories: 0, taskId: null, ...s,
   }));
   // Hydrate default fields on array items
-  merged.tasks    = merged.tasks.map((i)    => ({ completed: false, ...i }));
-  merged.habits   = merged.habits.map((i)   => ({ completed: false, ...i }));
+  merged.tasks    = merged.tasks.map((i)    => ({
+    completed: false, notes: '', tags: [], dueDate: '', recurring: null,
+    subtasks: [], dependsOn: [], attachments: [], reminder: null, reminderFired: false,
+    createdAt: i.createdAt || null, completedAt: i.completedAt || null,
+    ...i,
+    tags: Array.isArray(i.tags) ? i.tags : [],
+    subtasks: Array.isArray(i.subtasks) ? i.subtasks : [],
+    dependsOn: Array.isArray(i.dependsOn) ? i.dependsOn : [],
+    attachments: Array.isArray(i.attachments) ? i.attachments : [],
+  }));
+  merged.habits   = merged.habits.map((i)   => ({
+    completed: false, completions: [], difficulty: 'Medium', weeklyTarget: 7, createdAt: i.createdAt || null,
+    ...i,
+    completions: Array.isArray(i.completions) ? i.completions : [],
+  }));
+  const habitsToday = new Date().toISOString().slice(0, 10);
+  merged.habits.forEach((h) => { h.completed = h.completions.includes(habitsToday); });
   merged.goals    = merged.goals.map((i)    => ({ period: 'Daily', category: 'General', completed: false, ...i }));
   merged.meals    = merged.meals.map((i)    => ({ protein: 0, carbs: 0, fat: 0, ...i }));
   merged.workouts = merged.workouts.map((i) => ({ day: '', title: 'Exercise', weight: 0, reps: 0, sets: 1, note: '', ...i }));
@@ -1090,6 +1554,8 @@ function normalizeData(data, name) {
   merged.exams        = merged.exams.map((i)        => ({ subjectId: null, date: '', time: '', room: '', instructor: '', importance: 'Medium', preparation: 0, studyMaterials: '', notes: '', ...i }));
   merged.projects      = merged.projects.map((i)     => ({ title: 'Project', progress: 0, tasks: [], deadline: '', priority: 'Medium', attachments: '', members: '', notes: '', ...i }));
   merged.studyNotes   = merged.studyNotes.map((i)   => ({ text: '', color: '#f2d492', pinned: false, archived: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...i }));
+  merged.profile.photo = isSafeImageDataUrl(merged.profile.photo) ? merged.profile.photo : null;
+  merged.profile.cover = isSafeImageDataUrl(merged.profile.cover) ? merged.profile.cover : null;
   return merged;
 }
 
@@ -1117,6 +1583,24 @@ function percent(value, max) {
   return Math.max(0, Math.min(100, Math.round((Number(value) / Number(max || 1)) * 100)));
 }
 
+// Reusable radial progress indicator. `colorVar` is a CSS custom property
+// name (e.g. 'blue', 'green') so the ring always matches the active theme.
+function progressRingSvg(pct, colorVar = 'blue', size = 56) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const stroke = Math.round(size / 9.5);
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (clamped / 100) * c;
+  return `
+    <svg class="progress-ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="${clamped}%">
+      <circle class="progress-ring-track" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}" fill="none" />
+      <circle class="progress-ring-value" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}" fill="none"
+        stroke="var(--${colorVar})" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${offset}"
+        transform="rotate(-90 ${size / 2} ${size / 2})" />
+    </svg>
+  `;
+}
+
 function labelize(key) {
   return key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
@@ -1133,3 +1617,7 @@ function escapeHtml(v) {
 }
 
 function escapeAttr(v) { return escapeHtml(v); }
+
+function isSafeImageDataUrl(value) {
+  return typeof value === 'string' && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+}

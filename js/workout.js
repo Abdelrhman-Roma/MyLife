@@ -5,6 +5,34 @@ const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WORKOUT_TYPES = ['Push Day', 'Pull Day', 'Leg Day', 'Upper Body', 'Lower Body', 'Full Body', 'Cardio', 'Rest Day'];
 
+// Muscle-group lookup for the exercise library (Phase 3: muscle recovery).
+// Matched by exercise title, case-insensitively, so it works with anything
+// typed into the exercise-name field (library suggestion or free text).
+const MUSCLE_GROUP_MAP = {
+  'Barbell Bench Press': 'Chest', 'Incline Dumbbell Press': 'Chest', 'Decline Bench Press': 'Chest',
+  'Dumbbell Flyes': 'Chest', 'Cable Crossover': 'Chest', 'Push-Ups': 'Chest', 'Chest Dips': 'Chest',
+  'Deadlift': 'Back', 'Pull-Ups': 'Back', 'Lat Pulldown': 'Back', 'Barbell Row': 'Back',
+  'Seated Cable Row': 'Back', 'T-Bar Row': 'Back', 'Single-Arm Dumbbell Row': 'Back', 'Face Pulls': 'Back',
+  'Back Squat': 'Legs', 'Front Squat': 'Legs', 'Romanian Deadlift': 'Legs', 'Leg Press': 'Legs',
+  'Walking Lunges': 'Legs', 'Leg Extension': 'Legs', 'Leg Curl': 'Legs', 'Calf Raises': 'Legs',
+  'Hip Thrust': 'Legs', 'Bulgarian Split Squat': 'Legs',
+  'Overhead Press': 'Shoulders', 'Arnold Press': 'Shoulders', 'Lateral Raises': 'Shoulders',
+  'Front Raises': 'Shoulders', 'Rear Delt Flyes': 'Shoulders', 'Upright Row': 'Shoulders', 'Shrugs': 'Shoulders',
+  'Barbell Curl': 'Arms', 'Dumbbell Curl': 'Arms', 'Hammer Curl': 'Arms', 'Preacher Curl': 'Arms',
+  'Tricep Pushdown': 'Arms', 'Skull Crushers': 'Arms', 'Overhead Tricep Extension': 'Arms', 'Close-Grip Bench Press': 'Arms',
+  'Plank': 'Core', 'Hanging Leg Raise': 'Core', 'Cable Crunch': 'Core', 'Russian Twists': 'Core', 'Ab Wheel Rollout': 'Core',
+  'Treadmill Run': 'Cardio', 'Rowing Machine': 'Cardio', 'Stationary Bike': 'Cardio', 'Jump Rope': 'Cardio',
+  'Kettlebell Swings': 'Cardio', 'Burpees': 'Cardio',
+};
+const MUSCLE_GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio'];
+const MUSCLE_RECOVERY_HOURS = 48; // rule-based heuristic, not a physiological model
+
+function muscleGroupFor(title) {
+  if (MUSCLE_GROUP_MAP[title]) return MUSCLE_GROUP_MAP[title];
+  const hit = Object.keys(MUSCLE_GROUP_MAP).find((k) => k.toLowerCase() === String(title || '').toLowerCase());
+  return hit ? MUSCLE_GROUP_MAP[hit] : null;
+}
+
 const EX_STATUS_CLASS = { 'Not Started': 'ex-ns', 'In Progress': 'ex-inprogress', 'Done': 'ex-done', 'Skipped': 'ex-skipped' };
 
 const WO_STATUS = ['Not Started', 'In Progress', 'Done', 'Skipped', 'Rest Day'];
@@ -538,9 +566,17 @@ function renderWorkoutRoot() {
       <div class="workout-analytics-grid">${analyticsBlockHtml()}</div>
     </section>
 
+    <section class="panel">
+      <div class="workout-panel-head">
+        <div><p class="eyebrow">Deeper tracking</p><h2>Volume, recovery &amp; body stats</h2></div>
+      </div>
+      <div class="workout-analytics-grid">${advancedTrackingHtml()}</div>
+    </section>
+
     ${workoutFabHtml()}
   `;
   updateSessionClock();
+  bindAdvancedTrackingEvents();
 }
 
 function workoutFabHtml() {
@@ -650,7 +686,7 @@ function excelPlanTableHtml() {
         <tr data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}">
           <td data-label="Exercise">
             <label class="sr-only" for="${escapeAttr(nameId)}">${escapeHtml(exLabel)} name</label>
-            <input id="${escapeAttr(nameId)}" type="text" value="${escapeAttr(ex.name || '')}" placeholder="Enter Exercise Name" aria-label="${escapeAttr(exLabel)} name" data-excel-field="name" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
+            <input id="${escapeAttr(nameId)}" type="text" list="mylife-exercise-library" value="${escapeAttr(ex.name || '')}" placeholder="Enter Exercise Name" aria-label="${escapeAttr(exLabel)} name" data-excel-field="name" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" />
             ${ex.video ? `<a class="workout-exercise-name-link" href="${escapeAttr(ex.video)}" target="_blank" rel="noopener">${escapeHtml(ex.name)} ▶</a>` : ''}
           </td>
           <td data-label="Sets"><label class="sr-only" for="${escapeAttr(setsId)}">${escapeHtml(exLabel)} sets</label><input id="${escapeAttr(setsId)}" type="number" min="1" value="${ex.sets || 3}" placeholder="sets" aria-label="${escapeAttr(exLabel)} sets" data-excel-field="sets" data-schedule="${escapeAttr(s.id)}" data-exercise="${escapeAttr(ex.id)}" /></td>
@@ -872,23 +908,53 @@ function finishSession(scheduleId) {
   s.durationMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
 
   let loggedSetCount = 0;
+  let anyLogged = false;
+  const newPRs = [];
   s.exercises.forEach((ex) => {
     updateExerciseStatusFromSets(ex, s.date);
     const logged = (ex.log || []).filter(setIsDone);
     loggedSetCount += logged.length;
     if (!logged.length) return;
+    anyLogged = true;
     const top = logged.reduce((a, b) => (Number(b.weight) || 0) > (Number(a.weight) || 0) ? b : a, logged[0]);
+    const topWeight = Number(top.weight) || 0;
+    const volume = logged.reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
+    if (topWeight > 0) {
+      const priorBest = currentData.workouts
+        .filter((w) => w.title === ex.name)
+        .reduce((max, w) => Math.max(max, Number(w.weight) || 0), 0);
+      if (topWeight > priorBest) newPRs.push({ name: ex.name, weight: topWeight, reps: Number(top.reps) || 0 });
+    }
     currentData.workouts.push({
       id: makeId(),
       day: s.day,
       date: s.date,
       title: ex.name,
-      weight: Number(top.weight) || 0,
+      weight: topWeight,
       reps: Number(top.reps) || 0,
       sets: logged.length,
+      volume,
       note: '',
     });
   });
+  // Bug fix: previously, finishing a session without logging any set data
+  // (no "reps done" filled in) marked the schedule status "Done" but never
+  // added anything to currentData.workouts — the array Statistics and the
+  // dashboard actually count from. Status and analytics could drift apart.
+  // Always record a session-level entry so a finished workout is always
+  // reflected in analytics, even without per-set detail.
+  if (!anyLogged) {
+    currentData.workouts.push({
+      id: makeId(),
+      day: s.day,
+      date: s.date,
+      title: s.type || s.day,
+      weight: 0,
+      reps: 0,
+      sets: s.exercises.length,
+      note: 'Logged without set detail',
+    });
+  }
 
   s.calories = loggedSetCount ? loggedSetCount * 8 : s.exercises.length * 40;
   s.status = 'Done';
@@ -906,6 +972,12 @@ function finishSession(scheduleId) {
   openSessionId = null;
   delete sessionTimers[scheduleId];
   refreshWorkout({ art: true });
+
+  newPRs.forEach((pr, i) => {
+    window.setTimeout(() => {
+      showToast(`New PR! ${pr.name} \u2014 ${pr.weight}${pr.reps ? ` \u00d7 ${pr.reps}` : ''}`, 'success', 3400);
+    }, i * 350);
+  });
 }
 
 function skipSession(scheduleId) {
@@ -1153,6 +1225,244 @@ function updateSessionClock() {
   }, 1000);
 }
 
+// ─── Phase 3: Volume, muscle recovery, body stats, photos ─────────────────
+function volumeByWeekHtml() {
+  const dates = lastNDates(28);
+  const weeks = [0, 1, 2, 3].map((i) => dates.slice(i * 7, (i + 1) * 7));
+  const values = weeks.map((days) => currentData.workouts
+    .filter((w) => days.includes(w.date))
+    .reduce((sum, w) => sum + (Number(w.volume) || 0), 0));
+  const thisWeek = values[3];
+  const max = Math.max(1, ...values);
+  return `
+    <div class="workout-chart-card workout-chart-block">
+      <h3>Training volume</h3>
+      <p class="muted" style="margin-top:-6px">Weight \u00d7 reps across all logged sets. This week: <strong>${Math.round(thisWeek).toLocaleString()}</strong></p>
+      <div class="chart-bars" style="height:80px">${values.map((v) => `<span style="height:${Math.round((v / max) * 100)}%" title="${Math.round(v)}"></span>`).join('')}</div>
+      <div class="wo-week-labels">${['3wk ago', '2wk ago', 'Last wk', 'This wk'].map((l) => `<small>${l}</small>`).join('')}</div>
+    </div>
+  `;
+}
+
+function muscleRecoveryHtml() {
+  const now = Date.now();
+  const lastTrained = {};
+  currentData.workouts.forEach((w) => {
+    const group = muscleGroupFor(w.title);
+    if (!group || group === 'Cardio' || !w.date) return;
+    const t = new Date(`${w.date}T12:00:00`).getTime();
+    if (Number.isNaN(t)) return;
+    if (!lastTrained[group] || t > lastTrained[group]) lastTrained[group] = t;
+  });
+  return `
+    <div class="workout-chart-card workout-chart-block">
+      <h3>Muscle recovery</h3>
+      <p class="muted" style="margin-top:-6px">Rule-of-thumb estimate (${MUSCLE_RECOVERY_HOURS}h to full recovery) \u2014 not a physiological measurement.</p>
+      <div class="wo-recovery-grid">
+        ${MUSCLE_GROUPS.filter((g) => g !== 'Cardio').map((g) => {
+          const last = lastTrained[g];
+          const hoursSince = last ? Math.round((now - last) / 3600000) : null;
+          const pct = last ? Math.min(100, Math.round((hoursSince / MUSCLE_RECOVERY_HOURS) * 100)) : 0;
+          const ready = last !== null && pct >= 100;
+          const ago = hoursSince === null ? 'No sessions logged' : hoursSince < 24 ? `${hoursSince}h ago` : `${Math.floor(hoursSince / 24)}d ago`;
+          return `
+            <div class="wo-recovery-card${ready ? ' is-ready' : ''}">
+              <strong>${g}</strong>
+              <div class="td-subtask-bar"><i style="width:${last === null ? 0 : pct}%"></i></div>
+              <span class="muted">${last === null ? 'Not trained yet' : `${ready ? 'Ready' : 'Recovering'} \u00b7 ${ago}`}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function measurementsHtml() {
+  const items = [...currentData.bodyMeasurements].sort((a, b) => b.date.localeCompare(a.date));
+  const latest = items[0];
+  const weightSeries = [...items].reverse().map((m) => Number(m.weight) || 0).filter((v) => v > 0);
+  return `
+    <div class="workout-chart-card workout-chart-block wo-measure-block">
+      <h3>Body measurements</h3>
+      <form class="form-grid" data-wo-measure-form>
+        <label>Date<input type="date" name="date" value="${todayIsoWorkout()}" required /></label>
+        <label>Weight (kg)<input type="number" step="0.1" min="0" name="weight" /></label>
+        <label>Chest (cm)<input type="number" step="0.1" min="0" name="chest" /></label>
+        <label>Waist (cm)<input type="number" step="0.1" min="0" name="waist" /></label>
+        <label>Hips (cm)<input type="number" step="0.1" min="0" name="hips" /></label>
+        <label>Arms (cm)<input type="number" step="0.1" min="0" name="arms" /></label>
+        <button type="submit" class="secondary-btn">+ Log</button>
+      </form>
+      ${latest ? `<p class="muted">Latest: ${escapeHtml(latest.date)} \u2014 ${latest.weight || '\u2014'}kg</p>` : ''}
+      ${weightSeries.length > 1 ? buildLineChartSvg(weightSeries) : '<p class="muted">Log at least two weight entries to see a trend.</p>'}
+      <div class="wo-measure-list">
+        ${items.slice(0, 6).map((m) => `
+          <div class="wo-measure-row">
+            <span>${escapeHtml(m.date)}</span><span>${m.weight ? `${m.weight}kg` : '\u2014'}</span>
+            <button type="button" class="std-icon-btn std-icon-danger" data-wo-measure-delete="${m.id}" aria-label="Delete entry">\u2715</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function photosHtml() {
+  const photos = [...currentData.progressPhotos].sort((a, b) => b.date.localeCompare(a.date));
+  return `
+    <div class="workout-chart-card workout-chart-block">
+      <h3>Progress photos</h3>
+      <p class="muted" style="margin-top:-6px">Compressed and stored only in this browser's local storage \u2014 never uploaded anywhere.</p>
+      <label class="secondary-btn wo-photo-upload-btn">
+        + Add photo
+        <input type="file" accept="image/*" data-wo-photo-input hidden />
+      </label>
+      <div class="wo-photo-grid">
+        ${photos.length ? photos.map((p) => `
+          <figure class="wo-photo-card">
+            <img src="${p.dataUrl}" alt="Progress photo ${escapeAttr(p.date)}" loading="lazy" />
+            <figcaption>${escapeHtml(p.date)}</figcaption>
+            <button type="button" class="std-icon-btn std-icon-danger wo-photo-delete" data-wo-photo-delete="${p.id}" aria-label="Delete photo">\u2715</button>
+          </figure>
+        `).join('') : `<div class="empty-state">No photos yet.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+function exerciseStatsHtml() {
+  const byName = {};
+  currentData.workouts.forEach((w) => {
+    const e = byName[w.title] || (byName[w.title] = { count: 0, maxWeight: 0, totalVolume: 0 });
+    e.count++;
+    e.maxWeight = Math.max(e.maxWeight, Number(w.weight) || 0);
+    e.totalVolume += Number(w.volume) || 0;
+  });
+  const rows = Object.entries(byName).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
+  return `
+    <div class="workout-chart-card workout-chart-block">
+      <h3>Exercise statistics</h3>
+      ${rows.length ? `
+        <table class="wo-exstat-table">
+          <thead><tr><th>Exercise</th><th>Sessions</th><th>Best</th><th>Total volume</th></tr></thead>
+          <tbody>
+            ${rows.map(([name, e]) => `
+              <tr><td>${escapeHtml(name)}</td><td>${e.count}</td><td>${e.maxWeight || '\u2014'}</td><td>${Math.round(e.totalVolume).toLocaleString()}</td></tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : '<p class="muted">Log a few sessions to see per-exercise stats.</p>'}
+    </div>
+  `;
+}
+
+function advancedTrackingHtml() {
+  return `${volumeByWeekHtml()}${muscleRecoveryHtml()}${measurementsHtml()}${photosHtml()}${exerciseStatsHtml()}`;
+}
+
+function todayIsoWorkout() { return new Date().toISOString().slice(0, 10); }
+
+function compressImageFile(file, maxDim = 900, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > h && w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else if (h >= w && h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function bindAdvancedTrackingEvents() {
+  const measureForm = document.querySelector('[data-wo-measure-form]');
+  if (measureForm) {
+    measureForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.currentTarget);
+      const entry = { id: makeId(), date: String(fd.get('date') || todayIsoWorkout()) };
+      ['weight', 'chest', 'waist', 'hips', 'arms'].forEach((k) => {
+        const v = fd.get(k);
+        if (v !== '' && v !== null) entry[k] = Number(v);
+      });
+      currentData.bodyMeasurements.push(entry);
+      persist();
+      renderWorkoutRoot();
+      showToast('Measurement logged', 'success');
+    });
+  }
+  document.querySelectorAll('[data-wo-measure-delete]').forEach((btn) => btn.addEventListener('click', () => {
+    currentData.bodyMeasurements = currentData.bodyMeasurements.filter((m) => m.id !== btn.dataset.woMeasureDelete);
+    persist();
+    renderWorkoutRoot();
+  }));
+
+  const photoInput = document.querySelector('[data-wo-photo-input]');
+  if (photoInput) {
+    photoInput.addEventListener('change', async () => {
+      const file = photoInput.files && photoInput.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await compressImageFile(file);
+        currentData.progressPhotos.push({ id: makeId(), date: todayIsoWorkout(), dataUrl });
+        persist();
+        renderWorkoutRoot();
+        showToast('Photo added', 'success');
+      } catch (err) {
+        showToast('Could not save that photo \u2014 storage may be full', 'danger');
+      }
+    });
+  }
+  document.querySelectorAll('[data-wo-photo-delete]').forEach((btn) => btn.addEventListener('click', () => {
+    currentData.progressPhotos = currentData.progressPhotos.filter((p) => p.id !== btn.dataset.woPhotoDelete);
+    persist();
+    renderWorkoutRoot();
+  }));
+}
+
+function personalRecordsHtml() {
+  const best = {};
+  currentData.workouts.forEach((w) => {
+    if (!w.title || !(Number(w.weight) > 0)) return;
+    const cur = best[w.title];
+    if (!cur || Number(w.weight) > cur.weight || (Number(w.weight) === cur.weight && Number(w.reps) > cur.reps)) {
+      best[w.title] = { weight: Number(w.weight), reps: Number(w.reps) || 0, date: w.date };
+    }
+  });
+  const records = Object.entries(best)
+    .map(([title, r]) => ({ title, ...r }))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .slice(0, 6);
+
+  return `
+    <div class="workout-chart-card workout-chart-block wo-pr-block">
+      <h3>Personal records</h3>
+      ${records.length
+        ? `<div class="wo-pr-grid">${records.map((r) => `
+            <div class="wo-pr-card">
+              <span class="wo-pr-icon" aria-hidden="true">🏆</span>
+              <div class="wo-pr-body">
+                <strong>${escapeHtml(r.title)}</strong>
+                <span>${r.weight}${r.reps ? ` \u00d7 ${r.reps}` : ''}</span>
+              </div>
+            </div>
+          `).join('')}</div>`
+        : '<p class="muted">Log a weight on any set to start tracking PRs.</p>'}
+    </div>
+  `;
+}
+
 function analyticsBlockHtml() {
   const p = plan();
   const active = p.schedule.filter((s) => !isRestDay(s));
@@ -1210,6 +1520,7 @@ function analyticsBlockHtml() {
       <h3>Strength progression${topExercise ? ` • ${escapeHtml(topExercise)}` : ''}</h3>
       ${series.length > 1 ? buildLineChartSvg(series) : '<p class="muted">Log a few sessions to see your trend.</p>'}
     </div>
+    ${personalRecordsHtml()}
   `;
 }
 

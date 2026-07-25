@@ -436,3 +436,25 @@
 @media (max-width: 480px) {
   .std-overview-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Resources ────────────────────────────────────────────────────────── */
+.std-resource-list { display: flex; flex-direction: column; gap: 8px; }
+.std-resource-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-3);
+  padding: 10px 12px;
+}
+.std-resource-icon { font-size: 1.15rem; }
+.std-resource-main { min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.std-resource-link {
+  color: var(--accent, var(--blue));
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+.std-resource-link:hover { text-decoration: underline; }

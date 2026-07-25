@@ -1010,6 +1010,57 @@ label, .stat-card span { font-weight: 650; }
 .nav-item strong small { display: block; margin-top: 1px; color: color-mix(in srgb, var(--on-nav) 58%, transparent); font-size: .66rem; font-weight: 500; letter-spacing: .02em; }
 .nav-item:hover { border-left-color: transparent; }
 .nav-item.active { background: rgba(255,255,255,.96); border-left-color: transparent; box-shadow: 0 8px 18px rgba(0,0,0,.16); }
+
+/* ── Sidebar collapse ─────────────────────────────────────────────────── */
+.nav-shortcut {
+  justify-self: end;
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--on-nav) 25%, transparent);
+  color: color-mix(in srgb, var(--on-nav) 60%, transparent);
+  background: rgba(255, 255, 255, 0.04);
+  font: 700 0.66rem var(--font-mono, monospace);
+  opacity: 0;
+  transition: opacity var(--dur-fast, 140ms) var(--ease-out, ease);
+}
+.nav-item:hover .nav-shortcut { opacity: 1; }
+.nav-item.active .nav-shortcut { border-color: color-mix(in srgb, var(--bg) 25%, transparent); color: color-mix(in srgb, var(--bg) 55%, transparent); }
+
+.sidebar-collapse-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 6px 0 6px auto;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--on-nav) 20%, transparent);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--on-nav);
+  cursor: pointer;
+  transition: background var(--dur-fast, 140ms) var(--ease-out, ease), transform var(--dur-fast, 140ms) var(--ease-out, ease);
+}
+.sidebar-collapse-btn:hover { background: rgba(255, 255, 255, 0.12); transform: scale(1.06); }
+
+body.sidebar-collapsed .app-shell { grid-template-columns: 84px minmax(0, 1fr); transition: grid-template-columns var(--dur-slow, 320ms) var(--ease-out, ease); }
+.sidebar.collapsed { transition: width var(--dur-slow, 320ms) var(--ease-out, ease); }
+.sidebar.collapsed .brand span,
+.sidebar.collapsed .nav-item strong,
+.sidebar.collapsed .nav-shortcut,
+.sidebar.collapsed .sidebar-account-info,
+.sidebar.collapsed .sidebar-account-chevron {
+  display: none;
+}
+.sidebar.collapsed .brand { justify-content: center; }
+.sidebar.collapsed .nav-item { grid-template-columns: 1fr; justify-items: center; }
+.sidebar.collapsed .sidebar-collapse-btn { transform: rotate(180deg); margin: 6px auto; }
+.sidebar.collapsed .sidebar-collapse-btn:hover { transform: rotate(180deg) scale(1.06); }
+.sidebar.collapsed .sidebar-account-trigger { justify-content: center; }
+@media (max-width: 860px) {
+  /* Collapse is a desktop affordance only — mobile already uses its own
+     bottom-nav / off-canvas pattern from Phase 1, so never shrink there. */
+  body.sidebar-collapsed .app-shell { grid-template-columns: unset; }
+  .sidebar-collapse-btn { display: none; }
+}
 .nav-item.active .nav-icon { color: #fff; background: var(--nav-accent, var(--blue)); }
 .nav-item.active strong small { color: color-mix(in srgb, var(--nav) 55%, transparent); }
 .sidebar-card { padding: 16px 7px 2px; }
@@ -1581,4 +1632,205 @@ label, .stat-card span { font-weight: 650; }
 .lang-switch-btn[aria-pressed='true'] {
   background: var(--accent, var(--blue));
   color: #fff;
+}
+
+/* ── Design System v2 — reusable progress ring + card grid ──────────────
+   Introduced for the Dashboard (Phase 2a) and now shared with Statistics
+   (Phase 2e) so both pages use the same primitives instead of duplicating
+   them per-page. */
+.progress-ring { display: block; transform: rotate(0deg); }
+.progress-ring-track { stroke: var(--line); }
+.progress-ring-value {
+  transition: stroke-dashoffset var(--dur-slow, 420ms) var(--ease-out, ease);
+}
+
+.dash-section-title {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dash-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated, var(--surface));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: transform var(--dur-fast, 140ms) var(--ease-out, ease),
+              box-shadow var(--dur-base, 220ms) var(--ease-out, ease),
+              border-color var(--dur-base, 220ms) var(--ease-out, ease);
+}
+
+.dash-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in srgb, var(--blue) 30%, var(--line));
+}
+
+.dash-card .progress-ring-value { stroke: var(--blue); }
+.dash-card[data-accent='green']  .progress-ring-value { stroke: var(--green); }
+.dash-card[data-accent='purple'] .progress-ring-value { stroke: var(--purple); }
+.dash-card[data-accent='orange'] .progress-ring-value { stroke: var(--orange); }
+.dash-card[data-accent='mars']   .progress-ring-value { stroke: var(--orange); }
+
+.dash-card-body { min-width: 0; }
+.dash-card-body h3 { margin: 0 0 3px; font-size: 0.92rem; }
+.dash-card-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (max-width: 860px) {
+  .dash-columns { grid-template-columns: 1fr; }
+}
+
+/* ── Bug fix: .std-icon-btn was used throughout study.js (edit/delete/pin/
+   archive icon buttons) but had no CSS definition anywhere in the project —
+   it rendered as a bare unstyled button. Habits/Tasks (Phase 3) use it too,
+   so fixing it here benefits every page that relies on it. */
+.std-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--ink);
+  appearance: none;
+  cursor: pointer;
+  transition: background-color var(--dur-fast, 120ms) ease, transform var(--dur-fast, 120ms) ease, color var(--dur-fast, 120ms) ease;
+}
+.std-icon-btn:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent, var(--blue)) 14%, var(--surface-2)); }
+.std-icon-danger:hover { background: var(--red, #e5484d); color: #fff; border-color: var(--red, #e5484d); }
+
+/* ── Shared list/filter/badge/modal kit ─────────────────────────────────
+   Introduced for Tasks (Phase 3a) and reused as-is by Habits (Phase 3b) —
+   kept the `td-` prefix rather than renaming everything; it now means
+   "shared list-page UI kit", not "todo-only". */
+
+.td-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.td-filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.td-chip {
+  padding: 7px 14px;
+  min-height: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dur-fast, 140ms) ease, color var(--dur-fast, 140ms) ease, border-color var(--dur-fast, 140ms) ease;
+}
+
+.td-chip:hover { color: var(--ink); }
+
+.td-chip.active { background: var(--accent, var(--blue)); border-color: var(--accent, var(--blue)); color: #fff; }
+
+.td-tag-select {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.8rem;
+  min-height: 0;
+}
+
+.td-check { display: flex; align-items: center; padding-top: 2px; }
+
+.td-card-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.td-card-top strong { font-size: 0.94rem; cursor: pointer; }
+
+.td-card-top strong:hover { text-decoration: underline; }
+
+.td-badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.td-badge-high   { background: color-mix(in srgb, var(--red, #e5484d) 16%, var(--surface-2)); color: var(--red, #e5484d); }
+
+.td-badge-medium { background: color-mix(in srgb, var(--orange) 16%, var(--surface-2)); color: var(--orange); }
+
+.td-badge-low    { background: color-mix(in srgb, var(--green) 16%, var(--surface-2)); color: var(--green); }
+
+.td-badge-recur    { background: color-mix(in srgb, var(--blue) 14%, var(--surface-2)); color: var(--blue); text-transform: none; }
+
+.td-badge-reminder { background: color-mix(in srgb, var(--purple) 14%, var(--surface-2)); color: var(--purple); }
+
+.td-badge-conflict { background: color-mix(in srgb, var(--red, #e5484d) 18%, var(--surface-2)); color: var(--red, #e5484d); }
+
+.td-tag-chip { font-size: 0.74rem; color: var(--accent, var(--blue)); font-weight: 700; }
+
+.td-subtask-bar { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+
+.td-subtask-bar i { display: block; height: 100%; background: var(--accent, var(--blue)); border-radius: 999px; transition: width var(--dur-base, 220ms) ease; }
+
+.td-actions { display: flex; gap: 4px; }
+
+.td-modal-overlay { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 18px; }
+
+.td-modal-backdrop { position: absolute; inset: 0; background: rgba(10, 10, 14, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+.td-modal-card {
+  position: relative;
+  width: min(620px, 100%);
+  max-height: min(90vh, 820px);
+  overflow-y: auto;
+  padding: var(--card-pad, 22px);
+  animation: tdModalIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tdModalIn { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.td-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+
+.td-modal-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+
+.td-modal-actions-right { display: flex; gap: 10px; }
+
+@media (max-width: 640px) {
+  .td-actions { grid-column: 1 / -1; justify-content: flex-end; }
 }

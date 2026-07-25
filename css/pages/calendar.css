@@ -789,3 +789,59 @@
   .cal-current-label { min-width: 0; }
   .cal-day-dots { gap: 3px; }
 }
+
+/* ── Agenda view ──────────────────────────────────────────────────────── */
+.cal-agenda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 74vh;
+  overflow-y: auto;
+}
+
+.cal-agenda-group { padding-top: 6px; }
+
+.cal-agenda-date {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 4px;
+  background: var(--surface-elevated, var(--surface));
+  border-bottom: 1px solid var(--line);
+}
+
+.cal-agenda-weekday {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cal-agenda-date strong { font-size: 0.98rem; }
+
+.cal-agenda-today-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent, var(--blue));
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.cal-agenda-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 2px 14px;
+}
+
+/* Drop-target highlight for dragging an event onto a different day's group */
+.cal-agenda-date.cal-drop-hover {
+  background: color-mix(in srgb, var(--blue) 16%, var(--surface-3));
+  border-bottom-color: var(--blue);
+}

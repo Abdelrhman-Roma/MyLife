@@ -8,8 +8,13 @@
   border-radius: var(--radius-xl);
   background: var(--surface-elevated, var(--surface));
   box-shadow: var(--shadow-card, var(--shadow));
-  overflow: hidden;
   border-top: 1px solid var(--line);
+  /* Do NOT set overflow:hidden here — the avatar/cover edit dropdown menus
+     are absolutely-positioned descendants of .account-photo-wrap, and
+     clipping the whole hero cut them off (this is the "photo upload modal
+     not opening on desktop" bug: the menu opened but was invisible/
+     unclickable, clipped by this ancestor). Only the cover image needs
+     rounded corners, so the clip is scoped to .account-cover below. */
 }
 
 .account-cover {
@@ -18,6 +23,9 @@
   background: linear-gradient(120deg, color-mix(in srgb, var(--accent, var(--blue)) 55%, var(--surface-2)), color-mix(in srgb, var(--accent, var(--purple)) 30%, var(--surface-3)));
   background-size: cover;
   background-position: center;
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
+  overflow: hidden;
 }
 
 .cover-edit-btn {

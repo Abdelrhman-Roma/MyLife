@@ -1,0 +1,71 @@
+/* MOMENTUM — Habits page styles (Phase 3). Reuses the shared td-* list/
+   filter/badge/modal kit from shared.css (see the note there). */
+
+.habits-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 32px 0;
+}
+@media (max-width: 860px) {
+  .habits-sections { margin-left: 16px; margin-right: 16px; }
+}
+
+.hab-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.hab-list { display: flex; flex-direction: column; gap: 10px; }
+
+.hab-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated, var(--surface));
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--dur-base, 220ms) var(--ease-out, ease);
+}
+.hab-card:hover { box-shadow: var(--shadow-sm); }
+.hab-card.is-completed { border-color: color-mix(in srgb, var(--green) 40%, var(--line)); }
+.hab-card.is-completed strong { color: var(--green); }
+
+.hab-card-main { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.hab-stats-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.hab-stat { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+
+.hab-week { display: flex; flex-direction: column; gap: 4px; }
+.hab-week-label { font-size: 0.76rem; font-weight: 700; color: var(--muted); }
+
+.hab-heatmap {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 10px);
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.hab-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: transform 100ms ease;
+}
+.hab-cell:hover { transform: scale(1.25); }
+.hab-cell.on { background: var(--green); border-color: var(--green); }
+
+@media (max-width: 640px) {
+  .hab-card { grid-template-columns: auto 1fr; }
+  .td-actions { grid-column: 1 / -1; justify-content: flex-end; }
+}

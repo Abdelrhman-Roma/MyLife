@@ -906,3 +906,93 @@
     flex: 1;
   }
 }
+
+/* ── Personal records ────────────────────────────────────────────────── */
+.wo-pr-block { min-height: 0; }
+.wo-pr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.wo-pr-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+}
+.wo-pr-icon { font-size: 1.2rem; flex-shrink: 0; }
+.wo-pr-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wo-pr-body strong {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wo-pr-body span {
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent, var(--orange));
+}
+
+/* ── Phase 3: volume / recovery / measurements / photos ─────────────────── */
+.wo-week-labels { display: flex; justify-content: space-between; margin-top: 6px; }
+.wo-week-labels small { color: var(--muted); font-size: 0.68rem; font-weight: 700; }
+
+.wo-recovery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+.wo-recovery-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+}
+.wo-recovery-card.is-ready { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+.wo-recovery-card.is-ready strong { color: var(--green); }
+
+.wo-measure-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.wo-measure-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.wo-photo-upload-btn {
+  display: inline-flex;
+  width: fit-content;
+  cursor: pointer;
+}
+.wo-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.wo-photo-card {
+  position: relative;
+  margin: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+}
+.wo-photo-card img { display: block; width: 100%; aspect-ratio: 3/4; object-fit: cover; }
+.wo-photo-card figcaption { padding: 4px 6px; font-size: 0.68rem; color: var(--muted); }
+.wo-photo-delete { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; }
+
+.wo-exstat-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.wo-exstat-table th { text-align: left; color: var(--muted); font-size: 0.7rem; text-transform: uppercase; padding: 4px 8px; }
+.wo-exstat-table td { padding: 6px 8px; border-top: 1px solid var(--line); }

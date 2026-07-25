@@ -1,0 +1,184 @@
+/* MOMENTUM — Dashboard ("Mission Control") page styles.
+   Everything here reads the shared design tokens (spacing/radius/shadow/
+   motion/accent colors) from variables.css + shared.css's Design System v2
+   layer, so it inherits theme, palette, dark/light and reduced-motion
+   automatically — no page-specific theme overrides needed. */
+
+.dash-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 20px);
+  margin-top: var(--space-5, 20px);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.dash-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5, 20px);
+  flex-wrap: wrap;
+  padding: var(--card-pad, 22px) clamp(18px, 3vw, 28px);
+  border-radius: var(--radius-xl);
+  background: var(--surface-elevated, var(--surface));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card, var(--shadow));
+}
+
+.dash-hero-greeting h2 {
+  margin: 4px 0 8px;
+  font-size: var(--fs-h1);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dash-hero-xp {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-hero-quote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  max-width: 46ch;
+  font-style: italic;
+}
+
+.dash-hero-rings {
+  display: flex;
+  gap: var(--space-5, 20px);
+  flex-shrink: 0;
+}
+
+.dash-hero-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.dash-hero-ring .progress-ring { grid-area: 1 / 1; }
+
+.dash-hero-ring span {
+  grid-area: 1 / 1;
+  font-weight: 800;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-hero-ring small {
+  position: absolute;
+  top: 100%;
+  margin-top: 6px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Progress ring primitive, .dash-grid/.dash-card, and .dash-columns now live
+   in shared.css's Design System v2 layer — Statistics reuses them too. */
+
+/* ── Quick actions ────────────────────────────────────────────────────── */
+.dash-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dash-quick-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  min-height: var(--tap, 44px);
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform var(--dur-fast, 140ms) var(--ease-out, ease),
+              background var(--dur-base, 220ms) var(--ease-out, ease),
+              border-color var(--dur-base, 220ms) var(--ease-out, ease);
+}
+
+.dash-quick-action span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--accent, var(--blue));
+  font-weight: 900;
+}
+
+.dash-quick-action:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent, var(--blue)) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent, var(--blue)) 35%, var(--line));
+}
+
+.dash-event-list,
+.dash-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-event-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.dash-event-date {
+  flex-shrink: 0;
+  min-width: 46px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--accent, var(--orange));
+}
+
+.dash-event-body p { margin: 0; font-size: 0.86rem; font-weight: 600; }
+.dash-event-body small { color: var(--muted); }
+
+.dash-activity-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 4px;
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+
+.dash-activity-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--accent, var(--blue));
+}
+
+.dash-activity-list strong { font-weight: 700; }
+
+@media (max-width: 860px) {
+  .dash-hero { flex-direction: column; align-items: flex-start; }
+  .dash-columns { grid-template-columns: 1fr; }
+}

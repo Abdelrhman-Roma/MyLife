@@ -1,0 +1,101 @@
+/* MOMENTUM — Tasks page styles (Phase 3). */
+
+.todo-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 32px 0;
+}
+@media (max-width: 860px) {
+  .todo-sections { margin-left: 16px; margin-right: 16px; }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+.td-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.td-search-row { margin-top: 14px; }
+.td-search {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* ── Filters ──────────────────────────────────────────────────────────── */
+
+/* ── Task list / cards ────────────────────────────────────────────────── */
+.td-list { display: flex; flex-direction: column; gap: 10px; }
+
+.td-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated, var(--surface));
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--dur-base, 220ms) var(--ease-out, ease);
+}
+.td-card:hover { box-shadow: var(--shadow-sm); }
+.td-card[data-priority='High']   { border-left-color: var(--red, #e5484d); }
+.td-card[data-priority='Medium'] { border-left-color: var(--orange); }
+.td-card[data-priority='Low']    { border-left-color: var(--green); }
+.td-card.is-completed { opacity: 0.62; }
+.td-card.is-completed strong { text-decoration: line-through; }
+.td-card.is-overdue { background: color-mix(in srgb, var(--red, #e5484d) 6%, var(--surface-elevated, var(--surface))); }
+.td-card.is-blocked { opacity: 0.8; }
+
+.td-check input { width: 20px; height: 20px; accent-color: var(--accent, var(--blue)); cursor: pointer; }
+.td-check input:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.td-card-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+
+
+.td-card-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.td-meta-item { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+
+.td-blocked-note { margin: 0; font-size: 0.78rem; color: var(--red, #e5484d); }
+
+.td-subtasks { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.td-subtask-toggle {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.td-subtask-toggle:hover { color: var(--accent, var(--blue)); }
+.td-subtask-list { display: flex; flex-direction: column; gap: 4px; padding-left: 2px; }
+.td-subtask-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+.td-subtask-row input { accent-color: var(--accent, var(--blue)); }
+
+.td-attachments { display: flex; flex-wrap: wrap; gap: 8px; }
+.td-attachment {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--accent, var(--blue));
+  text-decoration: none;
+}
+.td-attachment:hover { text-decoration: underline; }
+
+
+/* ── Modal ────────────────────────────────────────────────────────────── */
+.td-recur-toggle { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.td-recur-toggle input { width: 18px; height: 18px; accent-color: var(--accent, var(--blue)); }
+
+@media (max-width: 640px) {
+  .td-card { grid-template-columns: auto 1fr; }
+}
