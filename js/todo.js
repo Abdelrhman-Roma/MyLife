@@ -99,7 +99,7 @@ function renderTodoRoot() {
     <div class="td-list">
       ${tasks.length
         ? smartOrder(tasks).map((t) => taskCardHtml(t, conflicts)).join('')
-        : `<div class="empty-state">${t('No tasks here. Add one to get started.')}</div>`}
+        : emptyStateHtml('checklist', t('No tasks here. Add one to get started.'), `<button type="button" class="secondary-btn empty-state-cta" data-td-add>+ ${t('New task')}</button>`)}
     </div>
   `;
   bindTodoRootEvents(root);
@@ -220,7 +220,7 @@ function taskCardHtml(t, conflicts) {
 
 // ─── Events ─────────────────────────────────────────────────────────────────
 function bindTodoRootEvents(root) {
-  root.querySelector('[data-td-add]').addEventListener('click', () => openTaskModal());
+  root.querySelectorAll('[data-td-add]').forEach((btn) => btn.addEventListener('click', () => openTaskModal()));
   const search = root.querySelector('[data-td-search]');
   let searchTimer = null;
   search.addEventListener('input', () => {

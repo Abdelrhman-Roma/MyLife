@@ -657,7 +657,7 @@ function renderForm(pageKey) {
     return;
   }
 
-  entryForm.innerHTML = `<div class="empty-state">${t('Use the sidebar to navigate to a data page.')}</div>`;
+  entryForm.innerHTML = emptyStateHtml('sparkles', t('Use the sidebar to navigate to a data page.'));
   entryForm.onsubmit  = null;
 }
 
@@ -680,7 +680,7 @@ function renderGenericList(pageKey) {
   const page  = PAGES[pageKey];
   const items = currentData[page.collection] || [];
   if (!items.length) {
-    byId('data-list').innerHTML = `<div class="empty-state">${t('No {title} records yet. Add your first one above.', { title: escapeHtml(t(page.title).toLowerCase()) })}</div>`;
+    byId('data-list').innerHTML = emptyStateHtml('checklist', t('No {title} records yet. Add your first one above.', { title: escapeHtml(t(page.title).toLowerCase()) }));
     return;
   }
   byId('data-list').innerHTML = items.map((item) => cardHtml(item, page)).join('');
@@ -691,7 +691,7 @@ function renderChecklist(pageKey) {
   const page  = PAGES[pageKey];
   const items = currentData[page.collection] || [];
   if (!items.length) {
-    byId('data-list').innerHTML = `<div class="empty-state">${t('No {title} records yet. Add your first one above.', { title: escapeHtml(t(page.title).toLowerCase()) })}</div>`;
+    byId('data-list').innerHTML = emptyStateHtml('checklist', t('No {title} records yet. Add your first one above.', { title: escapeHtml(t(page.title).toLowerCase()) }));
     return;
   }
   byId('data-list').innerHTML = items.map((item) => `
@@ -758,7 +758,7 @@ function renderNutrition() {
     </div>
     ${items.length
       ? items.map((item) => cardHtml(item, PAGES.nutrition)).join('')
-      : `<div class="empty-state">${t('No meals yet. Log calories, protein, carbs, and fat above.')}</div>`}
+      : emptyStateHtml('apple', t('No meals yet. Log calories, protein, carbs, and fat above.'))}
   `;
   bindDeleteButtons('nutrition');
 }
@@ -814,7 +814,7 @@ function upcomingEventsHtml() {
     .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || ''))
     .slice(0, 5);
   if (!upcoming.length) {
-    return `<div class="empty-state">${t('Nothing on the calendar yet. Add an event to see it here.')}</div>`;
+    return emptyStateHtml('calendar', t('Nothing on the calendar yet. Add an event to see it here.'));
   }
   return `<div class="dash-event-list">${upcoming.map((e) => `
     <div class="dash-event-row">
@@ -841,7 +841,6 @@ function recentActivityHtml() {
     ['meals', 'title', t('Meal logged')],
     ['study', 'title', t('Study session logged')],
     ['sleep', 'title', t('Sleep logged')],
-    ['prayers', 'title', t('Prayer logged')],
   ];
   const items = [];
   sources.forEach(([key, field, label]) => {
@@ -850,7 +849,7 @@ function recentActivityHtml() {
   });
   const recent = items.slice(-6).reverse();
   if (!recent.length) {
-    return `<div class="empty-state">${t('Your recent activity will show up here as you use MyLife.')}</div>`;
+    return emptyStateHtml('activity', t('Your recent activity will show up here as you use MyLife.'));
   }
   return `<ul class="dash-activity-list">${recent.map((r) => `
     <li><span class="dash-activity-dot" aria-hidden="true"></span><span><strong>${escapeHtml(r.label)}</strong>${r.text ? ` \u2014 ${escapeHtml(r.text)}` : ''}</span></li>
@@ -920,7 +919,7 @@ function renderDashboard() {
           ${progressRingSvg(wo.pct, 'orange', 52)}
           <div class="dash-card-body"><h3>${t('Workout')}</h3><p>${wo.label} \u2014 ${wo.sub}</p></div>
         </a>
-        ${dashCard('prayer', t('Prayer'), 'green', counts.prayers, s.prayerGoal, `${counts.prayers}/${s.prayerGoal || 0} ${t('today')}`, 'prayer.html')}
+        ${dashCard('prayer', t('Prayer'), 'green', counts.prayersToday, s.prayerGoal, `${counts.prayersToday}/${s.prayerGoal || 0} ${t('today')}`, 'prayer.html')}
         ${dashCard('study', t('Study'), 'blue', counts.study, s.studyGoal ? Math.round(s.studyGoal / 30) : 1, `${counts.study} ${t('sessions')}`, 'study.html')}
         <a class="dash-card" data-accent="orange" href="calendar.html">
           ${progressRingSvg(percent(eventsToday, Math.max(eventsToday, 1)), 'orange', 52)}
@@ -1015,7 +1014,7 @@ function comparisonBarsHtml() {
     ['Goals',  percent(c.completedGoals, c.goals || 1), 'purple'],
     ['Water',  percent(c.water, currentData.settings.waterGoal), 'blue'],
     ['Sleep',  percent(c.sleep, currentData.settings.sleepGoal), 'purple'],
-    ['Prayer', percent(c.prayers, currentData.settings.prayerGoal), 'green'],
+    ['Prayer', percent(c.prayersToday, currentData.settings.prayerGoal), 'green'],
   ];
   return `<div class="stats-compare">${rows.map(([label, pct, color]) => `
     <div class="stats-compare-row">
@@ -1035,7 +1034,7 @@ function statsInsightsHtml() {
     ['Goals', percent(c.completedGoals, c.goals || 1)],
     ['Water', percent(c.water, s.waterGoal)],
     ['Sleep', percent(c.sleep, s.sleepGoal)],
-    ['Prayer', percent(c.prayers, s.prayerGoal)],
+    ['Prayer', percent(c.prayersToday, s.prayerGoal)],
   ];
   const strongest = rates.reduce((a, b) => (b[1] > a[1] ? b : a), rates[0]);
   const weakest = rates.reduce((a, b) => (b[1] < a[1] ? b : a), rates[0]);
@@ -1076,11 +1075,11 @@ function renderStatistics() {
     <section class="dash-columns">
       <div class="panel stats-chart-card">
         <h3>${t('Study sessions')}</h3>
-        ${studyBuckets.values.some(Boolean) ? statsBarChartSvg(studyBuckets.labels, studyBuckets.values, 'blue') : `<div class="empty-state">${t('Log a study session to see this chart.')}</div>`}
+        ${studyBuckets.values.some(Boolean) ? statsBarChartSvg(studyBuckets.labels, studyBuckets.values, 'blue') : emptyStateHtml('book', t('Log a study session to see this chart.'))}
       </div>
       <div class="panel stats-chart-card">
         <h3>${t('Workouts')}</h3>
-        ${workoutBuckets.values.some(Boolean) ? statsBarChartSvg(workoutBuckets.labels, workoutBuckets.values, 'orange') : `<div class="empty-state">${t('Finish a workout session to see this chart.')}</div>`}
+        ${workoutBuckets.values.some(Boolean) ? statsBarChartSvg(workoutBuckets.labels, workoutBuckets.values, 'orange') : emptyStateHtml('dumbbell', t('Finish a workout session to see this chart.'))}
       </div>
     </section>
 
@@ -1424,7 +1423,8 @@ function getCounts() {
     completedGoals:  currentData.goals.filter((i) => i.completed).length,
     events:          currentData.events.length,
     workouts:        currentData.workouts.length,
-    prayers:         currentData.prayers.length,
+    prayers:         currentData.prayers.filter((p) => p.status === 'Completed').length,
+    prayersToday:    currentData.prayers.filter((p) => p.date === new Date().toISOString().slice(0, 10) && p.status === 'Completed').length,
     meals:           currentData.meals.length,
     water:           currentData.water.reduce((s, i) => s + Number(i.amount || 0), 0),
     sleep:           currentData.sleep.length,
@@ -1463,8 +1463,9 @@ function productivityScore() {
   return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
 }
 
-function nutritionTotals() {
-  return currentData.meals.reduce(
+function nutritionTotals(dateIso) {
+  const target = dateIso || new Date().toISOString().slice(0, 10);
+  return currentData.meals.filter((m) => (m.date || target) === target).reduce(
     (t, i) => ({
       calories: t.calories + Number(i.calories || 0),
       protein:  t.protein  + Number(i.protein  || 0),
@@ -1500,7 +1501,7 @@ function emptyData(name) {
     tasks:    [], habits: [], goals: [], events: [], workouts: [],
     prayers:  [], meals:  [], water: [], sleep:  [], study:   [],
     subjects: [], assignments: [], exams: [], projects: [], studyNotes: [], resources: [],
-    bodyMeasurements: [], progressPhotos: [],
+    bodyMeasurements: [], progressPhotos: [], quranLog: [], hadithCollection: [], shoppingList: [],
     workoutPlan: { daysPerWeek: 4, trainingDays: ['Mon','Tue','Thu','Fri'], schedule: [] },
     pomodoro: { mode: '25/5', workMin: 25, breakMin: 5, sessionsToday: 0, dailyGoal: 8, lastResetDate: '', soundOn: true },
   };
@@ -1545,8 +1546,28 @@ function normalizeData(data, name) {
   }));
   const habitsToday = new Date().toISOString().slice(0, 10);
   merged.habits.forEach((h) => { h.completed = h.completions.includes(habitsToday); });
+
+  // Prayers: migrate to a real 5-daily-prayer model. Old free-form entries
+  // (title/time/status only, no date) are preserved as-is under whatever
+  // name they had — nothing is deleted — while the canonical daily prayers
+  // are auto-generated so streaks/insights have real per-day data to work with.
+  const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+  const prayerToday = habitsToday;
+  merged.prayers = merged.prayers.map((i) => ({
+    date: i.date || '', prayer: i.prayer || i.title || '', time: i.time || '',
+    status: i.status === 'Completed' ? 'Completed' : (i.status === 'Missed' ? 'Missed' : 'Pending'),
+    completedAt: i.completedAt || null,
+    ...i,
+  }));
+  merged.prayers.forEach((p) => { if (p.date && p.date < prayerToday && p.status === 'Pending') p.status = 'Missed'; });
+  const existingTodayPrayers = new Set(merged.prayers.filter((p) => p.date === prayerToday).map((p) => p.prayer));
+  PRAYER_NAMES.forEach((name) => {
+    if (!existingTodayPrayers.has(name)) {
+      merged.prayers.push({ id: makeId(), date: prayerToday, prayer: name, time: '', status: 'Pending', completedAt: null });
+    }
+  });
   merged.goals    = merged.goals.map((i)    => ({ period: 'Daily', category: 'General', completed: false, ...i }));
-  merged.meals    = merged.meals.map((i)    => ({ protein: 0, carbs: 0, fat: 0, ...i }));
+  merged.meals    = merged.meals.map((i)    => ({ protein: 0, carbs: 0, fat: 0, date: '', ingredients: '', ...i }));
   merged.workouts = merged.workouts.map((i) => ({ day: '', title: 'Exercise', weight: 0, reps: 0, sets: 1, note: '', ...i }));
   merged.study        = merged.study.map((i)        => ({ title: 'Study session', topic: '', subjectId: null, date: '', startTime: '', duration: 30, minutes: 30, priority: 'Medium', difficulty: 'Medium', status: 'Planned', progress: 0, elapsedSeconds: 0, notes: '', completed: false, completedAt: null, ...i }));
   merged.subjects     = merged.subjects.map((i)     => ({ name: 'Subject', icon: '📘', color: '#3b6ea5', teacher: '', semester: '', creditHours: 0, progress: 0, avgGrade: '', difficulty: 'Medium', notes: '', ...i }));
@@ -1581,6 +1602,26 @@ function firstName(name) { return name.split(' ')[0] || name; }
 
 function percent(value, max) {
   return Math.max(0, Math.min(100, Math.round((Number(value) / Number(max || 1)) * 100)));
+}
+
+// ─── Empty-state illustrations ──────────────────────────────────────────────
+const EMPTY_ICONS = {
+  checklist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><path d="M4 5h16v14H4z"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>',
+  flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 4-4 5-4 10a4 4 0 0 0 8 0c0-2-1-3-1-3s2 1 2 4a6 6 0 0 1-12 0c0-6 6-7 5-11z"/></svg>',
+  dumbbell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M4 9l3-3 2 2-3 3-2-2zm9 9l3-3 2 2-3 3-2-2zM2 11l2-2M20 15l2-2"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5V4.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>',
+  apple: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8c-3 0-5.5 2.5-5.5 6.5S9 21 12 21s5.5-2.5 5.5-6.5S15 8 12 8z"/><path d="M12 8c0-2 1-4 3-4"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></svg>',
+  chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>',
+  sparkles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg>',
+  cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 12.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 7H6"/></svg>',
+  activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 8 4-16 2 8h6"/></svg>',
+};
+
+function emptyStateHtml(icon, message, ctaHtml = '') {
+  return `<div class="empty-state">${EMPTY_ICONS[icon] || EMPTY_ICONS.sparkles}<p>${message}</p>${ctaHtml}</div>`;
 }
 
 // Reusable radial progress indicator. `colorVar` is a CSS custom property

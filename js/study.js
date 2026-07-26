@@ -367,7 +367,7 @@ function todayPlanHtml() {
         <button class="secondary-btn" type="button" data-std-add="session">+ Session</button>
       </div>
       <div class="std-session-list">
-        ${items.length ? items.map(sessionCardHtml).join('') : '<div class="empty-state">Nothing planned for today yet. Add a study session to get started.</div>'}
+        ${items.length ? items.map(sessionCardHtml).join('') : emptyStateHtml('book', 'Nothing planned for today yet. Add a study session to get started.')}
       </div>
     </section>
   `;
@@ -596,7 +596,7 @@ function subjectsHtml() {
               ${upcomingExam[s.id] ? `<span class="std-chip">Exam ${escapeHtml(upcomingExam[s.id])}</span>` : ''}
             </div>
           </article>
-        `).join('') : '<div class="empty-state">No subjects yet. Add your first subject to start organizing sessions.</div>'}
+        `).join('') : emptyStateHtml('book', 'No subjects yet. Add your first subject to start organizing sessions.')}
       </div>
     </section>
   `;
@@ -615,7 +615,7 @@ function assignmentsHtml() {
         <button class="secondary-btn" type="button" data-std-add="assignment">+ Assignment</button>
       </div>
       <div class="std-assignment-list">
-        ${items.length ? items.map(assignmentRowHtml).join('') : '<div class="empty-state">No assignments tracked yet.</div>'}
+        ${items.length ? items.map(assignmentRowHtml).join('') : emptyStateHtml('checklist', 'No assignments tracked yet.')}
       </div>
     </section>
   `;
@@ -634,7 +634,7 @@ function resourcesHtml() {
         <button class="secondary-btn" type="button" data-std-add="resource">+ Resource</button>
       </div>
       <div class="std-resource-list">
-        ${items.length ? items.map(resourceRowHtml).join('') : '<div class="empty-state">No resources saved yet. Add links, articles, or materials per subject.</div>'}
+        ${items.length ? items.map(resourceRowHtml).join('') : emptyStateHtml('sparkles', 'No resources saved yet. Add links, articles, or materials per subject.')}
       </div>
     </section>
   `;
@@ -703,7 +703,7 @@ function examsHtml() {
         <button class="secondary-btn" type="button" data-std-add="exam">+ Exam</button>
       </div>
       <div class="std-exam-grid">
-        ${items.length ? items.map(examCardHtml).join('') : '<div class="empty-state">No exams scheduled.</div>'}
+        ${items.length ? items.map(examCardHtml).join('') : emptyStateHtml('calendar', 'No exams scheduled.')}
       </div>
     </section>
   `;
@@ -738,7 +738,7 @@ function projectsHtml() {
         <button class="secondary-btn" type="button" data-std-add="project">+ Project</button>
       </div>
       <div class="std-project-grid">
-        ${items.length ? items.map(projectCardHtml).join('') : '<div class="empty-state">No projects yet.</div>'}
+        ${items.length ? items.map(projectCardHtml).join('') : emptyStateHtml('sparkles', 'No projects yet.')}
       </div>
     </section>
   `;
@@ -819,7 +819,7 @@ function notesHtml() {
         </div>
       </div>
       <div class="std-notes-grid">
-        ${items.length ? items.map(noteCardHtml).join('') : `<div class="empty-state">${studyState.notesShowArchived ? 'No archived notes.' : 'No notes yet. Jot one down.'}</div>`}
+        ${items.length ? items.map(noteCardHtml).join('') : emptyStateHtml('book', studyState.notesShowArchived ? 'No archived notes.' : 'No notes yet. Jot one down.')}
       </div>
     </section>
   `;
@@ -940,7 +940,7 @@ function recentActivityHtml() {
   return `
     <section class="panel std-recent">
       <p class="eyebrow">Recent Activity</p><h2>What's happened lately</h2>
-      ${items.length ? `<ul class="std-recent-list">${items.map((i) => `<li><span>${i.icon}</span> ${escapeHtml(i.text)}</li>`).join('')}</ul>` : '<div class="empty-state">Nothing logged yet.</div>'}
+      ${items.length ? `<ul class="std-recent-list">${items.map((i) => `<li><span>${i.icon}</span> ${escapeHtml(i.text)}</li>`).join('')}</ul>` : emptyStateHtml('activity', 'Nothing logged yet.')}
     </section>
   `;
 }

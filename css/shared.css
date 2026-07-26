@@ -269,6 +269,13 @@ body[data-page='settings'] { --accent: var(--orange); }
   transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 
+.primary-btn:active,
+.secondary-btn:active,
+.danger-btn:active,
+.small-danger:active {
+  transform: scale(0.96);
+}
+
 .primary-btn:focus-visible,
 .secondary-btn:focus-visible,
 .danger-btn:focus-visible,
@@ -1469,17 +1476,18 @@ body.sidebar-collapsed .app-shell { grid-template-columns: 84px minmax(0, 1fr); 
   animation: emptyIn var(--dur-slow) var(--ease-out);
 }
 
-.empty-state::before {
-  content: '◌';
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
+.empty-state svg {
+  width: 40px;
+  height: 40px;
+  padding: 9px;
   border-radius: 50%;
   background: var(--surface-elevated, var(--surface));
   box-shadow: var(--shadow-xs);
   color: var(--accent, var(--blue));
-  font-size: 1.3rem;
+}
+
+.empty-state-cta {
+  margin-top: 4px;
 }
 
 @keyframes emptyIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

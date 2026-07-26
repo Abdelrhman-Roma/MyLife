@@ -10,16 +10,17 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../css/variables.css" />
     <link rel="stylesheet" href="../css/shared.css" />
-    <link rel="stylesheet" href="../css/pages/prayer.css" />
     <link rel="stylesheet" href="../css/responsive.css" />
     <link rel="stylesheet" href="../css/momentum.css" />
+    <link rel="stylesheet" href="../css/pages/prayer.css" />
   </head>
   <body data-page="prayer">
     <div class="app-shell">
       <aside class="sidebar" id="sidebar"></aside>
       <main class="main-panel">
         <header class="topbar" id="topbar"></header>
-        <main class="worship-dashboard" id="worship-dashboard" tabindex="-1" aria-live="polite"></main>
+        <section class="page-art" id="page-art"></section>
+        <section class="prayer-sections" id="prayer-root"></section>
       </main>
     </div>
     <script src="../locales/en.js"></script>
@@ -28,6 +29,7 @@
     <script src="../locales/de.js"></script>
     <script src="../js/i18n.js"></script>
     <script src="../js/shared.js"></script>
-    <script src="../js/pages/prayer.js"></script>
+    <script src="../js/prayer.js" defer></script>
+    <script src="../js/pages/prayer.js" defer></script>
   </body>
 </html>

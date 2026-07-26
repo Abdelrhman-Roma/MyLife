@@ -1,4 +1,6 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
-  initPage('nutrition');
+document.addEventListener('DOMContentLoaded', () => {
+  if (bootShell('nutrition') && typeof initNutritionPage === 'function') {
+    initNutritionPage();
+    window.__pageContentReinit = initNutritionPage;
+  }
 });
-

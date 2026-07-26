@@ -1,14 +1,73 @@
-.worship-dashboard{max-width:1440px;margin:0 auto;padding:0 28px 48px;display:grid;gap:20px;color:var(--ink)}
-.worship-dashboard *{box-sizing:border-box}.worship-dashboard button{font:inherit}.worship-dashboard button:focus-visible{outline:3px solid var(--focus-ring);outline-offset:3px}
-.worship-hero,.worship-card{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
-.worship-hero{padding:clamp(20px,3vw,36px);display:grid;grid-template-columns:1.3fr auto;gap:24px;align-items:center;overflow:hidden;position:relative}
-.worship-hero:after{content:"";position:absolute;width:240px;height:240px;right:-90px;top:-130px;border-radius:50%;background:color-mix(in srgb,var(--green) 22%,transparent);filter:blur(12px);pointer-events:none}.worship-kicker{margin:0 0 8px;color:var(--green);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.worship-hero h2{margin:0;font-size:clamp(26px,4vw,42px);letter-spacing:-.04em}.worship-subtitle{margin:10px 0 0;color:var(--muted);font-size:16px}.worship-date{text-align:right;z-index:1}.worship-clock{display:block;font:700 clamp(24px,3vw,38px)/1 var(--mono,monospace);font-variant-numeric:tabular-nums}.worship-date span{display:block;margin-top:7px;color:var(--muted);font-size:13px}
-.worship-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:20px}.worship-card{grid-column:span 4;padding:22px;min-width:0}.worship-card.wide{grid-column:span 8}.worship-card.full{grid-column:1/-1}.worship-card h3{margin:0;font-size:18px}.card-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:18px}.card-head p{margin:4px 0 0;color:var(--muted);font-size:13px}.icon-chip{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent);flex:none}.icon-chip svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
-.next-prayer{display:flex;align-items:center;gap:22px}.ring{--p:0;position:relative;width:116px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) calc(var(--p)*1%),color-mix(in srgb,var(--line) 85%,transparent) 0)}.ring:before{content:"";position:absolute;inset:9px;border-radius:inherit;background:var(--surface)}.ring strong,.ring span{position:relative;z-index:1;text-align:center}.ring strong{font-size:21px;font-variant-numeric:tabular-nums}.ring span{font-size:11px;color:var(--muted)}.next-prayer h4{font-size:24px;margin:0}.next-prayer p{color:var(--muted);margin:5px 0 13px}.action-row{display:flex;flex-wrap:wrap;gap:8px}.worship-btn{min-height:44px;border-radius:11px;padding:0 13px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer;transition:transform .18s ease,background-color .18s ease}.worship-btn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--green) 13%,var(--surface-2))}.worship-btn.primary{background:var(--green);color:#062d27;border-color:transparent;font-weight:700}.worship-btn[aria-pressed=true]{background:var(--green);color:#062d27;border-color:transparent}
-.prayer-list{display:grid;grid-template-columns:repeat(6,minmax(92px,1fr));gap:8px}.prayer-row{padding:13px 10px;border:1px solid var(--line);border-radius:14px;text-align:center;cursor:pointer;background:transparent;color:var(--ink);min-height:94px}.prayer-row.is-current{border-color:var(--green);background:color-mix(in srgb,var(--green) 13%,var(--surface))}.prayer-row strong,.prayer-row span{display:block}.prayer-row strong{font-size:14px}.prayer-row span{color:var(--muted);font:600 13px var(--mono,monospace);margin:7px 0}.prayer-row small{font-size:11px;color:var(--green)}
-.tracker{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.track-prayer{min-height:112px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:14px;cursor:pointer;padding:12px;text-align:left}.track-prayer strong,.track-prayer span{display:block}.track-prayer span{color:var(--muted);font-size:12px;margin-top:8px}.track-prayer[data-status=prayed],.track-prayer[data-status=mosque]{border-color:var(--green);background:color-mix(in srgb,var(--green) 13%,var(--surface-2))}.track-prayer[data-status=missed]{border-color:var(--red)}
-.goal-list{display:grid;gap:11px}.goal-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}.goal-row button{width:26px;height:26px;border:1px solid var(--line);border-radius:8px;background:var(--surface);cursor:pointer;color:var(--green)}.goal-row button[aria-pressed=true]{background:var(--green);color:#062d27}.goal-row label{font-size:14px}.goal-row small{color:var(--muted);font-variant-numeric:tabular-nums}.bar{height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;width:var(--value);border-radius:inherit;background:var(--green);transition:width .25s ease}
-.arabic{font-family:'Noto Sans Arabic',sans-serif;direction:rtl;font-size:21px;line-height:1.9}.content-copy{color:var(--muted);line-height:1.6}.quote-source{font-size:12px;color:var(--muted)}.tasbeeh{display:grid;place-items:center;text-align:center;gap:13px}.tasbeeh-count{font:700 56px/1 var(--mono,monospace);color:var(--green);font-variant-numeric:tabular-nums}.tasbeeh button{width:104px;aspect-ratio:1;border-radius:50%;border:8px solid color-mix(in srgb,var(--green) 25%,var(--surface));background:var(--surface-2);color:var(--ink);cursor:pointer;font-weight:700}.tasbeeh button:active{transform:scale(.96)}.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:var(--surface-2);padding:15px;border-radius:13px}.stat strong,.stat span{display:block}.stat strong{font-size:23px}.stat span{font-size:12px;color:var(--muted);margin-top:5px}.sun-card{border-color:color-mix(in srgb,var(--orange) 40%,var(--line));background:linear-gradient(135deg,color-mix(in srgb,var(--orange) 15%,var(--surface)),var(--surface))}.hidden{display:none!important}
-@media(max-width:1050px){.worship-card,.worship-card.wide{grid-column:span 6}.prayer-list{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:680px){.worship-dashboard{padding:0 14px 32px;gap:14px}.worship-hero{grid-template-columns:1fr;border-radius:16px}.worship-date{text-align:left}.worship-grid{gap:14px}.worship-card,.worship-card.wide{grid-column:1/-1;padding:18px;border-radius:16px}.prayer-list{grid-template-columns:repeat(2,1fr)}.tracker{grid-template-columns:repeat(2,1fr)}.next-prayer{gap:15px}.ring{width:94px}.stat-grid{grid-template-columns:repeat(2,1fr)}}
-@media(prefers-reduced-motion:reduce){.worship-dashboard *, .worship-btn{transition:none!important;scroll-behavior:auto!important}}
+/* MOMENTUM — Prayer page styles (Phase 3). */
+
+.prayer-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 32px 0;
+}
+@media (max-width: 860px) {
+  .prayer-sections { margin-left: 16px; margin-right: 16px; }
+}
+
+.pr-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.pr-hero-stats { display: flex; gap: 22px; }
+.pr-hero-stat { text-align: center; }
+.pr-hero-stat strong { display: block; font-size: 1.15rem; }
+.pr-hero-stat small { color: var(--muted); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+
+.pr-today-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+.pr-prayer-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: background var(--dur-fast, 140ms) ease, border-color var(--dur-fast, 140ms) ease;
+}
+.pr-prayer-toggle input { width: 20px; height: 20px; accent-color: var(--green); margin-bottom: 4px; }
+.pr-prayer-toggle span { font-weight: 700; font-size: 0.88rem; }
+.pr-prayer-toggle small { color: var(--muted); font-size: 0.72rem; }
+.pr-prayer-toggle.is-done { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); background: color-mix(in srgb, var(--green) 10%, var(--surface-2)); }
+.pr-prayer-toggle.is-missed { border-color: color-mix(in srgb, var(--red, #e5484d) 35%, var(--line)); }
+
+.pr-insight-panel { border-left: 4px solid var(--orange); }
+.pr-insight-panel p { margin: 0; }
+
+.pr-log-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pr-log-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.pr-log-row strong { display: block; font-size: 0.84rem; }
+.pr-log-row small { display: block; color: var(--muted); font-size: 0.72rem; }
+
+.pr-hadith-quote {
+  margin: 10px 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent, var(--green));
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.pr-hadith-quote p { margin: 0 0 6px; font-style: italic; }
+.pr-hadith-quote footer { color: var(--muted); font-size: 0.78rem; }

@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="../css/shared.css" />
     <link rel="stylesheet" href="../css/responsive.css" />
     <link rel="stylesheet" href="../css/momentum.css" />
+    <link rel="stylesheet" href="../css/pages/nutrition.css" />
   </head>
   <body data-page="nutrition">
     <div class="app-shell">
@@ -19,19 +20,7 @@
       <main class="main-panel">
         <header class="topbar" id="topbar"></header>
         <section class="page-art" id="page-art"></section>
-        <section class="stats-grid" id="stats-grid"></section>
-        <section class="content-grid">
-          <div class="panel">
-            <p class="eyebrow" id="form-kicker"></p>
-            <h2 id="form-title"></h2>
-            <form id="entry-form" class="form-stack" novalidate></form>
-          </div>
-          <div class="panel">
-            <p class="eyebrow">Your data</p>
-            <h2 id="list-title"></h2>
-            <div class="data-list" id="data-list"></div>
-          </div>
-        </section>
+        <section class="nutrition-sections" id="nutrition-root"></section>
       </main>
     </div>
     <script src="../locales/en.js"></script>
@@ -40,6 +29,7 @@
     <script src="../locales/de.js"></script>
     <script src="../js/i18n.js"></script>
     <script src="../js/shared.js"></script>
-    <script src="../js/pages/nutrition.js"></script>
+    <script src="../js/nutrition.js" defer></script>
+    <script src="../js/pages/nutrition.js" defer></script>
   </body>
 </html>

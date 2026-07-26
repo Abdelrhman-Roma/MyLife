@@ -90,7 +90,7 @@ function renderHabitsRoot() {
     ${habitsHeaderHtml()}
     ${habitsFiltersHtml()}
     <div class="hab-list">
-      ${habits.length ? habits.map(habitCardHtml).join('') : `<div class="empty-state">${t('No habits yet. Add one to start building your streak.')}</div>`}
+      ${habits.length ? habits.map(habitCardHtml).join('') : emptyStateHtml('flame', t('No habits yet. Add one to start building your streak.'), `<button type="button" class="secondary-btn empty-state-cta" data-hab-add>+ ${t('New habit')}</button>`)}
     </div>
   `;
   bindHabitsRootEvents(root);
@@ -179,7 +179,7 @@ function habitCardHtml(h) {
 }
 
 function bindHabitsRootEvents(root) {
-  root.querySelector('[data-hab-add]').addEventListener('click', () => openHabitModal());
+  root.querySelectorAll('[data-hab-add]').forEach((btn) => btn.addEventListener('click', () => openHabitModal()));
   root.querySelectorAll('[data-hab-filter]').forEach((btn) => btn.addEventListener('click', () => { habitState.filter = btn.dataset.habFilter; renderHabitsRoot(); }));
   const catSelect = root.querySelector('[data-hab-category]');
   if (catSelect) catSelect.addEventListener('change', () => { habitState.category = catSelect.value; renderHabitsRoot(); });

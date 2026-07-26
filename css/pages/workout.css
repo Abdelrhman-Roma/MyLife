@@ -996,3 +996,23 @@
 .wo-exstat-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .wo-exstat-table th { text-align: left; color: var(--muted); font-size: 0.7rem; text-transform: uppercase; padding: 4px 8px; }
 .wo-exstat-table td { padding: 6px 8px; border-top: 1px solid var(--line); }
+
+/* ── Workout templates ────────────────────────────────────────────────── */
+.wo-template-row {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wo-template-label { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.wo-template-controls { display: flex; gap: 10px; flex-wrap: wrap; }
+.wo-template-controls select {
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+}

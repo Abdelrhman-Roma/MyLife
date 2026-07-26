@@ -64,7 +64,8 @@ const SOURCE_MODULE_META = {
                getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; } },
   prayer:    { category: 'prayer',label: 'Prayer',  page: 'prayer.html',    completable: true,
                getCollection: () => currentData.prayers || [],
-               getCompleted: (i) => i.status === 'Completed', setCompleted: (i, v) => { i.status = v ? 'Completed' : 'Planned'; } },
+               getCompleted: (i) => i.status === 'Completed',
+               setCompleted: (i, v) => { i.status = v ? 'Completed' : 'Pending'; i.completedAt = v ? new Date().toISOString() : null; } },
   workout:   { category: 'workout', label: 'Workout', page: 'workout.html', completable: true,
                getCollection: () => (currentData.workoutPlan && currentData.workoutPlan.schedule) || [],
                getCompleted: (i) => i.status === 'Done', setCompleted: (i, v) => { i.status = v ? 'Done' : 'Not Started'; } },
@@ -239,12 +240,17 @@ function reconcileSourceLinkedEvents() {
     startTime: t.time || '',
   }));
   (currentData.habits || []).forEach((h) => materializeSourceEvent('habit', h, { title: h.title || 'Habit', date: todayISO(), repeatRule: 'Daily' }));
-  (currentData.prayers || []).forEach((p) => materializeSourceEvent('prayer', p, { title: p.title || 'Prayer', date: todayISO(), repeatRule: 'Daily', startTime: p.time }));
+  (currentData.prayers || []).forEach((p) => materializeSourceEvent('prayer', p, {
+    title: p.prayer || p.title || 'Prayer',
+    date: p.date || todayISO(),
+    repeatRule: p.date ? 'None' : 'Daily',
+    startTime: p.time || '',
+  }));
   (currentData.goals || []).forEach((g) => materializeSourceEvent('goals', g, { title: g.title || 'Goal', date: g.deadline || todayISO(), repeatRule: g.deadline ? 'None' : 'Daily' }));
   ((currentData.workoutPlan && currentData.workoutPlan.schedule) || []).forEach((w) => {
     if (w.date) materializeSourceEvent('workout', w, { title: w.type || 'Workout', date: w.date, repeatRule: 'None' });
   });
-  (currentData.meals || []).forEach((m) => materializeSourceEvent('nutrition', m, { title: m.title || 'Meal logged', date: todayISO(), repeatRule: 'None' }));
+  (currentData.meals || []).forEach((m) => materializeSourceEvent('nutrition', m, { title: m.title || 'Meal logged', date: m.date || todayISO(), repeatRule: 'None' }));
   (currentData.water || []).forEach((w) => materializeSourceEvent('water', w, { title: `Water${w.amount ? ` · ${w.amount} glasses` : ''}`, date: todayISO(), repeatRule: 'None' }));
   (currentData.sleep || []).forEach((s) => materializeSourceEvent('sleep', s, { title: s.title || 'Sleep logged', date: todayISO(), repeatRule: 'None' }));
   (currentData.study || []).forEach((s) => materializeSourceEvent('study', s, { title: s.topic ? `${s.title} · ${s.topic}` : (s.title || 'Study session'), date: s.date || todayISO(), repeatRule: 'None', priority: s.priority, startTime: s.startTime }));
@@ -519,7 +525,7 @@ function agendaHtml() {
   if (!groups.length) {
     return `
       <div class="panel cal-agenda">
-        <div class="empty-state">Nothing scheduled in the next 30 days.</div>
+        ${emptyStateHtml('calendar', 'Nothing scheduled in the next 30 days.')}
       </div>
     `;
   }
@@ -643,7 +649,7 @@ function dailyScheduleHtml() {
         <button class="cal-collapse-toggle${calState.scheduleCollapsed ? ' collapsed' : ''}" data-cal-schedule-collapse type="button" aria-label="Toggle schedule">⌄</button>
       </div>
       <div class="cal-schedule-list${calState.scheduleCollapsed ? ' collapsed' : ''}" data-cal-schedule-list>
-        ${items.length ? items.map(scheduleItemHtml).join('') : '<div class="empty-state">No activities for this day. Add one below.</div>'}
+        ${items.length ? items.map(scheduleItemHtml).join('') : emptyStateHtml('calendar', 'No activities for this day. Add one below.')}
       </div>
     </section>
   `;
@@ -722,7 +728,7 @@ function upcomingHtml() {
     <section class="panel cal-upcoming">
       <p class="eyebrow">Upcoming</p><h2>Upcoming events</h2>
       ${allEmpty
-        ? '<div class="empty-state">Nothing on the horizon. Add an event to get started.</div>'
+        ? emptyStateHtml('calendar', 'Nothing on the horizon. Add an event to get started.')
         : `<div class="cal-upcoming-scroll">${groups.map((g) => `
             <div class="cal-upcoming-group">
               <h3>${escapeHtml(g.label)}</h3>

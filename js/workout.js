@@ -33,6 +33,70 @@ function muscleGroupFor(title) {
   return hit ? MUSCLE_GROUP_MAP[hit] : null;
 }
 
+// ─── Workout templates (preset weekly plans) ───────────────────────────────
+const WORKOUT_TEMPLATES = {
+  full_body_3day: {
+    label: 'Full Body (3 days/week)',
+    plan: {
+      Monday:    { type: 'Full Body', exercises: ['Back Squat', 'Barbell Bench Press', 'Barbell Row', 'Overhead Press', 'Plank'] },
+      Wednesday: { type: 'Full Body', exercises: ['Deadlift', 'Incline Dumbbell Press', 'Lat Pulldown', 'Walking Lunges', 'Cable Crunch'] },
+      Friday:    { type: 'Full Body', exercises: ['Front Squat', 'Pull-Ups', 'Dumbbell Curl', 'Tricep Pushdown', 'Hanging Leg Raise'] },
+    },
+  },
+  upper_lower_4day: {
+    label: 'Upper / Lower (4 days/week)',
+    plan: {
+      Monday:   { type: 'Upper Body', exercises: ['Barbell Bench Press', 'Barbell Row', 'Overhead Press', 'Lat Pulldown', 'Barbell Curl'] },
+      Tuesday:  { type: 'Lower Body', exercises: ['Back Squat', 'Romanian Deadlift', 'Leg Press', 'Calf Raises', 'Plank'] },
+      Thursday: { type: 'Upper Body', exercises: ['Incline Dumbbell Press', 'Seated Cable Row', 'Arnold Press', 'Tricep Pushdown', 'Hammer Curl'] },
+      Friday:   { type: 'Lower Body', exercises: ['Front Squat', 'Hip Thrust', 'Leg Curl', 'Bulgarian Split Squat', 'Russian Twists'] },
+    },
+  },
+  push_pull_legs_6day: {
+    label: 'Push / Pull / Legs (6 days/week)',
+    plan: {
+      Monday:    { type: 'Push Day', exercises: ['Barbell Bench Press', 'Overhead Press', 'Incline Dumbbell Press', 'Lateral Raises', 'Tricep Pushdown'] },
+      Tuesday:   { type: 'Pull Day', exercises: ['Deadlift', 'Barbell Row', 'Lat Pulldown', 'Face Pulls', 'Barbell Curl'] },
+      Wednesday: { type: 'Leg Day', exercises: ['Back Squat', 'Romanian Deadlift', 'Leg Press', 'Calf Raises', 'Ab Wheel Rollout'] },
+      Thursday:  { type: 'Push Day', exercises: ['Decline Bench Press', 'Arnold Press', 'Cable Crossover', 'Front Raises', 'Skull Crushers'] },
+      Friday:    { type: 'Pull Day', exercises: ['Pull-Ups', 'T-Bar Row', 'Single-Arm Dumbbell Row', 'Rear Delt Flyes', 'Hammer Curl'] },
+      Saturday:  { type: 'Leg Day', exercises: ['Front Squat', 'Leg Extension', 'Leg Curl', 'Bulgarian Split Squat', 'Hanging Leg Raise'] },
+    },
+  },
+  bro_split_5day: {
+    label: 'Bro Split (5 days/week)',
+    plan: {
+      Monday:    { type: 'Push Day', exercises: ['Barbell Bench Press', 'Incline Dumbbell Press', 'Dumbbell Flyes', 'Chest Dips', 'Cable Crossover'] },
+      Tuesday:   { type: 'Pull Day', exercises: ['Deadlift', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Shrugs'] },
+      Wednesday: { type: 'Leg Day', exercises: ['Back Squat', 'Leg Press', 'Leg Extension', 'Leg Curl', 'Calf Raises'] },
+      Thursday:  { type: 'Upper Body', exercises: ['Overhead Press', 'Lateral Raises', 'Rear Delt Flyes', 'Barbell Curl', 'Tricep Pushdown'] },
+      Friday:    { type: 'Full Body', exercises: ['Front Squat', 'Pull-Ups', 'Push-Ups', 'Plank', 'Russian Twists'] },
+    },
+  },
+};
+
+function applyWorkoutTemplate(key) {
+  const tpl = WORKOUT_TEMPLATES[key];
+  if (!tpl) return;
+  const days = Object.keys(tpl.plan);
+  const hasContent = plan().schedule.some((s) => s.exercises.length);
+  if (hasContent && !window.confirm(`Apply "${tpl.label}"? This replaces this week's training days and exercises.`)) return;
+  const weekKey = startOfWeek().toISOString().slice(0, 10);
+  generateSchedule(days.length, days, weekKey, false);
+  const p = plan();
+  p.schedule.forEach((s) => {
+    const dayPlan = tpl.plan[s.dayFull];
+    if (!dayPlan) return;
+    s.type = dayPlan.type;
+    s.exercises = dayPlan.exercises.map((name) => ({ ...createNewExercise(), name }));
+  });
+  persist();
+  openSessionId = null;
+  renderWorkoutStats();
+  renderWorkoutRoot();
+  showToast(`Applied "${tpl.label}"`, 'success');
+}
+
 const EX_STATUS_CLASS = { 'Not Started': 'ex-ns', 'In Progress': 'ex-inprogress', 'Done': 'ex-done', 'Skipped': 'ex-skipped' };
 
 const WO_STATUS = ['Not Started', 'In Progress', 'Done', 'Skipped', 'Rest Day'];
@@ -527,6 +591,15 @@ function renderWorkoutRoot() {
       ${selected.length ? `<p class="muted wo-days-summary">
         <strong>${selected.length} training days:</strong> ${escapeHtml(selected.join(', '))}
       </p>` : '<p class="muted wo-days-summary">Select at least one training day above.</p>'}
+      <div class="wo-template-row">
+        <label class="wo-template-label" for="wo-template-select">Or start from a template</label>
+        <div class="wo-template-controls">
+          <select id="wo-template-select">
+            ${Object.entries(WORKOUT_TEMPLATES).map(([key, tpl]) => `<option value="${key}">${escapeHtml(tpl.label)}</option>`).join('')}
+          </select>
+          <button type="button" class="secondary-btn" data-apply-template>Apply template</button>
+        </div>
+      </div>
     </section>
 
     ${weeklySummaryHtml()}
@@ -785,7 +858,7 @@ function sessionPanelHtml(id) {
       <div class="workout-sections">
         ${s.exercises.length
           ? s.exercises.map((ex) => exerciseCardHtml(s, ex)).join('')
-          : '<div class="empty-state">No exercises saved yet. Add exercises in the workout plan sheet before starting.</div>'}
+          : emptyStateHtml('dumbbell', 'No exercises saved yet. Add exercises in the workout plan sheet before starting.')}
       </div>
     </section>
   `;
@@ -1325,7 +1398,7 @@ function photosHtml() {
             <figcaption>${escapeHtml(p.date)}</figcaption>
             <button type="button" class="std-icon-btn std-icon-danger wo-photo-delete" data-wo-photo-delete="${p.id}" aria-label="Delete photo">\u2715</button>
           </figure>
-        `).join('') : `<div class="empty-state">No photos yet.</div>`}
+        `).join('') : emptyStateHtml('camera', 'No photos yet.')}
       </div>
     </div>
   `;
@@ -1633,6 +1706,13 @@ function onWorkoutClick(e) {
       selected.sort((a, b) => DAY_NAMES_FULL.indexOf(a) - DAY_NAMES_FULL.indexOf(b));
     }
     setTrainingDays(selected);
+    return;
+  }
+
+  const templateBtn = e.target.closest('[data-apply-template]');
+  if (templateBtn) {
+    const select = document.getElementById('wo-template-select');
+    if (select && select.value) applyWorkoutTemplate(select.value);
     return;
   }
 
