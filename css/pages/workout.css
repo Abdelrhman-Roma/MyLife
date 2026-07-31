@@ -429,7 +429,7 @@
   width: 100%;
   transition: border-color 0.15s;
 }
-.workout-set-row input:focus { border-color: var(--blue); outline: none; }
+.workout-set-row input:focus-visible { border-color: var(--blue); outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* ── Rest timer ─────────────────────────────────────────────────────────── */
 .workout-rest-timer {
@@ -869,8 +869,19 @@
     min-height: var(--tap);
   }
 
-  body:has(.workout-session-actions) .workout-fab {
-    bottom: 92px;
+  /* Phase 4 browser-compat note (TECH-002): :has() reached Firefox only in
+     version 121 (Dec 2023). Wrapped in @supports so this is explicit
+     progressive enhancement rather than a rule that silently does nothing
+     on older Firefox. Documented, accepted trade-off on unsupporting
+     browsers: the FAB stays at its default position and may sit slightly
+     closer to the sticky session-actions bar than intended — not broken,
+     just not repositioned. A JS-based fallback (toggling a body class
+     instead of relying on :has()) would fully fix this but is out of scope
+     for a CSS-only browser-compat pass. */
+  @supports selector(:has(a)) {
+    body:has(.workout-session-actions) .workout-fab {
+      bottom: 92px;
+    }
   }
 
   /* ── Sticky session controls ───────────────────────────────────────────── */

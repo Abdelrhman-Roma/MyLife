@@ -69,10 +69,10 @@
   --nav-muted: #7d8bab;
   --on-nav: #f8fafc;
   --blue: #2563eb;
-  --green: #0ea5a0;
+  --green: #0b7a76;
   --purple: #7c6ee0;
   --orange: #e08a3c;
-  --red: #dc4a4a;
+  --red: #c93f3f;
   --danger-bg: #fdecec;
   --focus-ring: rgba(37, 99, 235, .25);
   --shadow: 0 20px 45px rgba(15, 23, 42, .08);
@@ -241,6 +241,34 @@
 
   --app-gap: clamp(10px, 3vw, 18px);
   --card-pad: clamp(14px, 4vw, 18px);
+  --font-scale: 1;
+}
+
+/* Global user-preference tokens. Components consume the shared radius scale;
+   sizing the root makes every rem-based control and page respond together. */
+:root[data-font-size='sm'] { --font-scale: .875; }
+:root[data-font-size='md'] { --font-scale: 1; }
+:root[data-font-size='lg'] { --font-scale: 1.125; }
+:root[data-font-size='xl'] { --font-scale: 1.25; }
+:root[data-radius='sharp'] { --radius-sm: 2px; --radius-md: 4px; --radius-lg: 6px; --radius-xl: 8px; }
+:root[data-radius='md'] { --radius-sm: 8px; --radius-md: 10px; --radius-lg: 16px; --radius-xl: 20px; }
+:root[data-radius='round'] { --radius-sm: 14px; --radius-md: 20px; --radius-lg: 28px; --radius-xl: 36px; }
+
+/* Every color palette has a light surface mode. Accent variables remain owned
+   by the selected palette, so changing mode never discards the chosen color. */
+:root[data-theme='light'] {
+  --bg: #f7f9fc;
+  --surface: #ffffff;
+  --surface-2: #f0f4f8;
+  --surface-3: #f8fafc;
+  --ink: #172033;
+  --muted: #5d687b;
+  --line: #dbe3ee;
+  --nav: #172033;
+  --nav-muted: #aab5c7;
+  --on-nav: #ffffff;
+  --danger-bg: #fff0f1;
+  --shadow: 0 18px 45px rgba(23, 32, 51, .10);
 }
 
 img, svg, video {
@@ -248,8 +276,9 @@ img, svg, video {
 }
 
 html {
+  font-size: calc(16px * var(--font-scale));
+  scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
-
 

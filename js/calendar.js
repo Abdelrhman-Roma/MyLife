@@ -16,7 +16,7 @@ const CATEGORY_META = {
   habit:     { label: 'Habit',     icon: '⭐', color: 'var(--purple)' },
   water:     { label: 'Water',     icon: '💧', color: 'color-mix(in srgb, var(--blue) 65%, var(--green))' },
   sleep:     { label: 'Sleep',     icon: '😴', color: 'color-mix(in srgb, var(--purple) 55%, var(--blue))' },
-  nutrition: { label: 'Nutrition', icon: '🍽', color: 'var(--orange)' },
+  nutrition: { label: 'Health', icon: '🍽', color: 'var(--orange)' },
   prayer:    { label: 'Prayer',    icon: '🙏', color: 'var(--green)' },
   todo:      { label: 'Task',      icon: '✅', color: 'color-mix(in srgb, var(--blue) 55%, var(--orange))' },
   goal:      { label: 'Goal',      icon: '🎯', color: 'color-mix(in srgb, var(--purple) 60%, var(--orange))' },
@@ -70,8 +70,8 @@ const SOURCE_MODULE_META = {
                getCollection: () => (currentData.workoutPlan && currentData.workoutPlan.schedule) || [],
                getCompleted: (i) => i.status === 'Done', setCompleted: (i, v) => { i.status = v ? 'Done' : 'Not Started'; } },
   nutrition: { category: 'nutrition', label: 'Nutrition', page: 'nutrition.html', completable: false, getCollection: () => currentData.meals || [] },
-  water:     { category: 'water', label: 'Water',   page: 'water.html',     completable: false, getCollection: () => currentData.water || [] },
-  sleep:     { category: 'sleep', label: 'Sleep',    page: 'sleep.html',     completable: false, getCollection: () => currentData.sleep || [] },
+  water:     { category: 'water', label: 'Water',   page: 'nutrition.html#water', completable: false, getCollection: () => currentData.water || [] },
+  sleep:     { category: 'sleep', label: 'Sleep',    page: 'nutrition.html#sleep', completable: false, getCollection: () => currentData.sleep || [] },
   study:     { category: 'study', label: 'Study',    page: 'study.html',     completable: true,
                getCollection: () => currentData.study || [],
                getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; i.status = v ? 'Completed' : 'Planned'; } },
@@ -215,6 +215,7 @@ function materializeSourceEvent(sourceModule, item, defaults) {
     if (!meta.completable) ev.completedAt = ev.createdAt;
     else if (ev.completed) ev.completedAt = ev.createdAt;
     currentData.events.push(ev);
+    addNotification('Calendar', `${t('Event added')}: ${ev.title || t('Event')}`);
     return;
   }
   if (ev.title !== title) { ev.title = title; ev.updatedAt = nowStamp(); }

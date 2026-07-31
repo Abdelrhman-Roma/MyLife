@@ -173,6 +173,8 @@
 .account-nav {
   position: sticky;
   top: 18px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
   display: grid;
   gap: 3px;
   padding: 10px;

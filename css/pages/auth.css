@@ -592,6 +592,7 @@
 
 .auth-submit.is-loading,
 .auth-submit.is-success { pointer-events: none; }
+.auth-submit:disabled { cursor: wait; opacity: 1; }
 .auth-submit.is-success { background: linear-gradient(135deg, var(--green), color-mix(in srgb, var(--green) 65%, var(--blue))); }
 
 .auth-submit-label,

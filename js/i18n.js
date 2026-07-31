@@ -105,6 +105,15 @@ function initI18n() {
   document.documentElement.lang = lang;
   document.documentElement.dir = isRtl(lang) ? 'rtl' : 'ltr';
   document.documentElement.dataset.lang = lang;
+  // Apply the last resolved appearance before the shared app boots. This keeps
+  // the first paint aligned with the user's saved theme and palette.
+  const savedTheme = localStorage.getItem('mylife.theme');
+  const savedPalette = localStorage.getItem('mylife.palette');
+  if (savedTheme) {
+    document.documentElement.dataset.theme = savedTheme;
+    document.documentElement.style.colorScheme = savedTheme;
+  }
+  if (savedPalette) document.documentElement.dataset.palette = savedPalette;
 }
 
 // Builds a small, reusable language-switcher control. Any container can call

@@ -997,15 +997,15 @@ h1, h2, h3 { letter-spacing: -.035em; }
 input, select, textarea { border-radius: var(--radius-xs); background: color-mix(in srgb, var(--surface-3) 88%, white); padding: 12px 14px; }
 label, .stat-card span { font-weight: 650; }
 
-.auth-visual, .auth-card, .topbar, .page-art, .panel, .stat-card { border-radius: var(--radius-xl); background: var(--surface-elevated); box-shadow: var(--shadow-card); }
+.auth-visual, .auth-card, .topbar, .page-art, .panel, .stat-card { border-radius: var(--radius-xl); background: var(--surface); background: var(--surface-elevated); box-shadow: var(--shadow-card); }
 .topbar, .page-art, .panel, .stat-card { border-top: 1px solid var(--line); }
 
 .primary-btn, .secondary-btn, .danger-btn, .text-btn, .small-danger { border-radius: var(--radius-xs); font-size: .84rem; font-weight: 750; letter-spacing: .01em; text-transform: none; }
-.primary-btn { background: var(--accent, var(--blue)); color: #fff; box-shadow: 0 8px 18px color-mix(in srgb, var(--accent, var(--blue)) 25%, transparent); }
+.primary-btn { background: var(--accent, var(--blue)); color: #fff; box-shadow: 0 8px 18px rgba(0, 0, 0, .18); box-shadow: 0 8px 18px color-mix(in srgb, var(--accent, var(--blue)) 25%, transparent); }
 :root[data-theme='dark'] .primary-btn { color: #fff; }
 
 .app-shell { grid-template-columns: 252px minmax(0, 1fr); max-width: 1720px; margin: 0 auto; padding: clamp(14px, 2vw, 28px); }
-.sidebar { top: 22px; height: calc(100vh - 44px); gap: 22px; border-radius: var(--radius-xl); background: linear-gradient(160deg, var(--nav), color-mix(in srgb, var(--nav) 76%, #000)); padding: 20px 14px; }
+.sidebar { top: 22px; height: calc(100vh - 44px); gap: 22px; border-radius: var(--radius-xl); background: linear-gradient(160deg, var(--nav), var(--nav)); background: linear-gradient(160deg, var(--nav), color-mix(in srgb, var(--nav) 76%, #000)); padding: 20px 14px; }
 .brand { gap: 11px; padding: 0 7px; }
 .brand-logo { border-radius: 13px; }
 .brand-logo { display: grid; place-items: center; color: var(--nav); font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; }
@@ -1225,7 +1225,8 @@ body.sidebar-collapsed .app-shell { grid-template-columns: 84px minmax(0, 1fr); 
 .account-menu a:focus-visible,
 .account-menu button:focus-visible {
   background: color-mix(in srgb, var(--blue) 10%, transparent);
-  outline: none;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .account-menu-icon {
@@ -1490,6 +1491,13 @@ body.sidebar-collapsed .app-shell { grid-template-columns: 84px minmax(0, 1fr); 
   margin-top: 4px;
 }
 
+/* Phase 3 UI pass: error-state modifier (see js/shared.js errorStateHtml()).
+   Deliberately reuses .empty-state's exact shape/spacing/animation — only
+   the icon tint and border change, so an error and an empty list still
+   feel like the same design system, not two different components. */
+.empty-state-error { border-style: solid; border-color: color-mix(in srgb, var(--red) 35%, var(--line)); }
+.empty-state-error svg { color: var(--red); }
+
 @keyframes emptyIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── System-wide stagger reveal for cards & stats ────────────────────────
@@ -1557,6 +1565,21 @@ body.sidebar-collapsed .app-shell { grid-template-columns: 84px minmax(0, 1fr); 
 .toast-icon { flex-shrink: 0; display: grid; place-items: center; color: var(--accent, var(--blue)); }
 .toast-success .toast-icon { color: var(--green); }
 .toast-danger .toast-icon { color: var(--red); }
+
+.toast-undo-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--blue);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.toast-undo-btn:hover,
+.toast-undo-btn:focus-visible { background: color-mix(in srgb, var(--blue) 12%, transparent); }
 
 @keyframes toastIn { to { transform: translateX(0); opacity: 1; } }
 @keyframes toastOut { to { transform: translateX(120%); opacity: 0; } }
@@ -1719,8 +1742,15 @@ body.sidebar-collapsed .app-shell { grid-template-columns: 84px minmax(0, 1fr); 
 /* ── Bug fix: .std-icon-btn was used throughout study.js (edit/delete/pin/
    archive icon buttons) but had no CSS definition anywhere in the project —
    it rendered as a bare unstyled button. Habits/Tasks (Phase 3) use it too,
-   so fixing it here benefits every page that relies on it. */
+   so fixing it here benefits every page that relies on it.
+   Phase 3 UI pass: the 30px visual box was below the app's own --tap (48px)
+   standard (Phase 2 UI/UX audit, UX-A11Y-003). Kept the compact 30px look
+   (dense card actions still want a small icon) but expanded the actual
+   clickable/tappable area to --tap via a relatively-positioned transparent
+   ::after "hit box" rather than growing the visible button — the icon still
+   looks the same size, but touch/click now register across a 48x48 area. */
 .std-icon-btn {
+  position: relative;
   display: grid;
   place-items: center;
   width: 30px;
@@ -1734,7 +1764,13 @@ body.sidebar-collapsed .app-shell { grid-template-columns: 84px minmax(0, 1fr); 
   cursor: pointer;
   transition: background-color var(--dur-fast, 120ms) ease, transform var(--dur-fast, 120ms) ease, color var(--dur-fast, 120ms) ease;
 }
+.std-icon-btn::after {
+  content: '';
+  position: absolute;
+  inset: calc((30px - var(--tap)) / 2);
+}
 .std-icon-btn:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent, var(--blue)) 14%, var(--surface-2)); }
+.std-icon-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .std-icon-danger:hover { background: var(--red, #e5484d); color: #fff; border-color: var(--red, #e5484d); }
 
 /* ── Shared list/filter/badge/modal kit ─────────────────────────────────

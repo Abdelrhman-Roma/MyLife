@@ -971,6 +971,7 @@ function openWorkoutSession(id) {
   sessionTimers[id] = sessionTimers[id] || Date.now();
   syncScheduleToTodo();
   refreshWorkout({ art: true });
+  addNotification('Workout', `${t('Workout completed')}: ${s.type || s.day}`);
 }
 
 function finishSession(scheduleId) {

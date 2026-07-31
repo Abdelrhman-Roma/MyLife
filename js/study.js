@@ -1221,6 +1221,7 @@ function saveEntity(type, editing, data) {
   if (type === 'project') base.tasks = [];
   if (type === 'note') { base.pinned = false; base.archived = false; if (!base.color) base.color = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)]; }
   currentData[meta.collection].push(base);
+  addNotification('Study', `${t('New study item')}: ${base.title || base.name || type}`);
 }
 
 function deleteEntityById(type, id) {

@@ -6,6 +6,42 @@
   gap: 16px;
   margin: 20px 32px 0;
 }
+
+.pr-worship-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, .6fr);
+  gap: 18px;
+  padding: clamp(22px, 4vw, 42px);
+  border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));
+  border-radius: var(--radius-xl, 18px);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--green) 18%, var(--surface-elevated, var(--surface))), var(--surface-elevated, var(--surface)) 62%);
+  box-shadow: var(--shadow-card);
+}
+.pr-worship-heading h1 { max-width: 620px; margin: 6px 0 10px; font-size: clamp(1.7rem, 3vw, 2.8rem); letter-spacing: 0; }
+.pr-worship-heading p:last-child { max-width: 560px; margin: 0; color: var(--muted); }
+.pr-next-prayer { align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 20px; border-left: 1px solid var(--line); }
+.pr-next-prayer strong { color: var(--green); font-size: 1.8rem; }
+.pr-next-prayer span:last-child { color: var(--muted); }
+.pr-worship-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+.pr-worship-grid > .panel { min-width: 0; }
+.pr-time-card { grid-column: span 4; }
+.pr-quran-card, .pr-remembrance-card, .pr-hadith-card { grid-column: span 4; }
+.pr-tasbeeh-card, .pr-stats-card { grid-column: span 6; }
+.pr-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pr-card-heading h2 { margin: 4px 0 0; }
+.pr-card-mark { color: var(--green); font-weight: 800; }
+.pr-time-list { display: grid; gap: 7px; margin-top: 16px; }
+.pr-time-list div, .pr-stat-row, .pr-history-list div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pr-time-list time, .pr-stat-row strong { color: var(--green); font-weight: 800; }
+.pr-azkar-text { min-height: 76px; line-height: 1.9; font-family: 'Amiri', 'Noto Sans Arabic', serif; font-size: 1.15rem; }
+.tasbeeh-orb { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line)); border-radius: 50%; background: color-mix(in srgb, var(--green) 15%, var(--surface-2)); color: var(--green); font-size: 1.5rem; cursor: pointer; }
+.tasbeeh-orb:active { transform: scale(.96); }
+.pr-stat-row span { color: var(--muted); }
+.pr-achievements { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pr-achievements span { padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: .8rem; }
+.pr-achievements span.is-unlocked { border-color: color-mix(in srgb, var(--green) 50%, var(--line)); background: color-mix(in srgb, var(--green) 10%, var(--surface-2)); color: var(--ink); }
+.pr-history-list { margin-top: 10px; }
+.pr-lower-grid { margin-top: 0; }
 @media (max-width: 860px) {
   .prayer-sections { margin-left: 16px; margin-right: 16px; }
 }
@@ -71,3 +107,162 @@
 }
 .pr-hadith-quote p { margin: 0 0 6px; font-style: italic; }
 .pr-hadith-quote footer { color: var(--muted); font-size: 0.78rem; }
+
+/* ── Quran reader (Phase: Worship Module Quran integration) ─────────────── */
+.pr-quran-note {
+  margin: 8px 0 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.pr-quran-quicklinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+/* Surah browser */
+.pr-surah-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.pr-surah-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-elevated, var(--surface));
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--dur-fast, 140ms) ease, box-shadow var(--dur-base, 220ms) ease;
+}
+.pr-surah-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.pr-surah-num {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--accent, var(--green));
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+.pr-surah-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pr-surah-info strong { font-size: 0.88rem; }
+.pr-surah-info small { color: var(--muted); font-size: 0.72rem; }
+.pr-surah-arabic { font-family: 'Amiri', 'Noto Sans Arabic', serif; font-size: 1.3rem; color: var(--ink); flex-shrink: 0; }
+
+/* Search results */
+.pr-search-results { display: flex; flex-direction: column; gap: 8px; }
+.pr-search-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.pr-search-arabic { font-family: 'Amiri', 'Noto Sans Arabic', serif; font-size: 1.15rem; display: block; }
+
+/* Reader */
+.pr-reader-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pr-reader-title { flex: 1; min-width: 160px; }
+.pr-reader-title h2 { margin: 2px 0; }
+.pr-reader-arabic-title { font-family: 'Amiri', 'Noto Sans Arabic', serif; font-size: 1.8rem; color: var(--accent, var(--green)); }
+.pr-font-size-row { display: flex; gap: 4px; }
+.pr-font-btn {
+  min-height: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+.pr-font-btn.active { background: var(--accent, var(--green)); color: #fff; border-color: var(--accent, var(--green)); }
+.pr-reading-tools { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.pr-reading-tools select { min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--ink); }
+.pr-reading-sepia { background: #f4ead5; color: #4b3a27; border-color: #d9c59e; }
+.pr-ayah-list.pr-reading-night { background: #101916; color: #e8efe8; padding: 14px; border-radius: 12px; }
+.pr-reading-font-amiri .pr-ayah-arabic { font-family: 'Amiri', serif; }
+.pr-reading-font-noto .pr-ayah-arabic { font-family: 'Noto Sans Arabic', sans-serif; }
+.pr-reading-font-system .pr-ayah-arabic { font-family: inherit; }
+.pr-reading-line-compact .pr-ayah-arabic { line-height: 1.65; }
+.pr-reading-line-comfortable .pr-ayah-arabic { line-height: 2.1; }
+.pr-reading-line-spacious .pr-ayah-arabic { line-height: 2.65; }
+.pr-focus-mode .pr-ayah-translit { display: none; }
+
+.pr-ayah-list { display: flex; flex-direction: column; gap: 10px; }
+.pr-ayah-card { padding: 18px 20px; transition: background var(--dur-slow, 420ms) ease; }
+.pr-ayah-card.is-highlighted { background: color-mix(in srgb, var(--green) 12%, var(--surface-elevated, var(--surface))); }
+.pr-ayah-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.pr-ayah-badge {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--accent, var(--green));
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.pr-ayah-actions { display: flex; gap: 4px; }
+.std-icon-btn.is-active { background: color-mix(in srgb, var(--accent, var(--green)) 18%, var(--surface-2)); color: var(--accent, var(--green)); }
+.pr-ayah-arabic {
+  font-family: 'Amiri', 'Noto Sans Arabic', serif;
+  font-size: var(--pr-ayah-size, 1.9rem);
+  line-height: 2.1;
+  text-align: right;
+  margin: 0 0 10px;
+}
+.pr-ayah-translit { color: var(--muted); font-style: italic; font-size: 0.86rem; margin: 0; }
+
+.pr-reader-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+@media (max-width: 640px) {
+  .pr-worship-hero { grid-template-columns: 1fr; }
+  .pr-next-prayer { border-left: 0; border-top: 1px solid var(--line); padding: 18px 0 0; }
+  .pr-time-card, .pr-quran-card, .pr-remembrance-card, .pr-hadith-card, .pr-tasbeeh-card, .pr-stats-card { grid-column: 1 / -1; }
+  .pr-surah-grid { grid-template-columns: 1fr; }
+  .pr-ayah-arabic { font-size: calc(var(--pr-ayah-size, 1.9rem) * 0.8); }
+}
+
+.pr-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+/* ── Reading goal ─────────────────────────────────────────────────────── */
+.pr-goal-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--green) 10%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line));
+}
+.pr-goal-banner.is-overdue { background: color-mix(in srgb, var(--red, #e5484d) 10%, var(--surface-2)); border-color: color-mix(in srgb, var(--red, #e5484d) 30%, var(--line)); }
+.pr-goal-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.pr-goal-overdue { color: var(--red, #e5484d); font-size: 0.84rem; }

@@ -44,7 +44,19 @@
   border-radius: var(--radius-lg);
   background: var(--surface-elevated, var(--surface));
   box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--dur-base, 220ms) var(--ease-out, ease);
+  transition: box-shadow var(--dur-base, 220ms) var(--ease-out, ease), opacity var(--dur-fast, 140ms) ease;
+}
+.td-card.is-draggable { grid-template-columns: auto auto 1fr auto; cursor: grab; }
+.td-card.is-dragging { opacity: 0.4; }
+.td-card.td-drop-hover { border-color: var(--accent, var(--blue)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, var(--blue)) 35%, transparent); }
+.td-drag-handle {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  letter-spacing: -2px;
+  cursor: grab;
+  user-select: none;
 }
 .td-card:hover { box-shadow: var(--shadow-sm); }
 .td-card[data-priority='High']   { border-left-color: var(--red, #e5484d); }
@@ -52,6 +64,18 @@
 .td-card[data-priority='Low']    { border-left-color: var(--green); }
 .td-card.is-completed { opacity: 0.62; }
 .td-card.is-completed strong { text-decoration: line-through; }
+
+/* Phase 3 UI pass: a small, fast "success" pop when a task is marked
+   complete (js/todo.js toggleTask adds/removes this class transiently).
+   Uses the app's existing --dur-fast/--ease-out tokens for consistency with
+   every other micro-interaction, and is automatically silenced by the
+   global prefers-reduced-motion override in shared.css. */
+.td-card.is-just-completed { animation: taskCompletePop var(--dur-base, 220ms) var(--ease-out, ease); }
+@keyframes taskCompletePop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.015); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 35%, transparent); }
+  100% { transform: scale(1); }
+}
 .td-card.is-overdue { background: color-mix(in srgb, var(--red, #e5484d) 6%, var(--surface-elevated, var(--surface))); }
 .td-card.is-blocked { opacity: 0.8; }
 
@@ -98,4 +122,11 @@
 
 @media (max-width: 640px) {
   .td-card { grid-template-columns: auto 1fr; }
+  .td-card.is-draggable { grid-template-columns: auto auto 1fr; }
+  .td-card.is-draggable .td-actions { grid-column: 1 / -1; justify-content: flex-end; }
 }
+
+/* Phase 3 UI pass: skeleton variant of .td-card shown during the initial
+   Firestore load (see js/todo.js renderTodoRoot). Reuses the card's own
+   grid layout so nothing jumps when real content replaces it. */
+.td-card-skeleton { border-left-color: var(--line); pointer-events: none; }

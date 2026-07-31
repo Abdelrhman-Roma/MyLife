@@ -281,6 +281,7 @@ function renderHabitModal() {
       Object.assign(editing, data);
     } else {
       currentData.habits.push({ id: makeId(), completed: false, completions: [], createdAt: new Date().toISOString(), ...data });
+      addNotification('Habits', `${t('Habit added')}: ${title}`);
     }
     persist();
     closeHabitModal();

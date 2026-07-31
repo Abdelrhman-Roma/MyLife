@@ -37,15 +37,14 @@ const NAV = [
   ['calendar',    'Calendar',   'Planner'],
   ['workout',     'Workout',    'Training'],
   ['prayer',      'Prayer',     'Spiritual'],
-  ['nutrition',   'Nutrition',  'Meals'],
-  ['water',       'Water',      'Hydration'],
-  ['sleep',       'Sleep',      'Recovery'],
+  ['nutrition',   'Health',     'Wellness'],
+  ['weather',     'Weather',    'Forecast'],
   ['study',       'Study',      'Focus'],
   ['statistics',  'Statistics', 'Insights'],
 ];
 
 const NAV_ICONS = Object.fromEntries(['dashboard','todo','habits','goals','calendar','workout','prayer','nutrition','water','sleep','study','statistics','account'].map((key, i) => [key, `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="${i % 3 === 0 ? '8' : '6'}"/><path d="M${5 + i % 5} 12h${7 + i % 4}M12 ${5 + i % 5}v${7 + i % 4}"/></svg>`]));
-const PLANET_ASSETS = { dashboard:'jupiter.jpg', todo:'moon.jpg', habits:'mars.jpg', goals:'mars.jpg', calendar:'Milky Way.jpg', workout:'mars.jpg', prayer:'sun.jpg', nutrition:'Neptune.jpg', water:'Uranus.jpg', sleep:'moon.jpg', study:'ISS.jpg', statistics:'jupiter.jpg', account:'jupiter.jpg' };
+const PLANET_ASSETS = { dashboard:'jupiter.jpg', todo:'moon.jpg', habits:'mars.jpg', goals:'mars.jpg', calendar:'Milky Way.jpg', workout:'mars.jpg', prayer:'sun.jpg', nutrition:'Neptune.jpg', weather:'Earth.jpg', study:'ISS.jpg', statistics:'jupiter.jpg', account:'jupiter.jpg' };
 // Which of the 3 named brand tiers (earth / mars / jupiter) each page belongs
 // to, per the brand brief — drives the accent glow on that page's hero art.
 // Pages not listed keep the app's existing per-page accent color as-is.
@@ -82,7 +81,8 @@ const PAGES = {
   calendar:   { title: 'Calendar',    kicker: 'Weekly plan',         accent: 'orange', collection: 'events',   fields: [['title','Event','text'],['date','Date','date'],['time','Time','time']], labels: ['date','time'] },
   workout:    { title: 'Workout',     kicker: 'Training tracker',    accent: 'blue' },
   prayer:     { title: 'Prayer',      kicker: 'Spiritual tracker',   accent: 'green',  collection: 'prayers',  fields: [['title','Prayer or routine','text'],['time','Time','time'],['status','Status','select',['Planned','Completed']]], labels: ['time','status'] },
-  nutrition:  { title: 'Nutrition',   kicker: 'Meal tracking',       accent: 'orange', collection: 'meals',    fields: [['title','Meal','text'],['calories','Calories','number'],['protein','Protein','number'],['carbs','Carbs','number'],['fat','Fat','number'],['type','Type','select',['Breakfast','Lunch','Dinner','Snack']]], labels: ['calories','protein','carbs','fat','type'] },
+  nutrition:  { title: 'Health',      kicker: 'Daily wellness',      accent: 'orange', collection: 'meals',    fields: [['title','Meal','text'],['calories','Calories','number'],['protein','Protein','number'],['carbs','Carbs','number'],['fat','Fat','number'],['type','Type','select',['Breakfast','Lunch','Dinner','Snack']]], labels: ['calories','protein','carbs','fat','type'] },
+  weather:    { title: 'Weather',     kicker: 'Local forecast',      accent: 'blue' },
   water:      { title: 'Water',       kicker: 'Hydration',           accent: 'blue',   collection: 'water',    fields: [['title','Entry','text'],['amount','Glasses','number'],['time','Time','time']], labels: ['amount','time'] },
   sleep:      { title: 'Sleep',       kicker: 'Recovery',            accent: 'purple', collection: 'sleep',    fields: [['title','Sleep note','text'],['hours','Hours','number'],['quality','Quality','select',['Low','Good','Great']]], labels: ['hours','quality'] },
   study:      { title: 'Study',       kicker: 'Focus sessions',      accent: 'blue',   collection: 'study',    fields: [['title','Subject','text'],['topic','Topic','text'],['minutes','Minutes','number']], labels: ['topic','minutes'] },
@@ -254,6 +254,7 @@ function bootShell(pageKey) {
   initNavShortcuts();
   renderTopbar(pageKey);
   renderArt(pageKey);
+  initNotificationRuntime();
   return true;
 }
 
@@ -433,6 +434,7 @@ function renderTopbar(pageKey) {
       <h1>${pageKey === 'dashboard' ? 'Mission Control' : escapeHtml(page.title)}</h1>
     </div>
     <div class="topbar-actions">
+      ${notificationCenterHtml()}
       <button class="secondary-btn" id="theme-btn" type="button">${currentData.settings.theme === 'dark' ? 'Light mode' : 'Dark mode'}</button>
       <button class="secondary-btn" id="export-btn" type="button">Export</button>
       <button class="danger-btn"    id="logout-btn" type="button">Logout</button>
@@ -442,6 +444,7 @@ function renderTopbar(pageKey) {
   byId('logout-btn').addEventListener('click', logout);
   byId('export-btn').addEventListener('click', exportData);
   byId('theme-btn').addEventListener('click',  toggleTheme);
+  bindNotificationCenter();
 }
 
 // ─── Art panel ────────────────────────────────────────────────────────────────
@@ -906,8 +909,10 @@ function renderDashboard() {
       <a class="dash-quick-action" href="habits.html"><span aria-hidden="true">+</span>${t('Add habit')}</a>
       <a class="dash-quick-action" href="calendar.html"><span aria-hidden="true">+</span>${t('Add event')}</a>
       <a class="dash-quick-action" href="workout.html"><span aria-hidden="true">\u25b6</span>${t('Start workout')}</a>
-      <a class="dash-quick-action" href="water.html"><span aria-hidden="true">+</span>${t('Log water')}</a>
+      <a class="dash-quick-action" href="nutrition.html#water"><span aria-hidden="true">+</span>${t('Log water')}</a>
     </section>
+
+    <section class="dash-section" data-dashboard-weather aria-label="${t('Weather')}"></section>
 
     <section class="dash-section" aria-label="${t('Today')}">
       <h3 class="dash-section-title">${t('Today')}</h3>
@@ -925,8 +930,8 @@ function renderDashboard() {
           ${progressRingSvg(percent(eventsToday, Math.max(eventsToday, 1)), 'orange', 52)}
           <div class="dash-card-body"><h3>${t('Calendar')}</h3><p>${eventsToday} ${t('events today')}</p></div>
         </a>
-        ${dashCard('water', t('Water'), 'blue', counts.water, s.waterGoal, `${counts.water}/${s.waterGoal || 0} ${t('glasses')}`, 'water.html')}
-        ${dashCard('sleep', t('Sleep'), 'purple', counts.sleep, s.sleepGoal, `${counts.sleep} ${t('records')}`, 'sleep.html')}
+        ${dashCard('water', t('Water'), 'blue', counts.water, s.waterGoal, `${counts.water}/${s.waterGoal || 0} ${t('glasses')}`, 'nutrition.html#water')}
+        ${dashCard('sleep', t('Sleep'), 'purple', counts.sleep, s.sleepGoal, `${counts.sleep} ${t('records')}`, 'nutrition.html#sleep')}
       </div>
     </section>
 
@@ -1067,8 +1072,8 @@ function renderStatistics() {
       ${dashCard('tasks', t('Tasks'), 'blue', counts.completedTasks, counts.tasks, `${counts.completedTasks}/${counts.tasks || 0}`, 'todo.html')}
       ${dashCard('habits', t('Habits'), 'green', counts.completedHabits, counts.habits, `${counts.completedHabits}/${counts.habits || 0}`, 'habits.html')}
       ${dashCard('goals', t('Goals'), 'purple', counts.completedGoals, counts.goals, `${counts.completedGoals}/${counts.goals || 0}`, 'goals.html')}
-      ${dashCard('water', t('Water'), 'blue', counts.water, currentData.settings.waterGoal, `${counts.water}/${currentData.settings.waterGoal || 0}`, 'water.html')}
-      ${dashCard('sleep', t('Sleep'), 'purple', counts.sleep, currentData.settings.sleepGoal, `${counts.sleep} ${t('records')}`, 'sleep.html')}
+      ${dashCard('water', t('Water'), 'blue', counts.water, currentData.settings.waterGoal, `${counts.water}/${currentData.settings.waterGoal || 0}`, 'nutrition.html#water')}
+      ${dashCard('sleep', t('Sleep'), 'purple', counts.sleep, currentData.settings.sleepGoal, `${counts.sleep} ${t('records')}`, 'nutrition.html#sleep')}
       ${dashCard('level', t('Level'), 'green', lvl.into, lvl.span, `${t('Level')} ${lvl.level} \u00b7 ${lvl.pct}%`, 'account.html')}
     </section>
 
@@ -1140,6 +1145,7 @@ function addEntry(e, pageKey) {
     item[name] = type === 'number' ? Number(val) : String(val || '');
   });
   currentData[page.collection].push(item);
+  addNotification(pageKey, `${page.title}: ${item.title || t('New entry added')}`);
   persist();
   e.currentTarget.reset();
   initPage(pageKey);
@@ -1152,6 +1158,7 @@ function toggleComplete(pageKey, id) {
     item.completed = !item.completed;
     item.completedAt = item.completed ? new Date().toISOString() : null;
   }
+  if (item && item.completed) addNotification(pageKey, `${PAGES[pageKey].title}: ${item.title || t('Completed')}`);
   persist();
   initPage(pageKey);
 }
@@ -1190,16 +1197,114 @@ function ensureToastRegion() {
   return region;
 }
 
-function showToast(message, variant = 'default', duration = 2600) {
+function showToast(message, variant = 'default', duration = 2600, options = {}) {
+  const { onUndo } = options; // optional callback — new in the Phase 2 Firestore migration, additive only
   const region = ensureToastRegion();
   const toast = document.createElement('div');
   toast.className = `toast toast-${variant}`;
-  toast.innerHTML = `<span class="toast-icon" aria-hidden="true">${TOAST_ICONS[variant] || TOAST_ICONS.default}</span><span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<span class="toast-icon" aria-hidden="true">${TOAST_ICONS[variant] || TOAST_ICONS.default}</span><span>${escapeHtml(message)}</span>${onUndo ? `<button type="button" class="toast-undo-btn" data-toast-undo>${t('Undo')}</button>` : ''}`;
   region.appendChild(toast);
-  setTimeout(() => {
+  const dismiss = () => {
     toast.classList.add('is-leaving');
     toast.addEventListener('animationend', () => toast.remove(), { once: true });
-  }, duration);
+  };
+  const timer = setTimeout(dismiss, duration);
+  if (onUndo) {
+    const undoBtn = toast.querySelector('[data-toast-undo]');
+    undoBtn.addEventListener('click', () => {
+      clearTimeout(timer);
+      onUndo();
+      dismiss();
+    });
+  }
+}
+
+// ─── Notification center + browser notification bridge ───────────────────
+// Stored per user with the rest of their local-first data. The service worker
+// handles future Push API payloads; foreground reminders provide a useful
+// fallback on static hosting where no push server has been configured yet.
+function notificationCenterHtml() {
+  const items = (currentData.notificationCenter || []);
+  const unread = items.filter((item) => !item.read).length;
+  return `<div class="notification-center">
+    <button class="notification-bell" id="notification-bell" type="button" aria-label="${t('Notifications')}" aria-expanded="false" aria-controls="notification-panel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+      ${unread ? `<b aria-label="${unread} unread">${unread > 99 ? '99+' : unread}</b>` : ''}
+    </button>
+    <section class="notification-panel" id="notification-panel" hidden aria-label="${t('Notification center')}">
+      <header><div><p class="eyebrow">${t('Updates')}</p><h2>${t('Notifications')}</h2></div><button class="text-btn" type="button" data-notification-clear>${t('Clear all')}</button></header>
+      <div class="notification-tools"><button class="text-btn" type="button" data-notification-read>${t('Mark all read')}</button>${typeof Notification !== 'undefined' && Notification.permission === 'default' ? `<button class="text-btn" type="button" data-notification-permission>${t('Enable browser alerts')}</button>` : ''}</div>
+      <div class="notification-list">${items.length ? items.slice(0, 30).map(notificationItemHtml).join('') : `<p class="notification-empty">${t('You are all caught up.')}</p>`}</div>
+    </section>
+  </div>`;
+}
+
+function notificationItemHtml(item) {
+  return `<article class="notification-item${item.read ? '' : ' is-unread'}" data-notification-id="${escapeAttr(item.id)}">
+    <span class="notification-category">${escapeHtml(t(item.category || 'General'))}</span><div><p>${escapeHtml(item.message)}</p><time>${formatDateLocalized(item.createdAt, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></div>
+    <div class="notification-item-actions"><button type="button" aria-label="${t('Mark as read')}" data-notification-read-one="${escapeAttr(item.id)}">✓</button><button type="button" aria-label="${t('Delete')}" data-notification-delete="${escapeAttr(item.id)}">×</button></div>
+  </article>`;
+}
+
+function bindNotificationCenter() {
+  const bell = byId('notification-bell'); const panel = byId('notification-panel');
+  if (!bell || !panel) return;
+  const close = () => { panel.hidden = true; bell.setAttribute('aria-expanded', 'false'); };
+  bell.addEventListener('click', (event) => { event.stopPropagation(); panel.hidden = !panel.hidden; bell.setAttribute('aria-expanded', String(!panel.hidden)); });
+  if (!window.__notificationOutsideBound) {
+    window.__notificationOutsideBound = true;
+    document.addEventListener('click', (event) => {
+      const activePanel = byId('notification-panel'); const activeBell = byId('notification-bell');
+      if (activePanel && activeBell && !activePanel.hidden && !activePanel.contains(event.target) && event.target !== activeBell) {
+        activePanel.hidden = true; activeBell.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+  panel.querySelector('[data-notification-clear]')?.addEventListener('click', () => { currentData.notificationCenter = []; persist(); refreshChrome(); });
+  panel.querySelector('[data-notification-read]')?.addEventListener('click', () => { currentData.notificationCenter.forEach((item) => { item.read = true; }); persist(); refreshChrome(); });
+  panel.querySelector('[data-notification-permission]')?.addEventListener('click', requestBrowserNotificationPermission);
+  panel.querySelectorAll('[data-notification-read-one]').forEach((button) => button.addEventListener('click', () => updateNotification(button.dataset.notificationReadOne, { read: true })));
+  panel.querySelectorAll('[data-notification-delete]').forEach((button) => button.addEventListener('click', () => { currentData.notificationCenter = currentData.notificationCenter.filter((item) => item.id !== button.dataset.notificationDelete); persist(); refreshChrome(); }));
+}
+
+function updateNotification(id, values) { const item = currentData.notificationCenter.find((entry) => entry.id === id); if (item) Object.assign(item, values); persist(); refreshChrome(); }
+function addNotification(category, message, options = {}) {
+  if (!currentData) return;
+  currentData.notificationCenter = Array.isArray(currentData.notificationCenter) ? currentData.notificationCenter : [];
+  currentData.notificationCenter.unshift({ id: makeId(), category, message, read: false, createdAt: new Date().toISOString(), ...options });
+  currentData.notificationCenter = currentData.notificationCenter.slice(0, 100);
+  persist();
+  if (options.browser !== false) showBrowserNotification(category, message);
+}
+
+async function requestBrowserNotificationPermission() {
+  if (!('Notification' in window)) { showToast(t('Browser notifications are unavailable.'), 'danger'); return; }
+  const result = await Notification.requestPermission();
+  currentData.notifications.desktop = result === 'granted'; persist(); refreshChrome();
+  showToast(result === 'granted' ? t('Browser alerts enabled.') : t('Browser alert permission was not granted.'), result === 'granted' ? 'success' : 'danger');
+}
+function showBrowserNotification(category, message) {
+  if (!currentData?.notifications?.desktop || !('Notification' in window) || Notification.permission !== 'granted') return;
+  try { new Notification(`${t('Momentum')} — ${t(category)}`, { body: message, tag: `momentum-${category}` }); } catch (_) { /* browser may require an active page */ }
+}
+function initNotificationRuntime() {
+  if ('serviceWorker' in navigator && !window.__momentumServiceWorker) {
+    window.__momentumServiceWorker = true;
+    navigator.serviceWorker.register('../sw.js').catch(() => { /* static previews may not expose a worker scope */ });
+  }
+  if (window.__momentumReminderTimer) return;
+  window.__momentumReminderTimer = window.setInterval(runForegroundReminders, 60000);
+  runForegroundReminders();
+}
+function runForegroundReminders() {
+  if (!currentData?.notifications?.desktop) return;
+  const now = new Date(); const key = now.toISOString().slice(0, 10); const hour = now.getHours();
+  const reminders = currentData.reminderLog || (currentData.reminderLog = {});
+  if (hour === 9 && !reminders[`habits-${key}`]) { reminders[`habits-${key}`] = true; addNotification('Habits', t('Time to check in on your habits.'), { browser: true }); }
+  if (hour === 18 && !reminders[`prayer-${key}`]) { reminders[`prayer-${key}`] = true; addNotification('Prayer', t('Prayer reminder'), { browser: true }); }
+  if (hour === 20 && !reminders[`goals-${key}`]) { reminders[`goals-${key}`] = true; addNotification('Goals', t('Review today’s goal progress.'), { browser: true }); }
+  if (hour === 21 && !reminders[`daily-${key}`]) { reminders[`daily-${key}`] = true; addNotification('Daily', t('Your daily review is ready.'), { browser: true }); }
+  persist();
 }
 
 // ─── Theme ────────────────────────────────────────────────────────────────
@@ -1497,11 +1602,17 @@ function emptyData(name) {
       weeklyReview: true, monthlyReview: true,
     },
     security: { twoFactor: false, lastPasswordChange: null },
+    quranProgress: {
+      lastSurah: null, lastAyah: null, lastReadAt: null, readLog: {}, dailyGoal: 10, goal: null,
+      readingSettings: { mode: 'light', fontSize: 'md', lineHeight: 'comfortable', fontFamily: 'amiri', focus: false, autoScroll: false },
+    },
     achievements: { unlocked: [] },
+    notificationCenter: [], reminderLog: {},
     tasks:    [], habits: [], goals: [], events: [], workouts: [],
     prayers:  [], meals:  [], water: [], sleep:  [], study:   [],
     subjects: [], assignments: [], exams: [], projects: [], studyNotes: [], resources: [],
     bodyMeasurements: [], progressPhotos: [], quranLog: [], hadithCollection: [], shoppingList: [],
+    quranBookmarks: [], quranFavorites: [], tasbeeh: { count: 0, target: 33, updatedAt: null },
     workoutPlan: { daysPerWeek: 4, trainingDays: ['Mon','Tue','Thu','Fri'], schedule: [] },
     pomodoro: { mode: '25/5', workMin: 25, breakMin: 5, sessionsToday: 0, dailyGoal: 8, lastResetDate: '', soundOn: true },
   };
@@ -1516,23 +1627,30 @@ function normalizeData(data, name) {
     notifications: { ...base.notifications, ...(data.notifications || {}) },
     security:      { ...base.security,      ...(data.security      || {}) },
     achievements:  { ...base.achievements,  ...(data.achievements  || {}) },
+    reminderLog: { ...(data.reminderLog || {}) },
     workoutPlan:   { ...base.workoutPlan,   ...(data.workoutPlan   || {}) },
+    quranProgress: {
+      ...base.quranProgress, ...(data.quranProgress || {}),
+      readingSettings: { ...base.quranProgress.readingSettings, ...((data.quranProgress && data.quranProgress.readingSettings) || {}) },
+    },
     pomodoro:      { ...base.pomodoro,      ...(data.pomodoro      || {}) },
   };
   // Ensure every array key exists
   Object.keys(base).forEach((k) => {
     if (Array.isArray(base[k]) && !Array.isArray(merged[k])) merged[k] = [];
   });
+  if (!Array.isArray(merged.notificationCenter)) merged.notificationCenter = [];
   if (!Array.isArray(merged.workoutPlan.schedule)) merged.workoutPlan.schedule = [];
   if (!Array.isArray(merged.workoutPlan.trainingDays)) merged.workoutPlan.trainingDays = base.workoutPlan.trainingDays;
+  merged.tasbeeh = { ...base.tasbeeh, ...(data.tasbeeh || {}) };
   merged.workoutPlan.schedule = merged.workoutPlan.schedule.map((s) => ({
     status: 'Pending', exercises: [], durationMin: 0, calories: 0, taskId: null, ...s,
   }));
   // Hydrate default fields on array items
-  merged.tasks    = merged.tasks.map((i)    => ({
+  merged.tasks    = merged.tasks.map((i, idx)    => ({
     completed: false, notes: '', tags: [], dueDate: '', recurring: null,
     subtasks: [], dependsOn: [], attachments: [], reminder: null, reminderFired: false,
-    createdAt: i.createdAt || null, completedAt: i.completedAt || null,
+    createdAt: i.createdAt || null, completedAt: i.completedAt || null, order: idx,
     ...i,
     tags: Array.isArray(i.tags) ? i.tags : [],
     subtasks: Array.isArray(i.subtasks) ? i.subtasks : [],
@@ -1618,10 +1736,51 @@ const EMPTY_ICONS = {
   sparkles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></svg>',
   cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 12.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 7H6"/></svg>',
   activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 8 4-16 2 8h6"/></svg>',
+  // Phase 3 UI pass — added for the new errorStateHtml() component below.
+  'wifi-off': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l22 22M8.5 16.5a5 5 0 0 1 7 0M5 12.5a10 10 0 0 1 3.5-2.3M19 12.5a10 10 0 0 0-2.8-2.1M12 20h.01M12.5 8.3A14 14 0 0 1 22.5 11"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>',
+  'alert-triangle': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
 };
 
 function emptyStateHtml(icon, message, ctaHtml = '') {
   return `<div class="empty-state">${EMPTY_ICONS[icon] || EMPTY_ICONS.sparkles}<p>${message}</p>${ctaHtml}</div>`;
+}
+
+/**
+ * Phase 3 UI pass: a single, consistent error-state component for every
+ * page, driven by core/ErrorMapper.js's `category` — so "no internet,"
+ * "permission denied," "server unavailable," etc. all get a recognizable
+ * icon and tone instead of each page inventing its own error markup.
+ * Visually reuses `.empty-state` (same spacing/typography as the empty
+ * state above) with an `.empty-state-error` modifier for a slightly
+ * warmer/attention tint, per the brief's "Error States" section.
+ * @param {{ category: string, message: string, retryable: boolean }} mappedError - from core/ErrorMapper.js
+ * @param {{ onRetryId?: string }} [options] - onRetryId: element id to bind a retry click to (see bindErrorStateEvents)
+ */
+function errorStateHtml(mappedError, options = {}) {
+  const icons = {
+    network: 'wifi-off', permission: 'lock', 'not-found': 'sparkles',
+    timeout: 'alert-triangle', unavailable: 'server', 'auth-expired': 'lock',
+    validation: 'alert-triangle', unknown: 'alert-triangle',
+  };
+  const icon = icons[mappedError.category] || 'alert-triangle';
+  const retryBtn = mappedError.retryable
+    ? `<button type="button" class="secondary-btn empty-state-cta" id="${options.onRetryId || 'error-state-retry'}">${t('Try again')}</button>`
+    : '';
+  return `<div class="empty-state empty-state-error">${EMPTY_ICONS[icon]}<p>${escapeHtml(mappedError.message)}</p>${retryBtn}</div>`;
+}
+
+/**
+ * Wires the retry button rendered by errorStateHtml(). Call after inserting
+ * the HTML into the DOM, same pattern as bindTodoRootEvents/etc.
+ * @param {HTMLElement} root
+ * @param {() => void} onRetry
+ * @param {string} [retryId]
+ */
+function bindErrorStateEvents(root, onRetry, retryId = 'error-state-retry') {
+  const btn = root.querySelector(`#${retryId}`);
+  if (btn) btn.addEventListener('click', onRetry);
 }
 
 // Reusable radial progress indicator. `colorVar` is a CSS custom property

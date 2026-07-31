@@ -53,6 +53,13 @@ function renderNutritionRoot() {
       </div>
     </section>
 
+    <section class="health-tracking-grid">
+      ${waterTrackerHtml()}
+      ${sleepTrackerHtml()}
+      ${bodyTrackerHtml()}
+      ${nutritionGoalsHtml()}
+    </section>
+
     <section class="panel">
       ${mealPlannerHtml()}
     </section>
@@ -68,6 +75,63 @@ function renderNutritionRoot() {
   `;
   bindNutritionRootEvents(root);
   renderMealModal();
+}
+
+function waterTrackerHtml() {
+  const today = nutToday();
+  const glasses = currentData.water.filter((entry) => !entry.date || entry.date === today)
+    .reduce((sum, entry) => sum + Number(entry.glasses || entry.amount || 1), 0);
+  const goal = Number(currentData.settings.waterGoal) || 8;
+  return `<section class="panel health-tracker" id="water">
+    <p class="eyebrow">${t('Hydration')}</p><h2>${t('Water')}</h2>
+    <strong class="health-tracker-value">${glasses} / ${goal} ${t('glasses')}</strong>
+    <div class="meter"><i style="width:${percent(glasses, goal)}%"></i></div>
+    <form class="health-inline-form" data-health-water-form>
+      <label>${t('Glasses')}<input name="glasses" type="number" min="1" value="1" required></label>
+      <button class="primary-btn" type="submit">${t('Add water')}</button>
+    </form>
+  </section>`;
+}
+
+function sleepTrackerHtml() {
+  const latest = [...currentData.sleep].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+  return `<section class="panel health-tracker" id="sleep">
+    <p class="eyebrow">${t('Recovery')}</p><h2>${t('Sleep')}</h2>
+    <strong class="health-tracker-value">${latest ? `${latest.hours || 0} ${t('hours')}` : t('No sleep logged')}</strong>
+    <p class="muted">${latest ? `${t('Quality')}: ${t(latest.quality || '—')}` : t('Track each night to understand your recovery.')}</p>
+    <form class="health-inline-form" data-health-sleep-form>
+      <label>${t('Hours')}<input name="hours" type="number" min="0" max="24" step="0.1" required></label>
+      <label>${t('Quality')}<select name="quality"><option>${t('Good')}</option><option>${t('Great')}</option><option>${t('Low')}</option></select></label>
+      <button class="primary-btn" type="submit">${t('Log sleep')}</button>
+    </form>
+  </section>`;
+}
+
+function bodyTrackerHtml() {
+  const latest = [...currentData.bodyMeasurements].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+  return `<section class="panel health-tracker" id="measurements">
+    <p class="eyebrow">${t('Progress')}</p><h2>${t('Body measurements')}</h2>
+    <strong class="health-tracker-value">${latest?.weight ? `${latest.weight} kg` : t('No measurement logged')}</strong>
+    <form class="health-inline-form" data-health-body-form>
+      <label>${t('Weight')}<input name="weight" type="number" min="0" step="0.1" required></label>
+      <label>${t('Waist')}<input name="waist" type="number" min="0" step="0.1"></label>
+      <button class="primary-btn" type="submit">${t('Save measurement')}</button>
+    </form>
+  </section>`;
+}
+
+function nutritionGoalsHtml() {
+  const s = currentData.settings;
+  return `<section class="panel health-tracker" id="goals">
+    <p class="eyebrow">${t('Personal targets')}</p><h2>${t('Nutrition goals')}</h2>
+    <form class="health-inline-form health-goals-form" data-health-goals-form>
+      <label>${t('Calories')}<input name="calorieTarget" type="number" min="0" value="${s.calorieTarget || ''}"></label>
+      <label>${t('Protein')}<input name="proteinTarget" type="number" min="0" value="${s.proteinTarget || ''}"></label>
+      <label>${t('Carbs')}<input name="carbTarget" type="number" min="0" value="${s.carbTarget || ''}"></label>
+      <label>${t('Fat')}<input name="fatTarget" type="number" min="0" value="${s.fatTarget || ''}"></label>
+      <button class="primary-btn" type="submit">${t('Save goals')}</button>
+    </form>
+  </section>`;
 }
 
 function nutRing(label, value, target, color, suffix = '') {
@@ -219,6 +283,23 @@ function bindNutritionRootEvents(root) {
     persist();
     renderNutritionRoot();
   }));
+  root.querySelector('[data-health-water-form]')?.addEventListener('submit', (e) => {
+    e.preventDefault(); const glasses = Number(new FormData(e.currentTarget).get('glasses')) || 0;
+    if (!glasses) return; currentData.water.push({ id: makeId(), glasses, date: nutToday() }); addNotification('Nutrition', `${glasses} ${t('glasses')} ${t('of water logged')}`); renderNutritionRoot();
+  });
+  root.querySelector('[data-health-sleep-form]')?.addEventListener('submit', (e) => {
+    e.preventDefault(); const fd = new FormData(e.currentTarget); const hours = Number(fd.get('hours'));
+    if (!Number.isFinite(hours)) return; currentData.sleep.push({ id: makeId(), hours, quality: String(fd.get('quality')), date: nutToday() }); addNotification('Nutrition', `${hours} ${t('hours')} ${t('of sleep logged')}`); renderNutritionRoot();
+  });
+  root.querySelector('[data-health-body-form]')?.addEventListener('submit', (e) => {
+    e.preventDefault(); const fd = new FormData(e.currentTarget); const weight = Number(fd.get('weight'));
+    if (!weight) return; currentData.bodyMeasurements.push({ id: makeId(), weight, waist: Number(fd.get('waist')) || 0, date: nutToday() }); addNotification('Nutrition', t('Body measurement saved')); renderNutritionRoot();
+  });
+  root.querySelector('[data-health-goals-form]')?.addEventListener('submit', (e) => {
+    e.preventDefault(); const fd = new FormData(e.currentTarget);
+    ['calorieTarget', 'proteinTarget', 'carbTarget', 'fatTarget'].forEach((key) => { currentData.settings[key] = Number(fd.get(key)) || 0; });
+    persist(); renderNutritionRoot();
+  });
 }
 
 function deleteMeal(id) {
@@ -305,6 +386,7 @@ function renderMealModal() {
       Object.assign(editing, data);
     } else {
       currentData.meals.push({ id: makeId(), ...data });
+      addNotification('Nutrition', `${t('Meal logged')}: ${title}`);
     }
     persist();
     closeMealModal();

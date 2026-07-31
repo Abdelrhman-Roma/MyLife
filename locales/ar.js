@@ -208,3 +208,16 @@ window.MOMENTUM_LOCALES.ar = {
   '13 life domains, one dashboard': '13 مجالاً حياتياً، لوحة تحكم واحدة',
   'Free — no account needed to explore': 'مجاني — لا حاجة لحساب للاستكشاف',
 };
+
+Object.assign(window.MOMENTUM_LOCALES.ar, {
+  'Weather':'الطقس','Forecast':'التوقعات','Local forecast':'التوقعات المحلية','Open detailed weather':'فتح تفاصيل الطقس','Feels like':'المحسوس','High':'العظمى','Updated':'تم التحديث','Low':'الصغرى','Weather is unavailable':'الطقس غير متاح','Please check your connection and try again.':'تحقق من اتصالك وحاول مرة أخرى.','Retry':'إعادة المحاولة','Choose a city':'اختر مدينة','Search city':'ابحث عن مدينة','Search':'بحث','Searching…':'جارٍ البحث…','No cities found.':'لم يتم العثور على مدن.','Next 24 hours':'الساعات الـ24 القادمة','Now':'الآن','Five day forecast':'توقعات خمسة أيام','Today':'اليوم','Weather details':'تفاصيل الطقس','UV Index':'مؤشر الأشعة فوق البنفسجية','Humidity':'الرطوبة','Pressure':'الضغط','Real Feel':'الحرارة المحسوسة','Wind':'الرياح','Wind direction':'اتجاه الرياح','Visibility':'الرؤية','Cloud cover':'الغطاء السحابي','Dew point':'نقطة الندى','Sunrise':'الشروق','Sunset':'الغروب','Rain probability':'احتمال المطر','Recommendations':'التوصيات','Trends':'الاتجاهات','Temperature':'الحرارة','Humidity chart':'مخطط الرطوبة','Temperature chart':'مخطط الحرارة','Wind chart':'مخطط الرياح','AQI':'جودة الهواء','Coming soon':'قريباً','Clear sky':'سماء صافية','Mainly clear':'صحو غالباً','Partly cloudy':'غائم جزئياً','Overcast':'غائم','Fog':'ضباب','Light rain':'مطر خفيف','Rain':'مطر','Heavy rain':'مطر غزير','Light snow':'ثلج خفيف','Snow':'ثلج','Thunderstorm':'عاصفة رعدية','Hot conditions: increase today’s water goal.':'طقس حار: زد هدف الماء اليومي.','High UV: use sunscreen and seek shade.':'أشعة فوق بنفسجية عالية: استخدم واقياً وابحث عن الظل.','Rain is likely: consider an indoor workout.':'المطر محتمل: فكر في تمرين داخلي.','Cold weather: wear warm layers.':'طقس بارد: ارتد طبقات دافئة.',
+  'Health': 'الصحة', 'Wellness': 'العافية', 'Daily wellness': 'العافية اليومية', 'Hydration': 'الترطيب',
+  'Body measurements': 'قياسات الجسم', 'Nutrition goals': 'أهداف التغذية', 'Personal targets': 'الأهداف الشخصية',
+  'Weight': 'الوزن', 'Waist': 'الخصر', 'Add water': 'إضافة ماء', 'Log sleep': 'تسجيل النوم',
+  'Save measurement': 'حفظ القياسات', 'Save goals': 'حفظ الأهداف', 'No sleep logged': 'لا يوجد نوم مسجل',
+  'No measurement logged': 'لا توجد قياسات مسجلة', 'Track each night to understand your recovery.': 'سجّل كل ليلة لفهم تعافيك.',
+  'hours': 'ساعات', 'glasses': 'أكواب', 'Theme': 'السمة', 'Light': 'فاتح', 'Dark': 'داكن', 'Use System': 'استخدام النظام',
+  'Theme Color': 'لون السمة', 'Font size': 'حجم الخط', 'Border radius': 'استدارة الحواف', 'Sharp': 'حاد', 'Rounded': 'مستدير', 'Pill': 'كبسولي',
+  'Animations': 'الحركات', 'Compact mode': 'الوضع المدمج', 'Glass effect': 'تأثير زجاجي'
+  , 'Deep Space': 'الفضاء السحيق', 'Solar Light': 'ضوء شمسي', 'Earth': 'الأرض', 'Mars': 'المريخ', 'Saturn': 'زحل', 'Neptune': 'نبتون', 'Nebula': 'سديم', 'Galaxy': 'مجرة', '{name} theme applied': 'تم تطبيق سمة {name}'
+});

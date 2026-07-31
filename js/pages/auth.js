@@ -50,6 +50,8 @@ function wireSubmitLoading(formId, msgId) {
     // that validation rejects incomplete or malformed input.
     if (!form.checkValidity()) {
       setButtonState(btn, 'idle');
+      const card = document.getElementById('auth-card');
+      if (card) { card.classList.remove('is-shaking'); void card.offsetWidth; card.classList.add('is-shaking'); }
       return;
     }
     loadingStartedAt = Date.now();
@@ -83,6 +85,8 @@ function setButtonState(btn, state) {
   btn.classList.remove('is-loading', 'is-success');
   if (state === 'loading') btn.classList.add('is-loading');
   if (state === 'success') btn.classList.add('is-success');
+  btn.disabled = state !== 'idle';
+  btn.setAttribute('aria-busy', String(state === 'loading'));
 }
 
 // Best-effort mapping of the authoritative error message to a field, purely

@@ -1,17 +1,56 @@
-// MyLife — Tasks module (Phase 3).
-// Reuses bootShell(), persist(), currentData, currentUser, escapeHtml(),
-// escapeAttr(), makeId(), percent(), t(), showToast(), ensureModalLayer()
-// from shared.js. currentData.tasks stays the same array/shape getCounts(),
-// the Dashboard, Statistics, and workout.js's auto-generated tasks already
-// depend on — every new field is additive with safe defaults.
+// MyLife — Tasks module (Phase 2 Firestore migration).
+//
+// Firestore replaces LocalStorage as the source of truth for tasks. This
+// file now:
+//   - imports TodoRepository (repositories/) instead of touching
+//     currentData.tasks / persist() for anything task-related,
+//   - keeps a `localTasks` array kept in sync via a realtime `subscribe()`
+//     listener (never polled — per the brief's "never poll the database"),
+//   - applies optimistic UI updates (mutate `localTasks` + re-render
+//     immediately, then write to Firestore in the background) with
+//     automatic rollback if the write fails,
+//   - supports undo for delete via core/UndoManager.js,
+//   - uses utils/QueryUtils.js for client-side search/filter/sort over the
+//     already-synced `localTasks` array (see that file for why).
+//
+// Everything else — rendering, smart ordering, dependency/blocking logic,
+// schedule-conflict detection, the reminder watcher, drag-to-reorder, the
+// add/edit modal — is UNCHANGED in behavior; only where the data comes from
+// and how writes happen has changed, per the brief's "UI must remain
+// visually identical."
+//
+// PREREQUISITE THIS FILE ASSUMES (see chat summary / MIGRATION_NOTES.md):
+// AuthService.getCurrentUser() must return a signed-in Firebase user. The
+// existing login/register pages have not been rewired onto Firebase Auth in
+// this pass — that is a separate, disclosed dependency, not something this
+// file can paper over.
+//
+// Reuses bootShell(), escapeHtml(), escapeAttr(), makeId(), percent(), t(),
+// showToast(), ensureModalLayer() from shared.js — nothing here duplicates
+// those.
+
+import { TodoRepository } from '../repositories/TodoRepository.js';
+import { AuthService } from '../services/AuthService.js';
+import { undoManager } from '../core/UndoManager.js';
+import { searchText, sortBy } from '../utils/QueryUtils.js';
 
 const TODO_PRIORITIES = ['Low', 'Medium', 'High'];
 const TODO_PRIORITY_RANK = { High: 0, Medium: 1, Low: 2 };
 const TODO_RECUR_FREQS = ['Daily', 'Weekly', 'Monthly'];
 const TODO_REMINDER_CHECK_MS = 20000;
 
-let todoState = { filter: 'all', tag: 'all', search: '', modal: null };
+let todoState = { filter: 'all', tag: 'all', search: '', modal: null, sort: 'smart', dragId: null };
 let todoReminderTimer = null;
+
+/** @type {import('../repositories/TodoRepository.js').TodoRepository|null} */
+let todoRepo = null;
+/** Realtime-synced local cache of the signed-in user's tasks — never polled, only pushed via subscribe(). */
+let localTasks = [];
+let todoUnsubscribe = null;
+/** True until the first Firestore snapshot arrives — distinguishes "still loading" from "genuinely no tasks" (see renderTodoRoot). */
+let todoLoading = true;
+/** Set when the realtime subscription itself fails (offline, permission, etc.) — see renderTodoRoot. @type {import('../core/ErrorMapper.js').MappedError|null} */
+let todoError = null;
 
 function todoToday() { return new Date().toISOString().slice(0, 10); }
 
@@ -20,19 +59,19 @@ function isTaskToday(t) { return !t.dueDate || t.dueDate === todoToday(); }
 function isTaskUpcoming(t) { return !!t.dueDate && t.dueDate > todoToday(); }
 
 function taskDependencies(t) {
-  return (t.dependsOn || []).map((id) => currentData.tasks.find((x) => x.id === id)).filter(Boolean);
+  return (t.dependsOn || []).map((id) => localTasks.find((x) => x.id === id)).filter(Boolean);
 }
 function isTaskBlocked(t) { return taskDependencies(t).some((d) => !d.completed); }
 
 function allTaskTags() {
   const set = new Set();
-  currentData.tasks.forEach((t) => (t.tags || []).forEach((tag) => set.add(tag)));
+  localTasks.forEach((t) => (t.tags || []).forEach((tag) => set.add(tag)));
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 function scheduleConflictIds() {
   const map = {};
-  currentData.tasks.filter((t) => !t.completed && t.dueDate && t.time).forEach((t) => {
+  localTasks.filter((t) => !t.completed && t.dueDate && t.time).forEach((t) => {
     const key = `${t.dueDate}_${t.time}`;
     (map[key] = map[key] || []).push(t.id);
   });
@@ -57,10 +96,45 @@ function smartOrder(tasks) {
   });
 }
 
-function initTodoPage() {
+async function initTodoPage() {
   renderArt('todo');
-  renderTodoRoot();
+
+  const user = AuthService.getCurrentUser();
+  if (!user) {
+    // Firebase Auth has no signed-in user yet. Rather than silently
+    // rendering an empty list (which would look like "you have no tasks"),
+    // surface this clearly — see the file header note on this dependency.
+    const root = byId('todo-root');
+    if (root) {
+      root.innerHTML = emptyStateHtml(
+        'lock',
+        t('Sign in to view your tasks.'),
+        `<button type="button" class="primary-btn" data-td-signin-redirect>${t('Go to sign in')}</button>`
+      );
+      const btn = root.querySelector('[data-td-signin-redirect]');
+      if (btn) btn.addEventListener('click', () => { window.location.href = '../pages/auth.html'; });
+    }
+    return;
+  }
+
+  todoRepo = new TodoRepository(user.uid);
+  todoLoading = true;
+  todoError = null;
+
+  if (todoUnsubscribe) todoUnsubscribe();
+  todoUnsubscribe = todoRepo.subscribe(
+    (items) => { localTasks = items; todoLoading = false; todoError = null; renderTodoRoot(); },
+    (mappedError) => { todoLoading = false; todoError = mappedError; renderTodoRoot(); },
+  );
+
+  renderTodoRoot(); // paint the skeleton immediately, before the first snapshot arrives
   startReminderWatch();
+}
+
+/** Called by the page router when navigating away from Todo — prevents a leaked listener/interval. */
+function disposeTodoPage() {
+  if (todoUnsubscribe) { todoUnsubscribe(); todoUnsubscribe = null; }
+  if (todoReminderTimer) { clearInterval(todoReminderTimer); todoReminderTimer = null; }
 }
 
 function startReminderWatch() {
@@ -69,36 +143,59 @@ function startReminderWatch() {
   todoReminderTimer = setInterval(checkTaskReminders, TODO_REMINDER_CHECK_MS);
 }
 
-function checkTaskReminders() {
-  if (!currentData) return;
+async function checkTaskReminders() {
+  if (!todoRepo) return;
   const now = Date.now();
-  let changed = false;
-  currentData.tasks.forEach((t) => {
-    if (!t.reminder || t.reminderFired || t.completed) return;
-    const target = new Date(t.reminder).getTime();
-    if (Number.isNaN(target) || target > now) return;
+  const due = localTasks.filter((t) => t.reminder && !t.reminderFired && !t.completed && new Date(t.reminder).getTime() <= now);
+  for (const t of due) {
+    // Optimistic: flip the local flag immediately so a second interval tick
+    // (or a second open tab, once Firestore's realtime listener catches up)
+    // can't also fire this same reminder — this directly replaces the
+    // duplicate-notification bug documented against the old LocalStorage
+    // architecture (Phase 4 audit, FINAL-BUG-002).
     t.reminderFired = true;
-    changed = true;
     showToast(`\u23f0 ${t.title}`, 'default', 5000);
     if ('Notification' in window && Notification.permission === 'granted') {
       try { new Notification('MyLife reminder', { body: t.title, icon: '../assist/Momentum_Logo-removebg-preview.png' }); } catch (_e) { /* ignore */ }
     }
-  });
-  if (changed) persist();
+    const result = await todoRepo.update(t.id, { reminderFired: true });
+    if (!result.ok) { t.reminderFired = false; } // rollback the optimistic flag if the write failed
+  }
 }
 
 // ─── Root render ────────────────────────────────────────────────────────────
 function renderTodoRoot() {
   const root = byId('todo-root');
   if (!root) return;
+
+  if (todoError) {
+    root.innerHTML = errorStateHtml(todoError, { onRetryId: 'td-error-retry' });
+    bindErrorStateEvents(root, () => initTodoPage(), 'td-error-retry');
+    return;
+  }
+
+  if (todoLoading) {
+    // Real loading state, not a guess dressed up as one: we haven't received
+    // Firestore's first snapshot yet, so we genuinely don't know if the user
+    // has tasks — showing "No tasks here" here would be misleading, not
+    // just unpolished (Phase 3 UI/UX pass).
+    root.innerHTML = `
+      ${todoHeaderSkeletonHtml()}
+      <div class="td-list">${[0, 1, 2].map(todoCardSkeletonHtml).join('')}</div>
+    `;
+    return;
+  }
+
   const tasks = visibleTasks();
   const conflicts = scheduleConflictIds();
+  const ordered = sortTasks(tasks);
+  const draggable = todoState.sort === 'custom';
   root.innerHTML = `
     ${todoHeaderHtml()}
     ${todoFiltersHtml()}
     <div class="td-list">
-      ${tasks.length
-        ? smartOrder(tasks).map((t) => taskCardHtml(t, conflicts)).join('')
+      ${ordered.length
+        ? ordered.map((t) => taskCardHtml(t, conflicts, draggable)).join('')
         : emptyStateHtml('checklist', t('No tasks here. Add one to get started.'), `<button type="button" class="secondary-btn empty-state-cta" data-td-add>+ ${t('New task')}</button>`)}
     </div>
   `;
@@ -106,10 +203,51 @@ function renderTodoRoot() {
   renderTaskModal();
 }
 
+/** Skeleton placeholder matching todoHeaderHtml's layout, so the page doesn't jump when real data arrives. */
+function todoHeaderSkeletonHtml() {
+  return `
+    <section class="panel td-header">
+      <div class="td-header-top">
+        <div>
+          <p class="eyebrow skeleton" style="width:90px;">&nbsp;</p>
+          <h2 class="skeleton" style="width:120px;">&nbsp;</h2>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+/** Skeleton placeholder matching taskCardHtml's layout — same card shape, shimmering instead of populated. */
+function todoCardSkeletonHtml() {
+  return `
+    <article class="td-card td-card-skeleton" aria-hidden="true">
+      <span class="skeleton" style="width:20px;height:20px;border-radius:6px;"></span>
+      <div class="td-card-main">
+        <div class="skeleton" style="width:60%;height:1.1em;margin-bottom:8px;">&nbsp;</div>
+        <div class="skeleton" style="width:35%;height:0.9em;">&nbsp;</div>
+      </div>
+    </article>
+  `;
+}
+
+function sortTasks(tasks) {
+  if (todoState.sort === 'custom') return [...tasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  if (todoState.sort === 'dueDate') {
+    return [...tasks].sort((a, b) => (a.dueDate || '9999-99-99').localeCompare(b.dueDate || '9999-99-99'));
+  }
+  if (todoState.sort === 'priority') {
+    return [...tasks].sort((a, b) => (TODO_PRIORITY_RANK[a.priority] ?? 1) - (TODO_PRIORITY_RANK[b.priority] ?? 1));
+  }
+  if (todoState.sort === 'az') {
+    return sortBy(tasks, { az: (a, b) => a.title.localeCompare(b.title) }, 'az');
+  }
+  return smartOrder(tasks); // 'smart' (default)
+}
+
 function todoHeaderHtml() {
-  const total = currentData.tasks.length;
-  const done = currentData.tasks.filter((t) => t.completed).length;
-  const overdue = currentData.tasks.filter(isTaskOverdue).length;
+  const total = localTasks.length;
+  const done = localTasks.filter((t) => t.completed).length;
+  const overdue = localTasks.filter(isTaskOverdue).length;
   return `
     <section class="panel td-header">
       <div class="td-header-top">
@@ -132,12 +270,19 @@ function todoFiltersHtml() {
     ['all', t('All')], ['today', t('Today')], ['upcoming', t('Upcoming')],
     ['overdue', t('Overdue')], ['completed', t('Completed')],
   ];
+  const sorts = [
+    ['smart', t('Smart')], ['dueDate', t('Due date')], ['priority', t('Priority')],
+    ['az', t('A\u2013Z')], ['custom', t('Custom (drag to reorder)')],
+  ];
   const tags = allTaskTags();
   return `
     <section class="td-filter-row">
       <div class="td-filter-chips" role="tablist">
         ${filters.map(([k, label]) => `<button type="button" class="td-chip${todoState.filter === k ? ' active' : ''}" data-td-filter="${k}" role="tab" aria-selected="${todoState.filter === k}">${label}</button>`).join('')}
       </div>
+      <select class="td-tag-select" data-td-sort aria-label="${t('Sort tasks')}">
+        ${sorts.map(([k, label]) => `<option value="${k}" ${todoState.sort === k ? 'selected' : ''}>${t('Sort')}: ${label}</option>`).join('')}
+      </select>
       ${tags.length ? `
         <select class="td-tag-select" data-td-tag aria-label="${t('Filter by tag')}">
           <option value="all" ${todoState.tag === 'all' ? 'selected' : ''}>${t('All tags')}</option>
@@ -149,31 +294,35 @@ function todoFiltersHtml() {
 }
 
 function visibleTasks() {
-  const q = todoState.search.trim().toLowerCase();
-  return currentData.tasks.filter((t) => {
+  let tasks = localTasks.filter((t) => {
     if (todoState.filter === 'today' && !(isTaskToday(t) && !t.completed)) return false;
     if (todoState.filter === 'upcoming' && !isTaskUpcoming(t)) return false;
     if (todoState.filter === 'overdue' && !isTaskOverdue(t)) return false;
     if (todoState.filter === 'completed' && !t.completed) return false;
-    if (todoState.filter === 'all' && t.completed) return false;
     if (todoState.tag !== 'all' && !(t.tags || []).includes(todoState.tag)) return false;
-    if (q) {
-      const hay = `${t.title} ${t.notes || ''} ${(t.tags || []).join(' ')}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
     return true;
   });
+  // Client-side search over the already realtime-synced local cache — see
+  // utils/QueryUtils.js for why this beats a server round-trip per keystroke.
+  if (todoState.search.trim()) {
+    const byTitleOrNotes = searchText(tasks, todoState.search, ['title', 'notes']);
+    tasks = byTitleOrNotes.length
+      ? byTitleOrNotes
+      : tasks.filter((t) => (t.tags || []).some((tag) => tag.toLowerCase().includes(todoState.search.trim().toLowerCase())));
+  }
+  return tasks;
 }
 
 // ─── Task card ──────────────────────────────────────────────────────────────
-function taskCardHtml(t, conflicts) {
+function taskCardHtml(t, conflicts, draggable) {
   const blocked = isTaskBlocked(t);
   const overdue = isTaskOverdue(t);
   const subtasks = t.subtasks || [];
   const subDone = subtasks.filter((s) => s.completed).length;
   const hasConflict = conflicts.has(t.id);
   return `
-    <article class="td-card${t.completed ? ' is-completed' : ''}${blocked ? ' is-blocked' : ''}${overdue ? ' is-overdue' : ''}" data-priority="${escapeAttr(t.priority || 'Medium')}">
+    <article class="td-card${t.completed ? ' is-completed' : ''}${blocked ? ' is-blocked' : ''}${overdue ? ' is-overdue' : ''}${draggable ? ' is-draggable' : ''}" data-priority="${escapeAttr(t.priority || 'Medium')}" data-td-id="${t.id}" ${draggable ? 'draggable="true"' : ''}>
+      ${draggable ? `<span class="td-drag-handle" aria-hidden="true" title="${t('Drag to reorder')}">\u22ee\u22ee</span>` : ''}
       <label class="td-check">
         <input type="checkbox" ${t.completed ? 'checked' : ''} ${blocked ? 'disabled' : ''} data-td-toggle="${t.id}" aria-label="${t.completed ? t('Mark incomplete') : t('Mark complete')}" title="${blocked ? t('Blocked by an incomplete dependency') : ''}" />
       </label>
@@ -225,7 +374,16 @@ function bindTodoRootEvents(root) {
   let searchTimer = null;
   search.addEventListener('input', () => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { todoState.search = search.value; renderTodoRoot(); }, 200);
+    const caret = search.selectionStart;
+    searchTimer = setTimeout(() => {
+      todoState.search = search.value;
+      renderTodoRoot();
+      const freshInput = document.querySelector('[data-td-search]');
+      if (freshInput) {
+        freshInput.focus();
+        try { freshInput.setSelectionRange(caret, caret); } catch (_e) { /* ignore */ }
+      }
+    }, 200);
   });
   root.querySelectorAll('[data-td-filter]').forEach((btn) => btn.addEventListener('click', () => {
     todoState.filter = btn.dataset.tdFilter;
@@ -233,6 +391,32 @@ function bindTodoRootEvents(root) {
   }));
   const tagSelect = root.querySelector('[data-td-tag]');
   if (tagSelect) tagSelect.addEventListener('change', () => { todoState.tag = tagSelect.value; renderTodoRoot(); });
+  const sortSelect = root.querySelector('[data-td-sort]');
+  if (sortSelect) sortSelect.addEventListener('change', () => { todoState.sort = sortSelect.value; renderTodoRoot(); });
+
+  root.querySelectorAll('[data-td-id][draggable="true"]').forEach((card) => {
+    card.addEventListener('dragstart', () => {
+      todoState.dragId = card.dataset.tdId;
+      card.classList.add('is-dragging');
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('is-dragging');
+      todoState.dragId = null;
+    });
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      card.classList.add('td-drop-hover');
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('td-drop-hover'));
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('td-drop-hover');
+      const draggedId = todoState.dragId;
+      const targetId = card.dataset.tdId;
+      if (!draggedId || draggedId === targetId) return;
+      reorderTasks(draggedId, targetId);
+    });
+  });
 
   root.querySelectorAll('[data-td-toggle]').forEach((el) => el.addEventListener('change', () => toggleTask(el.dataset.tdToggle)));
   root.querySelectorAll('[data-td-subtoggle]').forEach((el) => el.addEventListener('change', () => {
@@ -250,31 +434,58 @@ function bindTodoRootEvents(root) {
   root.querySelectorAll('[data-td-delete]').forEach((btn) => btn.addEventListener('click', () => deleteTask(btn.dataset.tdDelete)));
 }
 
-function toggleTask(id) {
-  const t = currentData.tasks.find((x) => x.id === id);
+/**
+ * Toggling a task is the one write in this file most exposed to the
+ * multi-tab race the old LocalStorage architecture had (Phase 4 audit,
+ * FINAL-BUG-001/002): two tabs could both see "not complete" at the same
+ * instant. A Firestore transaction re-reads the document server-side
+ * immediately before writing, so the second tab to commit sees the first
+ * tab's already-applied change and does not stomp on it.
+ */
+async function toggleTask(id) {
+  const t = localTasks.find((x) => x.id === id);
   if (!t || isTaskBlocked(t)) return;
-  if (t.recurring && !t.completed) {
-    // Recurring task: log this completion, then roll forward to the next
-    // occurrence instead of leaving it permanently checked off.
-    t.completionLog = (t.completionLog || []).concat(new Date().toISOString()).slice(-60);
-    t.dueDate = nextOccurrenceDate(t.dueDate || todoToday(), t.recurring);
-    t.completed = false;
-    t.completedAt = null;
-    t.reminderFired = false;
-    showToast(`${t.title} \u2014 ${t('next occurrence')}: ${t.dueDate}`, 'success');
-  } else {
-    t.completed = !t.completed;
-    t.completedAt = t.completed ? new Date().toISOString() : null;
-  }
-  persist();
-  renderTodoRoot();
-  syncDependentBlockedStates();
-}
 
-function syncDependentBlockedStates() {
-  // No stored state to flip here (blocked is computed live), but re-render
-  // so any task depending on the one just toggled reflects instantly.
+  const previous = { ...t };
+  let patch;
+  if (t.recurring && !t.completed) {
+    const nextDue = nextOccurrenceDate(t.dueDate || todoToday(), t.recurring);
+    patch = {
+      completionLog: (t.completionLog || []).concat(new Date().toISOString()).slice(-60),
+      dueDate: nextDue, completed: false, completedAt: null, reminderFired: false,
+    };
+    showToast(`${t.title} \u2014 ${t('next occurrence')}: ${nextDue}`, 'success');
+  } else {
+    patch = { completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : null };
+  }
+
+  const wasIncomplete = !previous.completed;
+  Object.assign(t, patch); // optimistic local update
   renderTodoRoot();
+
+  // Success micro-interaction: only on the "just completed" transition, not
+  // on un-checking or on a recurring task's silent rollover to its next
+  // occurrence (patch.completed stays false in that branch).
+  if (wasIncomplete && patch.completed) {
+    const card = document.querySelector(`[data-td-id="${id}"]`);
+    if (card) {
+      card.classList.add('is-just-completed');
+      card.addEventListener('animationend', () => card.classList.remove('is-just-completed'), { once: true });
+    }
+  }
+
+  // Re-read-then-write inside a transaction so a concurrent edit from
+  // another tab/device can't be silently overwritten (see doc comment above).
+  const result = await todoRepo.transaction(id, (current) => {
+    if (!current) throw new Error('Task no longer exists.');
+    return patch;
+  });
+
+  if (!result.ok) {
+    Object.assign(t, previous); // rollback
+    renderTodoRoot();
+    showToast(result.error.message, 'danger');
+  }
 }
 
 function nextOccurrenceDate(fromIso, recurring) {
@@ -285,21 +496,76 @@ function nextOccurrenceDate(fromIso, recurring) {
   return d.toISOString().slice(0, 10);
 }
 
-function toggleSubtask(taskId, subId) {
-  const t = currentData.tasks.find((x) => x.id === taskId);
+async function toggleSubtask(taskId, subId) {
+  const t = localTasks.find((x) => x.id === taskId);
   const s = t && (t.subtasks || []).find((x) => x.id === subId);
   if (!s) return;
-  s.completed = !s.completed;
-  persist();
+  const previous = s.completed;
+  s.completed = !s.completed; // optimistic
   renderTodoRoot();
+  const result = await todoRepo.update(taskId, { subtasks: t.subtasks });
+  if (!result.ok) { s.completed = previous; renderTodoRoot(); showToast(result.error.message, 'danger'); }
 }
 
-function deleteTask(id) {
-  currentData.tasks = currentData.tasks.filter((x) => x.id !== id);
-  // Clean up dangling dependency references in other tasks.
-  currentData.tasks.forEach((x) => { if (x.dependsOn) x.dependsOn = x.dependsOn.filter((depId) => depId !== id); });
-  persist();
+/**
+ * Reordering touches every visible task's `order` field at once — exactly
+ * the "move several ... Bulk Updates" case the brief calls out for
+ * Batch Writes, so this now does one `batchUpdate()` instead of N separate
+ * `update()` calls.
+ */
+async function reorderTasks(draggedId, targetId) {
+  const visible = sortTasks(visibleTasks());
+  const draggedIdx = visible.findIndex((x) => x.id === draggedId);
+  const targetIdx = visible.findIndex((x) => x.id === targetId);
+  if (draggedIdx === -1 || targetIdx === -1) return;
+  const [moved] = visible.splice(draggedIdx, 1);
+  visible.splice(targetIdx, 0, moved);
+
+  const ops = [];
+  visible.forEach((t, i) => {
+    const real = localTasks.find((x) => x.id === t.id);
+    if (real && real.order !== i) { real.order = i; ops.push({ type: 'update', id: t.id, data: { order: i } }); } // optimistic
+  });
   renderTodoRoot();
+  if (ops.length) {
+    const result = await todoRepo.batchUpdate(ops);
+    if (!result.ok) showToast(result.error.message, 'danger'); // local order already applied; next snapshot reconciles
+  }
+}
+
+/**
+ * Deletes a task, cleans up dangling dependency references in other tasks
+ * via a single batch write, and buffers an 8-second undo (core/UndoManager.js)
+ * that recreates the exact same document (same id, same data) if the user
+ * clicks "Undo" on the toast in time.
+ */
+async function deleteTask(id) {
+  const removed = localTasks.find((x) => x.id === id);
+  if (!removed) return;
+
+  const affectedDependents = localTasks.filter((x) => (x.dependsOn || []).includes(id));
+
+  // Optimistic local removal.
+  localTasks = localTasks.filter((x) => x.id !== id);
+  affectedDependents.forEach((x) => { x.dependsOn = x.dependsOn.filter((depId) => depId !== id); });
+  renderTodoRoot();
+
+  const ops = [
+    { type: 'delete', id },
+    ...affectedDependents.map((x) => ({ type: 'update', id: x.id, data: { dependsOn: x.dependsOn } })),
+  ];
+  const result = await todoRepo.batchUpdate(ops);
+  if (!result.ok) {
+    showToast(result.error.message, 'danger');
+    return; // next realtime snapshot will reconcile the (failed) optimistic removal
+  }
+
+  const undoToken = undoManager.register(async () => {
+    const restoreResult = await todoRepo.create(removed, removed.id);
+    if (!restoreResult.ok) { showToast(restoreResult.error.message, 'danger'); return; }
+    showToast(t('Task restored.'), 'success');
+  });
+  showToast(t('Task deleted.'), 'default', 8000, { onUndo: () => undoManager.undo(undoToken) });
 }
 
 // ─── Add / edit modal ───────────────────────────────────────────────────────
@@ -317,8 +583,8 @@ function renderTaskModal() {
   const existing = document.querySelector('[data-td-modal]');
   if (existing) existing.remove();
   if (!todoState.modal) return;
-  const editing = todoState.modal === 'new' ? null : currentData.tasks.find((x) => x.id === todoState.modal);
-  const otherTasks = currentData.tasks.filter((x) => x !== editing);
+  const editing = todoState.modal === 'new' ? null : localTasks.find((x) => x.id === todoState.modal);
+  const otherTasks = localTasks.filter((x) => x !== editing);
   const subtaskLines = (editing?.subtasks || []).map((s) => s.title).join('\n');
   const attachmentLines = (editing?.attachments || []).map((a) => `${a.name} | ${a.url}`).join('\n');
   const reminderValue = editing?.reminder ? editing.reminder.slice(0, 16) : '';
@@ -398,7 +664,7 @@ function renderTaskModal() {
   const delBtn = overlay.querySelector('[data-td-modal-delete]');
   if (delBtn) delBtn.addEventListener('click', () => { deleteTask(editing.id); closeTaskModal(); });
 
-  overlay.querySelector('[data-td-form]').addEventListener('submit', (e) => {
+  overlay.querySelector('[data-td-form]').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const title = String(fd.get('title') || '').trim();
@@ -437,13 +703,31 @@ function renderTaskModal() {
       Notification.requestPermission().catch(() => {});
     }
 
+    closeTaskModal(); // optimistic: close immediately, don't make the user wait on the network
+
     if (editing) {
-      Object.assign(editing, data);
+      Object.assign(editing, data); // optimistic local update
+      renderTodoRoot();
+      const result = await todoRepo.update(editing.id, data);
+      if (!result.ok) showToast(result.error.message, 'danger'); // next snapshot will reconcile
     } else {
-      currentData.tasks.push({ id: makeId(), completed: false, createdAt: new Date().toISOString(), completedAt: null, reminderFired: false, ...data });
+      const optimisticId = makeId();
+      const optimisticTask = { id: optimisticId, completed: false, createdAt: new Date().toISOString(), completedAt: null, reminderFired: false, ...data };
+      localTasks = [...localTasks, optimisticTask]; // optimistic local insert
+      renderTodoRoot();
+      const result = await todoRepo.create({ completed: false, completedAt: null, reminderFired: false, ...data }, optimisticId);
+      if (!result.ok) {
+        localTasks = localTasks.filter((x) => x.id !== optimisticId); // rollback
+        renderTodoRoot();
+        showToast(result.error.message, 'danger');
+      } else {
+        addNotification('Todo', `${t('Task added')}: ${data.title}`);
+      }
     }
-    persist();
-    closeTaskModal();
-    renderTodoRoot();
   });
 }
+
+// Now a real ES module (see file header) — exported explicitly instead of
+// relying on the old "every <script> shares one global scope" convention,
+// since module-scoped declarations are no longer automatically global.
+export { initTodoPage, disposeTodoPage };

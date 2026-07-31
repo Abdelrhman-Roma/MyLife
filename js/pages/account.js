@@ -132,7 +132,7 @@ function formatDate(iso) {
 function renderNav() {
   byId('account-nav').innerHTML = ACCOUNT_SECTIONS.map(([key, label, icon]) => `
     <a class="account-nav-item" href="#${key}" data-section="${key}">
-      <span aria-hidden="true">${icon}</span><span>${escapeHtml(label)}</span>
+      <span aria-hidden="true">${icon}</span><span>${escapeHtml(t(label))}</span>
     </a>
   `).join('');
   byId('account-nav').addEventListener('click', (e) => {
@@ -172,8 +172,8 @@ function renderContent() {
   byId('account-content').innerHTML = ACCOUNT_SECTIONS.map(([key, label]) => `
     <section class="account-panel" id="sec-${key}">
       <div class="account-panel-head">
-        <p class="eyebrow">${sectionEyebrow(key)}</p>
-        <h2>${escapeHtml(label)}</h2>
+        <p class="eyebrow">${t(sectionEyebrow(key))}</p>
+        <h2>${escapeHtml(t(label))}</h2>
       </div>
       <div class="account-panel-body">${sectionBody(key)}</div>
     </section>
@@ -316,14 +316,14 @@ function appearanceHtml() {
   const s = currentData.settings;
   return `
     <div class="appearance-block">
-      <h3>Theme</h3>
+      <h3>${t('Theme')}</h3>
       <div class="segmented" data-group="theme">
-        ${[['light', 'Light'], ['dark', 'Dark'], ['auto', 'Use System']].map(([t, l]) => `<button type="button" class="segmented-btn ${s.theme === t ? 'active' : ''}" data-value="${t}">${l}</button>`).join('')}
+        ${[['light', 'Light'], ['dark', 'Dark'], ['auto', 'Use System']].map(([mode, label]) => `<button type="button" class="segmented-btn ${s.theme === mode ? 'active' : ''}" data-value="${mode}">${t(label)}</button>`).join('')}
       </div>
     </div>
 
     <div class="appearance-block">
-      <h3>Theme Color</h3>
+      <h3>${t('Theme Color')}</h3>
       <div class="theme-card-grid">
         ${PALETTE_SWATCHES.map(([id, color, name]) => `
           <button type="button" class="theme-card ${s.palette === id ? 'active' : ''}" data-palette="${id}" aria-pressed="${s.palette === id}">
@@ -332,7 +332,7 @@ function appearanceHtml() {
                 <i></i><i></i><i></i>
               </span>
             </span>
-            <span class="theme-card-name">${name}</span>
+            <span class="theme-card-name">${t(name)}</span>
             <span class="theme-card-check" aria-hidden="true">${SVG_ICON.check || '✓'}</span>
           </button>
         `).join('')}
@@ -340,23 +340,23 @@ function appearanceHtml() {
     </div>
 
     <div class="appearance-block">
-      <h3>Font size</h3>
+      <h3>${t('Font size')}</h3>
       <div class="segmented" data-group="fontSize">
         ${[['sm', 'S'], ['md', 'M'], ['lg', 'L'], ['xl', 'XL']].map(([f, label]) => `<button type="button" class="segmented-btn ${s.fontSize === f ? 'active' : ''}" data-value="${f}">${label}</button>`).join('')}
       </div>
     </div>
 
     <div class="appearance-block">
-      <h3>Border radius</h3>
+      <h3>${t('Border radius')}</h3>
       <div class="segmented" data-group="radius">
-        ${[['sharp', 'Sharp'], ['md', 'Rounded'], ['round', 'Pill']].map(([r, l]) => `<button type="button" class="segmented-btn ${s.radius === r ? 'active' : ''}" data-value="${r}">${l}</button>`).join('')}
+        ${[['sharp', 'Sharp'], ['md', 'Rounded'], ['round', 'Pill']].map(([r, l]) => `<button type="button" class="segmented-btn ${s.radius === r ? 'active' : ''}" data-value="${r}">${t(l)}</button>`).join('')}
       </div>
     </div>
 
     <div class="appearance-block toggles">
-      ${toggleRow('animations', 'Animations', 'Enable interface motion and transitions.', s.animations !== false)}
-      ${toggleRow('compact', 'Compact mode', 'Tighten spacing to fit more on screen.', !!s.compact)}
-      ${toggleRow('glass', 'Glass effect', 'Frosted, translucent panels.', !!s.glass)}
+      ${toggleRow('animations', t('Animations'), t('Enable interface motion and transitions.'), s.animations !== false)}
+      ${toggleRow('compact', t('Compact mode'), t('Tighten spacing to fit more on screen.'), !!s.compact)}
+      ${toggleRow('glass', t('Glass effect'), t('Frosted, translucent panels.'), !!s.glass)}
     </div>
   `;
 }
@@ -721,7 +721,7 @@ function bindSectionEvents() {
         s.classList.toggle('active', s === btn);
         s.setAttribute('aria-pressed', String(s === btn));
       });
-      showToast(`${btn.querySelector('.theme-card-name').textContent} theme applied`, 'success');
+      showToast(t('{name} theme applied', { name: btn.querySelector('.theme-card-name').textContent }), 'success');
     });
   });
 

@@ -1,0 +1,70 @@
+rules_version = '2';
+
+// ---------------------------------------------------------------------------
+// MyLife Firestore Security Rules
+// ---------------------------------------------------------------------------
+// Matches the data layout used by repositories/BaseRepository.js:
+//   {module}/{uid}/items/{itemId}   — todos, habits, goals, calendar,
+//                                      workout, study, prayer, nutrition
+//   users/{uid}                     — profile/settings document
+//
+// A single ownership check per module secures every document under it, which
+// is exactly why BaseRepository roots everything under the user's own UID
+// rather than storing a flat collection with a per-document ownerId field as
+// the ONLY access control (that pattern is easy to get wrong; this one is
+// not). Client-side `assertOwnership()` (utils/validators.js) is defense in
+// depth on top of these rules, not a substitute for them — never assume
+// unrestricted database access from client code alone.
+// ---------------------------------------------------------------------------
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // users/{uid} — profile & settings
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // {module}/{uid}/items/{itemId} — one rule block per module, all identical.
+    match /todos/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /habits/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /goals/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /calendar/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /workout/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /study/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /prayer/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /nutrition/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    // "statistics" (mentioned in the brief's example DB structure) is
+    // deliberately NOT given its own repository/collection in this phase —
+    // see MIGRATION_NOTES.md, "Remaining Technical Debt," for why.
+
+    // Default deny: anything not explicitly matched above is inaccessible.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
