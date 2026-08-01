@@ -9,8 +9,8 @@
  * -----------
  * Per the brief's "use UID as root ownership" requirement, every module's
  * data lives at:
- *     {moduleName}/{uid}/items/{itemId}
- * e.g. todos/abc123/items/xYz, habits/abc123/items/qRs. This keeps each
+ *     users/{uid}/{moduleName}/{itemId}
+ * e.g. users/abc123/todos/xYz, users/abc123/habits/qRs. This keeps each
  * user's data in its own document subtree, which is exactly what makes a
  * simple, auditable Firestore Security Rule possible (see firestore.rules):
  * a single `request.auth.uid == uid` check at the `{moduleName}/{uid}/**`
@@ -45,15 +45,15 @@ export class BaseRepository {
     this.uid = uid;
   }
 
-  /** @returns {import('firebase/firestore').CollectionReference} the `{module}/{uid}/items` collection */
+  /** @returns {import('firebase/firestore').CollectionReference} the `users/{uid}/{module}` collection */
   get itemsCollection() {
-    return collectionRef(this.moduleName, this.uid, 'items');
+    return collectionRef('users', this.uid, this.moduleName);
   }
 
   /** @param {string} id @returns {import('firebase/firestore').DocumentReference} */
   itemDoc(id) {
     assertId(id);
-    return docRef(this.moduleName, this.uid, 'items', id);
+    return docRef('users', this.uid, this.moduleName, id);
   }
 
   /**
@@ -101,7 +101,7 @@ export class BaseRepository {
   create(data, id) {
     assertPlainObject(data);
     return tryFirebase(async () => {
-      const ref = id ? this.itemDoc(id) : docRef(this.moduleName, this.uid, 'items', crypto.randomUUID());
+      const ref = id ? this.itemDoc(id) : docRef('users', this.uid, this.moduleName, crypto.randomUUID());
       await setDoc(ref, { ...data, ownerId: this.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       return ref.id;
     });
@@ -214,7 +214,7 @@ export class BaseRepository {
       const b = writeBatch(this.itemsCollection.firestore);
       for (const op of operations) {
         if (op.type === 'create') {
-          const ref = op.id ? this.itemDoc(op.id) : docRef(this.moduleName, this.uid, 'items', crypto.randomUUID());
+          const ref = op.id ? this.itemDoc(op.id) : docRef('users', this.uid, this.moduleName, crypto.randomUUID());
           b.set(ref, { ...op.data, ownerId: this.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         } else if (op.type === 'update') {
           assertId(op.id);

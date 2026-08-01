@@ -37,6 +37,13 @@
           <nav class="account-nav" id="account-nav" aria-label="Account sections"></nav>
           <div class="account-content" id="account-content"></div>
         </section>
+
+        <!-- Phase 5: Connected Accounts — deliberately a separate, self-
+             contained section (own root id, own script) rather than wired
+             into account.js's existing 1,150+ line section-switching logic,
+             so this addition can't accidentally break the profile page's
+             existing behavior. -->
+        <section class="panel connected-accounts-panel" id="connected-accounts-root" aria-label="Connected accounts"></section>
       </main>
     </div>
 
@@ -48,6 +55,8 @@
     <script src="../locales/de.js"></script>
     <script src="../js/i18n.js"></script>
     <script src="../js/shared.js"></script>
+    <script type="module" src="../js/notification-center.js"></script>
     <script src="../js/pages/account.js"></script>
+    <script type="module" src="../js/pages/connected-accounts.js"></script>
   </body>
 </html>

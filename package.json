@@ -1,13 +1,15 @@
 {
   "name": "mylife",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "MyLife — personal productivity & Islamic lifestyle app (Firebase migration, Phase 1 foundation).",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "node scripts/release-check.mjs",
+    "verify": "npm run build && npm run check"
   },
   "dependencies": {
     "firebase": "^11.0.0"

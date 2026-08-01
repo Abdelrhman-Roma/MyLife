@@ -43,6 +43,21 @@ const CODE_MAP = {
   'auth/weak-password': { category: 'validation', message: 'Please choose a stronger password (at least 6 characters).', retryable: false },
   'auth/invalid-email': { category: 'validation', message: 'That doesn\u2019t look like a valid email address.', retryable: false },
   'auth/too-many-requests': { category: 'validation', message: 'Too many attempts. Please wait a moment before trying again.', retryable: true },
+
+  // Phase 5: OAuth provider sign-in / account-linking errors.
+  'auth/popup-closed-by-user': { category: 'validation', message: 'Sign-in was closed before it finished. Please try again.', retryable: true },
+  'auth/cancelled-popup-request': { category: 'validation', message: 'Sign-in was cancelled. Please try again.', retryable: true },
+  'auth/popup-blocked': { category: 'validation', message: 'Your browser blocked the sign-in popup. Please allow popups for this site and try again.', retryable: true },
+  'auth/unauthorized-domain': { category: 'permission', message: 'This site is not authorized for sign-in. Ask the site owner to add this domain in Firebase Authentication settings.', retryable: false },
+  'auth/operation-not-allowed': { category: 'permission', message: 'This sign-in provider has not been enabled in Firebase Authentication.', retryable: false },
+  'auth/invalid-api-key': { category: 'validation', message: 'Sign-in is not configured correctly for this environment. Please contact support.', retryable: false },
+  'auth/missing-config': { category: 'validation', message: 'Sign-in is not configured for this environment yet. Please contact support.', retryable: false },
+  'auth/account-exists-with-different-credential': { category: 'validation', message: 'An account already exists with this email using a different sign-in method. Try signing in with that method instead.', retryable: false },
+  'auth/credential-already-in-use': { category: 'validation', message: 'That account is already linked to a different MyLife user.', retryable: false },
+  'auth/provider-already-linked': { category: 'validation', message: 'This sign-in method is already connected to your account.', retryable: false },
+  'auth/no-such-provider': { category: 'validation', message: 'That sign-in method isn\u2019t connected to your account.', retryable: false },
+  'auth/user-token-expired': { category: 'auth-expired', message: 'Your session has expired. Please sign in again.', retryable: false },
+  'auth/user-mismatch': { category: 'validation', message: 'That doesn\u2019t match the currently signed-in account.', retryable: false },
 };
 
 /**
@@ -91,6 +106,10 @@ export async function tryFirebase(fn) {
     const data = await fn();
     return { ok: true, data };
   } catch (error) {
-    return { ok: false, error: mapFirebaseError(error) };
+    const mapped = mapFirebaseError(error);
+    if (import.meta.env?.DEV) {
+      console.error('[firebase] Operation failed', { code: mapped.code, category: mapped.category, error });
+    }
+    return { ok: false, error: mapped };
   }
 }

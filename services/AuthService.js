@@ -8,8 +8,12 @@
  */
 
 import * as fbAuth from '../firebase/auth.js';
+import { missingFirebaseConfig } from '../firebase/firebase.js';
 import { tryFirebase } from '../core/ErrorMapper.js';
 import { UserService } from './UserService.js';
+
+const PROVIDER_ID_MAP = { google: 'google.com', github: 'github.com', email: 'password' };
+const LAST_METHOD_MESSAGE = 'You can\u2019t remove your only sign-in method \u2014 connect another one first.';
 
 class AuthServiceImpl {
   constructor() {
@@ -56,9 +60,11 @@ class AuthServiceImpl {
   /**
    * @param {string} email @param {string} password
    */
-  signIn(email, password) {
+  async signIn(email, password, { remember = true } = {}) {
     return tryFirebase(async () => {
+      await fbAuth.setRememberMe(remember);
       const credential = await fbAuth.signIn(email, password);
+      await this._syncProfileFromAuthUser(credential.user, 'email');
       return credential.user;
     });
   }
@@ -118,6 +124,173 @@ class AuthServiceImpl {
       if (!this.currentUser) throw new Error('No signed-in user.');
       return fbAuth.changePassword(this.currentUser, currentPassword, newPassword);
     });
+  }
+
+  // ─── Phase 5: OAuth sign-in, provider linking, profile sync ──────────────
+
+  /**
+   * Signs in with Google or GitHub via popup. On success, syncs the user's
+   * profile metadata (display name, photo, provider, verification status,
+   * last login) into Firestore — "every login should update profile
+   * metadata," per the brief.
+   * @param {'google'|'github'} providerId
+   */
+  async signInWithProvider(providerId, { remember = true } = {}) {
+    return tryFirebase(async () => {
+      if (missingFirebaseConfig.length) {
+        const error = new Error(`Missing Firebase configuration: ${missingFirebaseConfig.join(', ')}`);
+        error.code = 'auth/missing-config';
+        throw error;
+      }
+      await fbAuth.setRememberMe(remember);
+      const credential = await fbAuth.signInWithProviderPopup(providerId);
+      await this._syncProfileFromAuthUser(credential.user, providerId);
+      return credential.user;
+    });
+  }
+
+  /** Starts redirect OAuth after a popup is blocked. The browser navigates away. */
+  async signInWithProviderRedirect(providerId, { remember = true } = {}) {
+    return tryFirebase(async () => {
+      if (missingFirebaseConfig.length) {
+        const error = new Error(`Missing Firebase configuration: ${missingFirebaseConfig.join(', ')}`);
+        error.code = 'auth/missing-config';
+        throw error;
+      }
+      await fbAuth.setRememberMe(remember);
+      sessionStorage.setItem('momentum.oauth.provider', providerId);
+      await fbAuth.signInWithProviderRedirect(providerId);
+      return null;
+    });
+  }
+
+  /** Completes a returning OAuth redirect and synchronizes the user profile. */
+  completeProviderRedirect() {
+    return tryFirebase(async () => {
+      // A normal visit is not an OAuth return. Avoid touching Firebase's
+      // redirect result API (and emitting a misleading configuration error)
+      // unless this browser initiated the fallback flow.
+      if (!sessionStorage.getItem('momentum.oauth.provider')) return null;
+      if (missingFirebaseConfig.length) {
+        const error = new Error(`Missing Firebase configuration: ${missingFirebaseConfig.join(', ')}`);
+        error.code = 'auth/missing-config';
+        throw error;
+      }
+      const credential = await fbAuth.getProviderRedirectResult();
+      if (!credential) return null;
+      const providerId = sessionStorage.getItem('momentum.oauth.provider') ||
+        (credential.providerId === 'github.com' ? 'github' : 'google');
+      sessionStorage.removeItem('momentum.oauth.provider');
+      await this._syncProfileFromAuthUser(credential.user, providerId);
+      return credential.user;
+    });
+  }
+
+  /**
+   * Links an additional provider onto the currently signed-in user (e.g. a
+   * user who registered with email choosing "Connect Google" later).
+   * Firebase automatically prevents linking a provider identity that's
+   * already attached to a DIFFERENT user (throws
+   * `auth/credential-already-in-use`); ErrorMapper turns that into a clear
+   * message rather than this method trying to auto-merge accounts, which
+   * Firebase's client SDK cannot safely do on its own.
+   * @param {'google'|'github'} providerId
+   */
+  linkProvider(providerId) {
+    return tryFirebase(async () => {
+      if (!this.currentUser) throw new Error('No signed-in user.');
+      const alreadyLinked = this.currentUser.providerData.some((p) => p.providerId === PROVIDER_ID_MAP[providerId]);
+      if (alreadyLinked) {
+        const err = new Error('Already linked');
+        err.code = 'auth/provider-already-linked';
+        throw err;
+      }
+      const credential = await fbAuth.linkProviderPopup(this.currentUser, providerId);
+      this.currentUser = fbAuth.getCurrentUser(); // Phase 6 audit: explicit refresh, don't rely on the SDK's in-place mutation behavior
+      await this._syncProfileFromAuthUser(credential.user, providerId);
+      return credential.user;
+    });
+  }
+
+  /**
+   * Unlinks a provider — refuses if it's the user's only remaining sign-in
+   * method ("never allow users to remove their last login method," per the
+   * brief), checked client-side against `user.providerData.length` before
+   * ever calling Firebase.
+   * @param {'google'|'github'|'email'} providerId
+   */
+  unlinkProvider(providerId) {
+    return tryFirebase(async () => {
+      if (!this.currentUser) throw new Error('No signed-in user.');
+      if (this.currentUser.providerData.length <= 1) {
+        const err = new Error(LAST_METHOD_MESSAGE);
+        err.code = 'LAST_METHOD';
+        throw err;
+      }
+      await fbAuth.unlinkProvider(this.currentUser, PROVIDER_ID_MAP[providerId]);
+      this.currentUser = fbAuth.getCurrentUser();
+      return true;
+    });
+  }
+
+  /**
+   * @returns {{ id: 'google'|'github'|'email', connected: boolean }[]}
+   * Connected-provider status for the currently signed-in user, in the
+   * shape the account page's badges need directly.
+   */
+  getConnectedProviders() {
+    const linked = new Set((this.currentUser?.providerData || []).map((p) => p.providerId));
+    return [
+      { id: 'email', connected: linked.has('password') },
+      { id: 'google', connected: linked.has('google.com') },
+      { id: 'github', connected: linked.has('github.com') },
+    ];
+  }
+
+  /**
+   * Resolves the best available avatar: the signed-in user's own photoURL
+   * (set by whichever provider they used — Google/GitHub both supply one),
+   * falling back to a deterministic generated avatar (initials on a color
+   * derived from their uid) so a broken image is never shown, per the
+   * brief's "never show broken images."
+   * @returns {{ type: 'photo', url: string } | { type: 'initials', initials: string, color: string }}
+   */
+  getAvatar() {
+    const user = this.currentUser;
+    if (user?.photoURL) return { type: 'photo', url: user.photoURL };
+    const name = user?.displayName || user?.email || '?';
+    const initials = name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || '?';
+    const palette = ['#2563eb', '#059669', '#7c3aed', '#d97706', '#dc2626', '#0891b2'];
+    const seed = (user?.uid || name).split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+    return { type: 'initials', initials, color: palette[seed % palette.length] };
+  }
+
+  /**
+   * Writes/updates the user's Firestore profile document from their current
+   * Firebase Auth user object. Called after every successful sign-in
+   * (email, Google, or GitHub) and after linking a new provider — this is
+   * the one place "profile synchronization" actually happens, per the
+   * brief, rather than being reimplemented at each call site.
+   * @param {import('firebase/auth').User} user
+   * @param {string} [providerId]
+   */
+  async _syncProfileFromAuthUser(user, providerId) {
+    const existing = await UserService.getProfile(user.uid);
+    if (!existing.ok) throw existing.error.original;
+    const workspace = await UserService.ensureWorkspace(user.uid, {
+      email: user.email || '',
+      displayName: user.displayName || '',
+    });
+    if (!workspace.ok) throw workspace.error.original;
+    const patch = {
+      email: user.email || '',
+      displayName: user.displayName || existing.data?.displayName || '',
+      photoURL: user.photoURL || existing.data?.photoURL || null,
+      emailVerified: user.emailVerified,
+      lastLoginAt: new Date().toISOString(),
+      lastProvider: providerId || 'email',
+    };
+    await UserService.updateProfile(user.uid, patch);
   }
 }
 

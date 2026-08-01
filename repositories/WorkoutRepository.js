@@ -14,6 +14,6 @@ import { BaseRepository } from './BaseRepository.js';
 export class WorkoutRepository extends BaseRepository {
   /** @param {string} uid */
   constructor(uid) {
-    super('workout', uid);
+    super('workouts', uid);
   }
 }

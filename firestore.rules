@@ -58,6 +58,12 @@ service cloud.firestore {
     match /nutrition/{uid}/items/{itemId} {
       allow read, write: if isOwner(uid);
     }
+    // Phase 6 audit fix: NotificationRepository (added in Phase 2) had no
+    // matching rule here — every read/write would have been silently
+    // blocked by the default-deny catch-all below. Confirmed and fixed.
+    match /notifications/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
     // "statistics" (mentioned in the brief's example DB structure) is
     // deliberately NOT given its own repository/collection in this phase —
     // see MIGRATION_NOTES.md, "Remaining Technical Debt," for why.

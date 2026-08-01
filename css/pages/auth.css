@@ -701,3 +701,69 @@
 }
 
 [dir='rtl'] .auth-lang-switch-wrap { right: auto; left: 18px; }
+
+/* ── Phase 5: OAuth provider buttons (Google/GitHub) ────────────────────────
+   Deliberately neutral/native-looking rather than accent-colored, per both
+   Google's and GitHub's own brand guidelines for third-party sign-in
+   buttons (they ask for a neutral surface with their icon+wordmark, not a
+   button re-themed in the host app's brand color). Built from the app's
+   existing tokens so it still fits the design system in every theme. */
+.auth-oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 14px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.auth-oauth-divider::before,
+.auth-oauth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.auth-oauth-row {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-oauth-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: var(--tap, 48px);
+  padding: 0 16px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 650;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background-color var(--dur-fast, 140ms) ease, transform var(--dur-fast, 140ms) ease, box-shadow var(--dur-fast, 140ms) ease;
+}
+.auth-oauth-btn:hover { background: var(--surface-2); transform: translateY(-1px); }
+.auth-oauth-btn:active { transform: translateY(0) scale(0.985); }
+.auth-oauth-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.auth-oauth-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.auth-oauth-icon { display: grid; place-items: center; flex-shrink: 0; }
+.auth-oauth-spinner { display: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--ink); animation: spin 700ms linear infinite; }
+.auth-oauth-btn.is-loading .auth-oauth-icon,
+.auth-oauth-btn.is-loading .auth-oauth-label { visibility: hidden; }
+.auth-oauth-btn.is-loading .auth-oauth-spinner { display: block; position: absolute; }
+
+/* RTL: gap/flex direction already handles icon+label order automatically —
+   no extra rule needed beyond making sure the divider lines don't need
+   mirroring (they don't; a horizontal line looks identical either way). */
+
+@media (max-width: 480px) {
+  .auth-oauth-label { font-size: 0.86rem; }
+}

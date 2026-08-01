@@ -22,6 +22,8 @@ import { BaseRepository } from './BaseRepository.js';
 import { setDoc, serverTimestamp } from '../firebase/firestore.js';
 import { tryFirebase } from '../core/ErrorMapper.js';
 
+/** @typedef {'Todo'|'Habit'|'Goal'|'Workout'|'Nutrition'|'Study'|'Prayer'|'Weather'|'Achievements'|'System'|'Security'|'Account'|'Backup'} NotificationCategory */
+
 export class NotificationRepository extends BaseRepository {
   /** @param {string} uid */
   constructor(uid) {
@@ -33,21 +35,26 @@ export class NotificationRepository extends BaseRepository {
    * call repeatedly (e.g. from several reminder checks, or several tabs) —
    * later calls simply overwrite the same document with the same content
    * rather than creating a duplicate.
-   * @param {string} category - e.g. 'Todo', 'Habit', 'Prayer', 'Weather'
+   * @param {NotificationCategory} category
    * @param {string} dedupKey - e.g. a task id + due date, or a date string for a daily reminder
-   * @param {{ message: string, read?: boolean, browser?: boolean }} data
+   * @param {{ message: string, priority?: 'low'|'normal'|'high', deepLink?: string, action?: { label: string, actionId: string }, metadata?: Record<string, unknown>, read?: boolean, browser?: boolean }} data
    */
   async notifyOnce(category, dedupKey, data) {
     const id = `${category}-${dedupKey}`.replace(/[^a-zA-Z0-9-_]/g, '_');
     return tryFirebase(() => setDoc(this.itemDoc(id), {
-      category, dedupKey, message: data.message, read: false,
+      category, dedupKey, message: data.message,
+      priority: data.priority || 'normal',
+      deepLink: data.deepLink || null,
+      action: data.action || null,
+      metadata: data.metadata || null,
+      read: false, pinned: false, archived: false,
       ownerId: this.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     }, { merge: false }));
   }
 
-  /** Fetches only unread notifications, newest first — what the notification bell badge needs. */
+  /** Fetches only unread, non-archived notifications, newest first — what the notification bell badge needs. */
   getUnread() {
-    return this.getAll({ where: [['read', '==', false]], orderBy: ['createdAt', 'desc'] });
+    return this.getAll({ where: [['read', '==', false], ['archived', '==', false]], orderBy: ['createdAt', 'desc'] });
   }
 
   /** Marks every currently-unread notification as read in one batch write. */
@@ -56,4 +63,13 @@ export class NotificationRepository extends BaseRepository {
     if (!result.ok) return result;
     return this.batchUpdate(result.data.map((n) => ({ type: 'update', id: n.id, data: { read: true } })));
   }
+
+  /** @param {string} id */
+  pin(id) { return this.update(id, { pinned: true }); }
+  /** @param {string} id */
+  unpin(id) { return this.update(id, { pinned: false }); }
+  /** @param {string} id */
+  archive(id) { return this.update(id, { archived: true, read: true }); }
+  /** @param {string} id */
+  unarchive(id) { return this.update(id, { archived: false }); }
 }

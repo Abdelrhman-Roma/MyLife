@@ -30,6 +30,7 @@
 // those.
 
 import { TodoRepository } from '../repositories/TodoRepository.js';
+import { NotificationRepository } from '../repositories/NotificationRepository.js';
 import { AuthService } from '../services/AuthService.js';
 import { undoManager } from '../core/UndoManager.js';
 import { searchText, sortBy } from '../utils/QueryUtils.js';
@@ -44,6 +45,8 @@ let todoReminderTimer = null;
 
 /** @type {import('../repositories/TodoRepository.js').TodoRepository|null} */
 let todoRepo = null;
+/** Phase 7: writes real entries into the Smart Notification Center for task-due/task-completed events. @type {import('../repositories/NotificationRepository.js').NotificationRepository|null} */
+let notificationRepo = null;
 /** Realtime-synced local cache of the signed-in user's tasks — never polled, only pushed via subscribe(). */
 let localTasks = [];
 let todoUnsubscribe = null;
@@ -118,6 +121,7 @@ async function initTodoPage() {
   }
 
   todoRepo = new TodoRepository(user.uid);
+  notificationRepo = new NotificationRepository(user.uid);
   todoLoading = true;
   todoError = null;
 
@@ -146,20 +150,32 @@ function startReminderWatch() {
 async function checkTaskReminders() {
   if (!todoRepo) return;
   const now = Date.now();
-  const due = localTasks.filter((t) => t.reminder && !t.reminderFired && !t.completed && new Date(t.reminder).getTime() <= now);
-  for (const t of due) {
+  const due = localTasks.filter((task) => task.reminder && !task.reminderFired && !task.completed && new Date(task.reminder).getTime() <= now);
+  for (const task of due) {
     // Optimistic: flip the local flag immediately so a second interval tick
     // (or a second open tab, once Firestore's realtime listener catches up)
     // can't also fire this same reminder — this directly replaces the
     // duplicate-notification bug documented against the old LocalStorage
     // architecture (Phase 4 audit, FINAL-BUG-002).
-    t.reminderFired = true;
-    showToast(`\u23f0 ${t.title}`, 'default', 5000);
+    task.reminderFired = true;
+    showToast(`\u23f0 ${task.title}`, 'default', 5000);
     if ('Notification' in window && Notification.permission === 'granted') {
-      try { new Notification('MyLife reminder', { body: t.title, icon: '../assist/Momentum_Logo-removebg-preview.png' }); } catch (_e) { /* ignore */ }
+      try { new Notification('MyLife reminder', { body: task.title, icon: '../assist/Momentum_Logo-removebg-preview.png' }); } catch (_e) { /* ignore */ }
     }
-    const result = await todoRepo.update(t.id, { reminderFired: true });
-    if (!result.ok) { t.reminderFired = false; } // rollback the optimistic flag if the write failed
+    // Phase 7: also create a real, deduplicated entry in the Smart
+    // Notification Center — notifyOnce() keys on (category, dedupKey), so
+    // this can never double-fire even across tabs/reminder-check ticks.
+    if (notificationRepo) {
+      notificationRepo.notifyOnce('Todo', `due-${task.id}`, {
+        message: `${task.title} ${t('is due')}`,
+        priority: isTaskOverdue(task) ? 'high' : 'normal',
+        deepLink: '../pages/todo.html',
+        action: { label: t('Open Todo'), actionId: 'open-todo' },
+        metadata: { taskId: task.id },
+      });
+    }
+    const result = await todoRepo.update(task.id, { reminderFired: true });
+    if (!result.ok) { task.reminderFired = false; } // rollback the optimistic flag if the write failed
   }
 }
 
@@ -314,54 +330,54 @@ function visibleTasks() {
 }
 
 // ─── Task card ──────────────────────────────────────────────────────────────
-function taskCardHtml(t, conflicts, draggable) {
-  const blocked = isTaskBlocked(t);
-  const overdue = isTaskOverdue(t);
-  const subtasks = t.subtasks || [];
+function taskCardHtml(task, conflicts, draggable) {
+  const blocked = isTaskBlocked(task);
+  const overdue = isTaskOverdue(task);
+  const subtasks = task.subtasks || [];
   const subDone = subtasks.filter((s) => s.completed).length;
-  const hasConflict = conflicts.has(t.id);
+  const hasConflict = conflicts.has(task.id);
   return `
-    <article class="td-card${t.completed ? ' is-completed' : ''}${blocked ? ' is-blocked' : ''}${overdue ? ' is-overdue' : ''}${draggable ? ' is-draggable' : ''}" data-priority="${escapeAttr(t.priority || 'Medium')}" data-td-id="${t.id}" ${draggable ? 'draggable="true"' : ''}>
+    <article class="td-card${task.completed ? ' is-completed' : ''}${blocked ? ' is-blocked' : ''}${overdue ? ' is-overdue' : ''}${draggable ? ' is-draggable' : ''}" data-priority="${escapeAttr(task.priority || 'Medium')}" data-td-id="${task.id}" ${draggable ? 'draggable="true"' : ''}>
       ${draggable ? `<span class="td-drag-handle" aria-hidden="true" title="${t('Drag to reorder')}">\u22ee\u22ee</span>` : ''}
       <label class="td-check">
-        <input type="checkbox" ${t.completed ? 'checked' : ''} ${blocked ? 'disabled' : ''} data-td-toggle="${t.id}" aria-label="${t.completed ? t('Mark incomplete') : t('Mark complete')}" title="${blocked ? t('Blocked by an incomplete dependency') : ''}" />
+        <input type="checkbox" ${task.completed ? 'checked' : ''} ${blocked ? 'disabled' : ''} data-td-toggle="${task.id}" aria-label="${task.completed ? t('Mark incomplete') : t('Mark complete')}" title="${blocked ? t('Blocked by an incomplete dependency') : ''}" />
       </label>
       <div class="td-card-main">
         <div class="td-card-top">
-          <strong data-td-edit="${t.id}" role="button" tabindex="0">${escapeHtml(t.title)}</strong>
-          <span class="td-badge td-badge-${(t.priority || 'Medium').toLowerCase()}">${t(t.priority || 'Medium')}</span>
-          ${t.recurring ? `<span class="td-badge td-badge-recur" title="${t('Repeats')} ${t(t.recurring.freq)}">\u21bb ${t(t.recurring.freq)}</span>` : ''}
-          ${t.reminder && !t.reminderFired ? `<span class="td-badge td-badge-reminder" title="${new Date(t.reminder).toLocaleString()}">\u23f0</span>` : ''}
+          <strong data-td-edit="${task.id}" role="button" tabindex="0">${escapeHtml(task.title)}</strong>
+          <span class="td-badge td-badge-${(task.priority || 'Medium').toLowerCase()}">${t(task.priority || 'Medium')}</span>
+          ${task.recurring ? `<span class="td-badge td-badge-recur" title="${t('Repeats')} ${t(task.recurring.freq)}">\u21bb ${t(task.recurring.freq)}</span>` : ''}
+          ${task.reminder && !task.reminderFired ? `<span class="td-badge td-badge-reminder" title="${new Date(task.reminder).toLocaleString()}">\u23f0</span>` : ''}
           ${hasConflict ? `<span class="td-badge td-badge-conflict" title="${t('Another task shares this exact date and time')}">\u26a0 ${t('Conflict')}</span>` : ''}
         </div>
         <div class="td-card-meta">
-          ${t.dueDate ? `<span class="td-meta-item">${overdue ? '\u26a0 ' : ''}${escapeHtml(t.dueDate)}${t.time ? ` \u00b7 ${escapeHtml(t.time)}` : ''}</span>` : ''}
-          ${(t.tags || []).map((tag) => `<span class="td-tag-chip">#${escapeHtml(tag)}</span>`).join('')}
+          ${task.dueDate ? `<span class="td-meta-item">${overdue ? '\u26a0 ' : ''}${escapeHtml(task.dueDate)}${task.time ? ` \u00b7 ${escapeHtml(task.time)}` : ''}</span>` : ''}
+          ${(task.tags || []).map((tag) => `<span class="td-tag-chip">#${escapeHtml(tag)}</span>`).join('')}
         </div>
-        ${blocked ? `<p class="td-blocked-note">\u26d4 ${t('Blocked by')}: ${taskDependencies(t).filter((d) => !d.completed).map((d) => escapeHtml(d.title)).join(', ')}</p>` : ''}
+        ${blocked ? `<p class="td-blocked-note">\u26d4 ${t('Blocked by')}: ${taskDependencies(task).filter((d) => !d.completed).map((d) => escapeHtml(d.title)).join(', ')}</p>` : ''}
         ${subtasks.length ? `
           <div class="td-subtasks">
             <div class="td-subtask-bar"><i style="width:${percent(subDone, subtasks.length)}%"></i></div>
-            <button type="button" class="td-subtask-toggle" data-td-expand="${t.id}">${subDone}/${subtasks.length} ${t('subtasks')}</button>
-            <div class="td-subtask-list" data-td-sublist="${t.id}" hidden>
+            <button type="button" class="td-subtask-toggle" data-td-expand="${task.id}">${subDone}/${subtasks.length} ${t('subtasks')}</button>
+            <div class="td-subtask-list" data-td-sublist="${task.id}" hidden>
               ${subtasks.map((s) => `
                 <label class="td-subtask-row">
-                  <input type="checkbox" ${s.completed ? 'checked' : ''} data-td-subtoggle="${t.id}:${s.id}" />
+                  <input type="checkbox" ${s.completed ? 'checked' : ''} data-td-subtoggle="${task.id}:${s.id}" />
                   <span>${escapeHtml(s.title)}</span>
                 </label>
               `).join('')}
             </div>
           </div>
         ` : ''}
-        ${(t.attachments || []).length ? `
+        ${(task.attachments || []).length ? `
           <div class="td-attachments">
-            ${t.attachments.map((a) => `<a class="td-attachment" href="${escapeAttr(a.url)}" target="_blank" rel="noopener">\ud83d\udd17 ${escapeHtml(a.name || a.url)}</a>`).join('')}
+            ${task.attachments.map((a) => `<a class="td-attachment" href="${escapeAttr(a.url)}" target="_blank" rel="noopener">\ud83d\udd17 ${escapeHtml(a.name || a.url)}</a>`).join('')}
           </div>
         ` : ''}
       </div>
       <div class="td-actions">
-        <button type="button" class="std-icon-btn" data-td-edit="${t.id}" title="${t('Edit')}" aria-label="${t('Edit')}">\u270e</button>
-        <button type="button" class="std-icon-btn std-icon-danger" data-td-delete="${t.id}" title="${t('Delete')}" aria-label="${t('Delete')}">\u2715</button>
+        <button type="button" class="std-icon-btn" data-td-edit="${task.id}" title="${t('Edit')}" aria-label="${t('Edit')}">\u270e</button>
+        <button type="button" class="std-icon-btn std-icon-danger" data-td-delete="${task.id}" title="${t('Delete')}" aria-label="${t('Delete')}">\u2715</button>
       </div>
     </article>
   `;
@@ -443,24 +459,28 @@ function bindTodoRootEvents(root) {
  * tab's already-applied change and does not stomp on it.
  */
 async function toggleTask(id) {
-  const t = localTasks.find((x) => x.id === id);
-  if (!t || isTaskBlocked(t)) return;
+  const task = localTasks.find((x) => x.id === id);
+  if (!task || isTaskBlocked(task)) return;
 
-  const previous = { ...t };
+  const previous = { ...task };
   let patch;
-  if (t.recurring && !t.completed) {
-    const nextDue = nextOccurrenceDate(t.dueDate || todoToday(), t.recurring);
+  if (task.recurring && !task.completed) {
+    const nextDue = nextOccurrenceDate(task.dueDate || todoToday(), task.recurring);
     patch = {
-      completionLog: (t.completionLog || []).concat(new Date().toISOString()).slice(-60),
+      completionLog: (task.completionLog || []).concat(new Date().toISOString()).slice(-60),
       dueDate: nextDue, completed: false, completedAt: null, reminderFired: false,
     };
-    showToast(`${t.title} \u2014 ${t('next occurrence')}: ${nextDue}`, 'success');
+    // Phase 7 bugfix: this line previously read `t('next occurrence')` where
+    // `t` was THIS function's own task variable (shadowing the global t()
+    // translation function) — a real TypeError on every recurring-task
+    // completion, from Phase 2 onward, caught while wiring up notifications.
+    showToast(`${task.title} \u2014 ${t('next occurrence')}: ${nextDue}`, 'success');
   } else {
-    patch = { completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : null };
+    patch = { completed: !task.completed, completedAt: !task.completed ? new Date().toISOString() : null };
   }
 
   const wasIncomplete = !previous.completed;
-  Object.assign(t, patch); // optimistic local update
+  Object.assign(task, patch); // optimistic local update
   renderTodoRoot();
 
   // Success micro-interaction: only on the "just completed" transition, not
@@ -472,6 +492,17 @@ async function toggleTask(id) {
       card.classList.add('is-just-completed');
       card.addEventListener('animationend', () => card.classList.remove('is-just-completed'), { once: true });
     }
+    // Phase 7: real "Task completed" notification, deduplicated per
+    // completion (keyed by id + completion timestamp, so a recurring
+    // task's next completion gets its own entry rather than being silently
+    // dropped as a duplicate of the last one).
+    if (notificationRepo) {
+      notificationRepo.notifyOnce('Todo', `completed-${id}-${patch.completedAt || Date.now()}`, {
+        message: `${t('Completed')}: ${task.title}`,
+        priority: 'low',
+        deepLink: '../pages/todo.html',
+      });
+    }
   }
 
   // Re-read-then-write inside a transaction so a concurrent edit from
@@ -482,7 +513,7 @@ async function toggleTask(id) {
   });
 
   if (!result.ok) {
-    Object.assign(t, previous); // rollback
+    Object.assign(task, previous); // rollback
     renderTodoRoot();
     showToast(result.error.message, 'danger');
   }

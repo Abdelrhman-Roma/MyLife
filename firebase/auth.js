@@ -24,6 +24,16 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential as _reauthenticateWithCredential,
   updatePassword as _updatePassword,
+  GoogleAuthProvider,
+  GithubAuthProvider,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  setPersistence as _setPersistence,
+  signInWithPopup as _signInWithPopup,
+  signInWithRedirect as _signInWithRedirect,
+  getRedirectResult as _getRedirectResult,
+  linkWithPopup as _linkWithPopup,
+  unlink as _unlink,
 } from 'firebase/auth';
 import { auth } from './firebase.js';
 
@@ -53,6 +63,15 @@ export function createUser(email, password) {
 
 export function signOut() {
   return _signOut(auth);
+}
+
+/**
+ * Selects whether Firebase should restore this session after the browser is
+ * closed. This makes the UI's "Remember me" choice apply to Firebase OAuth.
+ * @param {boolean} remember
+ */
+export function setRememberMe(remember) {
+  return _setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
 }
 
 /** @param {string} email */
@@ -90,3 +109,61 @@ export async function changePassword(user, currentPassword, newPassword) {
 }
 
 export { auth };
+
+// ─── Phase 5: OAuth providers (Google/GitHub) ──────────────────────────────
+// Provider instances are created once and reused, per Firebase's own
+// recommendation, rather than `new GoogleAuthProvider()` at every call site.
+const googleProvider = new GoogleAuthProvider();
+const githubProvider = new GithubAuthProvider();
+githubProvider.addScope('read:user'); // enough to get name/avatar/email, nothing more
+
+/** @param {'google'|'github'} providerId */
+function providerFor(providerId) {
+  if (providerId === 'google') return googleProvider;
+  if (providerId === 'github') return githubProvider;
+  throw new Error(`Unknown provider: ${providerId}`);
+}
+
+/**
+ * Signs in with a popup for the given OAuth provider. If the signed-in
+ * email already has an account under a different provider, Firebase throws
+ * `auth/account-exists-with-different-credential` — the caller (see
+ * AuthService.signInWithProvider) is responsible for surfacing that clearly
+ * rather than this file silently swallowing or reinterpreting it.
+ * @param {'google'|'github'} providerId
+ */
+export function signInWithProviderPopup(providerId) {
+  return _signInWithPopup(auth, providerFor(providerId));
+}
+
+/** Starts a full-page OAuth redirect when a browser blocks a popup. */
+export function signInWithProviderRedirect(providerId) {
+  return _signInWithRedirect(auth, providerFor(providerId));
+}
+
+/** Returns the completed redirect credential, or null when this load was not an OAuth return. */
+export function getProviderRedirectResult() {
+  return _getRedirectResult(auth);
+}
+
+/**
+ * Links an additional OAuth provider onto the CURRENTLY signed-in user
+ * (e.g. a user who registered with email later choosing "Connect Google").
+ * @param {import('firebase/auth').User} user
+ * @param {'google'|'github'} providerId
+ */
+export function linkProviderPopup(user, providerId) {
+  return _linkWithPopup(user, providerFor(providerId));
+}
+
+/**
+ * Unlinks a provider from the currently signed-in user. Firebase itself
+ * does not prevent removing the last sign-in method — that check belongs
+ * in AuthService.unlinkProvider(), not here, since this file is meant to
+ * stay a thin SDK wrapper with no business rules.
+ * @param {import('firebase/auth').User} user
+ * @param {string} providerId - Firebase's provider id string, e.g. 'google.com'/'github.com'/'password'
+ */
+export function unlinkProvider(user, providerId) {
+  return _unlink(user, providerId);
+}

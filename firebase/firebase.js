@@ -53,10 +53,14 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-if (!firebaseConfig.apiKey) {
+export const missingFirebaseConfig = Object.entries(firebaseConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+if (missingFirebaseConfig.length) {
   // Fail loudly and early rather than letting every Firebase call downstream
   // throw a cryptic "invalid-api-key" error with no context about why.
-  console.error('[firebase] Missing VITE_FIREBASE_* environment variables — copy .env.example to .env.local and fill in your project config.');
+  console.error(`[firebase] Missing Firebase configuration: ${missingFirebaseConfig.join(', ')}. Copy .env.example to .env.local and fill in your project config.`);
 }
 
 /**
