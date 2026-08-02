@@ -32,50 +32,12 @@ class UserServiceImpl {
   createProfile(uid, initial) {
     assertPlainObject(initial);
     return tryFirebase(() => setDoc(this._ref(uid), {
-      uid,
       email: initial.email,
       displayName: initial.displayName || '',
-      // Keep the account bootstrap atomic in the existing `users/{uid}`
-      // document model. This gives every first-time Auth user a profile,
-      // settings, and dashboard state without creating undocumented parallel
-      // collection paths that the current Firestore rules do not authorize.
-      profile: {
-        displayName: initial.displayName || '',
-        photoURL: null,
-        emailVerified: false,
-      },
       settings: { theme: 'dark', palette: 'deep-space', language: 'English', fontSize: 'md', radius: 'md' },
-      dashboard: { onboardingComplete: false, layout: 'default' },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }, { merge: true }));
-  }
-
-  /**
-   * Ensures the complete user workspace exists without overwriting an
-   * existing profile, settings, or dashboard. These logical resources are
-   * nested in users/{uid}, matching the project's established rules.
-   * @param {string} uid @param {{ email?: string, displayName?: string }} [initial]
-   */
-  ensureWorkspace(uid, initial = {}) {
-    assertPlainObject(initial);
-    return tryFirebase(async () => {
-      const ref = this._ref(uid);
-      const snapshot = await getDoc(ref);
-      if (!snapshot.exists()) {
-        await setDoc(ref, {
-          uid,
-          email: initial.email || '',
-          displayName: initial.displayName || '',
-          profile: { displayName: initial.displayName || '', photoURL: null, emailVerified: false },
-          settings: { theme: 'dark', palette: 'deep-space', language: 'English', fontSize: 'md', radius: 'md' },
-          dashboard: { onboardingComplete: false, layout: 'default' },
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      }
-      return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
-    });
+    }));
   }
 
   /** @param {string} uid */

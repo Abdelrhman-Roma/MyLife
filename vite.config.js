@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { cpSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { cpSync, existsSync } from 'fs';
 
 /**
  * Phase 6 audit fix: `sw.js`, `offline.html`, `data/*.json`, and `assist/*`
@@ -11,10 +11,7 @@ import { cpSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'fs
  * static import/HTML analysis, so `vite build` was silently producing a
  * `dist/` folder missing the service worker, the offline fallback page, and
  * every bit of bundled Quran/Azkar/Hadith content — a real, previously
- * undetected production bug caught in this phase's audit. Vite also leaves
- * classic (non-module) script tags untouched, so the legacy `js/` and
- * `locales/` folders must accompany the generated HTML or every non-module
- * page fails at runtime. Rather than move
+ * undetected production bug caught in this phase's audit. Rather than move
  * these into Vite's `public/` convention (which would mean rewriting every
  * existing relative path across 12 HTML files and 19 CSS files — too
  * invasive and risky for what this bug actually needs), this copies them
@@ -31,32 +28,10 @@ function copyRuntimeReferencedAssets() {
         ['manifest.json', 'manifest.json'], // defensive: copied even if Vite's HTML plugin also handles the <link rel="manifest"> reference
         ['data', 'data'],
         ['assist', 'assist'],
-        // These remain classic scripts while the migration to ES modules is
-        // incremental. Vite emits their URLs unchanged, so ship them verbatim.
-        ['js', 'js'],
-        ['locales', 'locales'],
       ];
       for (const [src, dest] of copies) {
         const from = resolve(__dirname, src);
         if (existsSync(from)) cpSync(from, resolve(outDir, dest), { recursive: true });
-      }
-
-      // Vite fingerprints the manifest referenced by each HTML page. Its
-      // relative icon URLs would then resolve from `/assets/`, where the
-      // copied `assist/` directory does not exist. Keep the manifest at the
-      // distribution root (where its URLs are valid) and point each emitted
-      // HTML document there instead.
-      const pageDir = resolve(outDir, 'pages');
-      const htmlFiles = [resolve(outDir, 'index.html')];
-      if (existsSync(pageDir)) {
-        htmlFiles.push(...readdirSync(pageDir)
-          .filter((name) => name.endsWith('.html'))
-          .map((name) => resolve(pageDir, name)));
-      }
-      for (const htmlFile of htmlFiles) {
-        const html = readFileSync(htmlFile, 'utf8');
-        const corrected = html.replace(/href="\/assets\/manifest-[^"]+\.json"/, 'href="/manifest.json"');
-        if (corrected !== html) writeFileSync(htmlFile, corrected);
       }
     },
   };

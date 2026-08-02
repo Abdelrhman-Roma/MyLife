@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="../css/momentum.css" />
     <link rel="stylesheet" href="../css/pages/dashboard.css" />
     <link rel="stylesheet" href="../css/pages/weather.css" />
+    <link rel="stylesheet" href="../css/pages/dashboard-widgets.css" />
   </head>
   <body data-page="dashboard">
     <div class="app-shell">
@@ -34,6 +35,9 @@
         <section class="page-art" id="page-art"></section>
         <h2 id="list-title" class="sr-only"></h2>
         <section class="dash-page" id="data-list"></section>
+        <!-- Phase 8: Custom Dashboard — a new, self-contained section, not a
+             replacement of the existing #data-list content above. -->
+        <section class="cdash-root" id="custom-dashboard-root" aria-label="Custom dashboard"></section>
       </main>
     </div>
     <script src="../locales/en.js"></script>
@@ -43,6 +47,7 @@
     <script src="../js/i18n.js"></script>
     <script src="../js/shared.js"></script>
     <script type="module" src="../js/notification-center.js"></script>
+    <script src="../js/gamification-ui.js"></script>
     <script src="../js/services/WeatherCacheService.js"></script>
     <script src="../js/services/WeatherCodes.js"></script>
     <script src="../js/services/WeatherGeocodingService.js"></script>
@@ -53,5 +58,6 @@
     <script src="../js/services/WeatherUI.js"></script>
     <script src="../js/weather-dashboard.js"></script>
     <script src="../js/pages/dashboard.js"></script>
+    <script type="module" src="../js/pages/custom-dashboard.js"></script>
   </body>
 </html>

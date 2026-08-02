@@ -26,12 +26,7 @@ import {
   updatePassword as _updatePassword,
   GoogleAuthProvider,
   GithubAuthProvider,
-  browserLocalPersistence,
-  browserSessionPersistence,
-  setPersistence as _setPersistence,
   signInWithPopup as _signInWithPopup,
-  signInWithRedirect as _signInWithRedirect,
-  getRedirectResult as _getRedirectResult,
   linkWithPopup as _linkWithPopup,
   unlink as _unlink,
 } from 'firebase/auth';
@@ -63,15 +58,6 @@ export function createUser(email, password) {
 
 export function signOut() {
   return _signOut(auth);
-}
-
-/**
- * Selects whether Firebase should restore this session after the browser is
- * closed. This makes the UI's "Remember me" choice apply to Firebase OAuth.
- * @param {boolean} remember
- */
-export function setRememberMe(remember) {
-  return _setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
 }
 
 /** @param {string} email */
@@ -134,16 +120,6 @@ function providerFor(providerId) {
  */
 export function signInWithProviderPopup(providerId) {
   return _signInWithPopup(auth, providerFor(providerId));
-}
-
-/** Starts a full-page OAuth redirect when a browser blocks a popup. */
-export function signInWithProviderRedirect(providerId) {
-  return _signInWithRedirect(auth, providerFor(providerId));
-}
-
-/** Returns the completed redirect credential, or null when this load was not an OAuth return. */
-export function getProviderRedirectResult() {
-  return _getRedirectResult(auth);
 }
 
 /**

@@ -25,14 +25,9 @@
 //     realtime streaming/long-polling connections is a well-known way to
 //     break realtime sync in subtle, hard-to-debug ways. Don't do it.
 
-// Bump this after changing cache behavior so clients discard previously
-// cached responses. In development Vite may return a CSS module as JavaScript
-// to a generic fetch (such as cache.addAll), which must never be served to a
-// stylesheet link on a later request.
-const CACHE_VERSION = 'mylife-v2';
+const CACHE_VERSION = 'mylife-v1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = './offline.html';
-const IS_DEVELOPMENT_HOST = ['localhost', '127.0.0.1', '::1'].includes(self.location.hostname);
 
 // Deliberately small and conservative: the true app shell plus the offline
 // fallback itself. Page-specific JS/CSS/images are cached opportunistically
@@ -54,13 +49,6 @@ const PRECACHE_URLS = [
 ];
 
 self.addEventListener('install', (event) => {
-  // Do not cache Vite's development responses. Vite conditionally transforms
-  // CSS requests into JavaScript modules for generic fetches, so a cache-first
-  // worker can otherwise return JavaScript with HTTP 200 for <link rel=stylesheet>.
-  if (IS_DEVELOPMENT_HOST) {
-    event.waitUntil(self.skipWaiting());
-    return;
-  }
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => cache.addAll(PRECACHE_URLS))
@@ -92,7 +80,6 @@ function isSameOrigin(url) {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (IS_DEVELOPMENT_HOST) return; // let Vite serve the correct asset type directly
   if (request.method !== 'GET') return; // never cache non-GET; let it pass through untouched
   if (!isSameOrigin(request.url)) return; // Firebase/Firestore/Open-Meteo/fonts — never intercepted, see header note
 

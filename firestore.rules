@@ -31,6 +31,32 @@ service cloud.firestore {
     // users/{uid} — profile & settings
     match /users/{uid} {
       allow read, write: if isOwner(uid);
+
+      // Phase 8: users/{uid}/dashboard/layout (DashboardLayoutService).
+      // The parent rule above does NOT cover subcollections automatically —
+      // this exact gap is what caused the Phase 6-discovered
+      // notifications/{uid} bug; added proactively here instead of after
+      // the fact.
+      match /dashboard/{document} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Phase 9: gamification subcollections — same proactive check.
+      match /xp/{document} {
+        allow read, write: if isOwner(uid);
+      }
+      match /badges/{document} {
+        allow read, write: if isOwner(uid);
+      }
+      match /achievements/{document} {
+        allow read, write: if isOwner(uid);
+      }
+      match /streaks/{document} {
+        allow read, write: if isOwner(uid);
+      }
+      match /challenges/{document} {
+        allow read, write: if isOwner(uid);
+      }
     }
 
     // {module}/{uid}/items/{itemId} — one rule block per module, all identical.

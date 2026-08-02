@@ -8,7 +8,6 @@
  */
 
 import * as fbAuth from '../firebase/auth.js';
-import { missingFirebaseConfig } from '../firebase/firebase.js';
 import { tryFirebase } from '../core/ErrorMapper.js';
 import { UserService } from './UserService.js';
 
@@ -60,11 +59,9 @@ class AuthServiceImpl {
   /**
    * @param {string} email @param {string} password
    */
-  async signIn(email, password, { remember = true } = {}) {
+  signIn(email, password) {
     return tryFirebase(async () => {
-      await fbAuth.setRememberMe(remember);
       const credential = await fbAuth.signIn(email, password);
-      await this._syncProfileFromAuthUser(credential.user, 'email');
       return credential.user;
     });
   }
@@ -135,52 +132,9 @@ class AuthServiceImpl {
    * metadata," per the brief.
    * @param {'google'|'github'} providerId
    */
-  async signInWithProvider(providerId, { remember = true } = {}) {
+  signInWithProvider(providerId) {
     return tryFirebase(async () => {
-      if (missingFirebaseConfig.length) {
-        const error = new Error(`Missing Firebase configuration: ${missingFirebaseConfig.join(', ')}`);
-        error.code = 'auth/missing-config';
-        throw error;
-      }
-      await fbAuth.setRememberMe(remember);
       const credential = await fbAuth.signInWithProviderPopup(providerId);
-      await this._syncProfileFromAuthUser(credential.user, providerId);
-      return credential.user;
-    });
-  }
-
-  /** Starts redirect OAuth after a popup is blocked. The browser navigates away. */
-  async signInWithProviderRedirect(providerId, { remember = true } = {}) {
-    return tryFirebase(async () => {
-      if (missingFirebaseConfig.length) {
-        const error = new Error(`Missing Firebase configuration: ${missingFirebaseConfig.join(', ')}`);
-        error.code = 'auth/missing-config';
-        throw error;
-      }
-      await fbAuth.setRememberMe(remember);
-      sessionStorage.setItem('momentum.oauth.provider', providerId);
-      await fbAuth.signInWithProviderRedirect(providerId);
-      return null;
-    });
-  }
-
-  /** Completes a returning OAuth redirect and synchronizes the user profile. */
-  completeProviderRedirect() {
-    return tryFirebase(async () => {
-      // A normal visit is not an OAuth return. Avoid touching Firebase's
-      // redirect result API (and emitting a misleading configuration error)
-      // unless this browser initiated the fallback flow.
-      if (!sessionStorage.getItem('momentum.oauth.provider')) return null;
-      if (missingFirebaseConfig.length) {
-        const error = new Error(`Missing Firebase configuration: ${missingFirebaseConfig.join(', ')}`);
-        error.code = 'auth/missing-config';
-        throw error;
-      }
-      const credential = await fbAuth.getProviderRedirectResult();
-      if (!credential) return null;
-      const providerId = sessionStorage.getItem('momentum.oauth.provider') ||
-        (credential.providerId === 'github.com' ? 'github' : 'google');
-      sessionStorage.removeItem('momentum.oauth.provider');
       await this._syncProfileFromAuthUser(credential.user, providerId);
       return credential.user;
     });
@@ -276,12 +230,6 @@ class AuthServiceImpl {
    */
   async _syncProfileFromAuthUser(user, providerId) {
     const existing = await UserService.getProfile(user.uid);
-    if (!existing.ok) throw existing.error.original;
-    const workspace = await UserService.ensureWorkspace(user.uid, {
-      email: user.email || '',
-      displayName: user.displayName || '',
-    });
-    if (!workspace.ok) throw workspace.error.original;
     const patch = {
       email: user.email || '',
       displayName: user.displayName || existing.data?.displayName || '',
@@ -290,7 +238,12 @@ class AuthServiceImpl {
       lastLoginAt: new Date().toISOString(),
       lastProvider: providerId || 'email',
     };
-    await UserService.updateProfile(user.uid, patch);
+    if (existing.ok && existing.data) {
+      await UserService.updateProfile(user.uid, patch);
+    } else {
+      await UserService.createProfile(user.uid, { email: patch.email, displayName: patch.displayName });
+      await UserService.updateProfile(user.uid, patch);
+    }
   }
 }
 

@@ -20,11 +20,10 @@
 // AUTHENTICATION.md for the follow-up this sets up.
 import { AuthService } from '../../services/AuthService.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-oauth]').forEach((btn) => {
-    btn.addEventListener('click', (event) => { event.preventDefault(); handleOAuthClick(btn); });
+    btn.addEventListener('click', () => handleOAuthClick(btn));
   });
-  await completeRedirectOAuth();
 });
 
 async function handleOAuthClick(btn) {
@@ -36,22 +35,9 @@ async function handleOAuthClick(btn) {
   setOAuthLoading(row, btn, true);
   if (messageEl) messageEl.textContent = '';
 
-  const remember = document.getElementById('remember-me')?.checked ?? true;
-  const result = await AuthService.signInWithProvider(providerId, { remember });
+  const result = await AuthService.signInWithProvider(providerId);
 
   if (!result.ok) {
-    console.error(`[auth] ${providerId} popup sign-in failed.`, result.error.original);
-    if (result.error.code === 'auth/popup-blocked') {
-      // A popup blocker is the only recoverable popup failure that should
-      // automatically navigate away. A user closing a popup should remain
-      // here with a clear retry message.
-      const redirectResult = await AuthService.signInWithProviderRedirect(providerId, { remember });
-      if (redirectResult.ok) return;
-      console.error(`[auth] ${providerId} redirect sign-in could not start.`, redirectResult.error.original);
-      if (messageEl) messageEl.textContent = redirectResult.error.message;
-      setOAuthLoading(row, btn, false);
-      return;
-    }
     setOAuthLoading(row, btn, false);
     if (messageEl) messageEl.textContent = result.error.message; // already a friendly, mapped message — see core/ErrorMapper.js
     return;
@@ -59,11 +45,7 @@ async function handleOAuthClick(btn) {
 
   try {
     bridgeIntoLocalSession(result.data);
-  } catch (error) {
-    console.error('[auth] Firebase sign-in succeeded but the local session bridge failed.', error);
-    if (messageEl) messageEl.textContent = 'Sign-in completed, but Momentum could not finish setting up this device. Please try again.';
-    setOAuthLoading(row, btn, false);
-    return;
+  } catch (_e) {
     // If the bridge itself fails for some reason, the user is still validly
     // signed in with Firebase — better to continue than to strand them on
     // the auth page with a successful sign-in and no error to show.
@@ -71,20 +53,6 @@ async function handleOAuthClick(btn) {
 
   // Reuse the existing page's success transition (button morph, confetti,
   // page-veil) exactly the way email login/register already does.
-  if (typeof window.onAuthSuccess === 'function') window.onAuthSuccess('pages/dashboard.html');
-  else window.location.href = 'pages/dashboard.html';
-}
-
-async function completeRedirectOAuth() {
-  const result = await AuthService.completeProviderRedirect();
-  if (!result.ok) {
-    console.error('[auth] OAuth redirect completion failed.', result.error.original);
-    const messageEl = document.getElementById('login-oauth-message');
-    if (messageEl) messageEl.textContent = result.error.message;
-    return;
-  }
-  if (!result.data) return;
-  bridgeIntoLocalSession(result.data);
   if (typeof window.onAuthSuccess === 'function') window.onAuthSuccess('pages/dashboard.html');
   else window.location.href = 'pages/dashboard.html';
 }

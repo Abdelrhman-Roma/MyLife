@@ -15,14 +15,11 @@
 // (still the common case today — see NOTIFICATION_CENTER.md), this module
 // does nothing and the original local system keeps working exactly as
 // before — a deliberate, graceful fallback, not an accident.
-// Keep Firebase out of the initial page graph. The legacy notification UI is
-// already rendered by shared.js, and this enhancement only needs Firebase
-// after the document is interactive and an authenticated session exists.
-let NotificationRepository;
-let AuthService;
-let UserService;
-let undoManager;
-let searchText;
+import { NotificationRepository } from '../repositories/NotificationRepository.js';
+import { AuthService } from '../services/AuthService.js';
+import { UserService } from '../services/UserService.js';
+import { undoManager } from '../core/UndoManager.js';
+import { searchText } from '../utils/QueryUtils.js';
 
 const CATEGORIES = ['Todo', 'Habit', 'Goal', 'Workout', 'Nutrition', 'Study', 'Prayer', 'Weather', 'Achievements', 'System', 'Security', 'Account', 'Backup'];
 const DEFAULT_SETTINGS = {
@@ -38,19 +35,6 @@ let unsubscribeSettings = null;
 const state = { tab: 'unread', search: '', category: 'all', settingsOpen: false };
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const [repositoryModule, authModule, userModule, undoModule, queryModule] = await Promise.all([
-    import('../repositories/NotificationRepository.js'),
-    import('../services/AuthService.js'),
-    import('../services/UserService.js'),
-    import('../core/UndoManager.js'),
-    import('../utils/QueryUtils.js'),
-  ]);
-  ({ NotificationRepository } = repositoryModule);
-  ({ AuthService } = authModule);
-  ({ UserService } = userModule);
-  ({ undoManager } = undoModule);
-  ({ searchText } = queryModule);
-
   await AuthService.waitUntilReady();
   const user = AuthService.getCurrentUser();
   if (!user) return; // graceful fallback — see file header

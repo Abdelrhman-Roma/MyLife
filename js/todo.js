@@ -31,6 +31,7 @@
 
 import { TodoRepository } from '../repositories/TodoRepository.js';
 import { NotificationRepository } from '../repositories/NotificationRepository.js';
+import { recordEvent } from '../core/GamificationEngine.js';
 import { AuthService } from '../services/AuthService.js';
 import { undoManager } from '../core/UndoManager.js';
 import { searchText, sortBy } from '../utils/QueryUtils.js';
@@ -503,6 +504,12 @@ async function toggleTask(id) {
         deepLink: '../pages/todo.html',
       });
     }
+    // Phase 9: the one real, wired Achievement System event source — awards
+    // XP, updates the daily-activity streak, and evaluates badges/
+    // achievements. Fire-and-forget deliberately: a slow/failed gamification
+    // write should never block or roll back the actual task completion
+    // above, which has already succeeded by this point.
+    recordEvent(AuthService.getCurrentUser().uid, 'todo:completed', { taskId: id }).catch(() => {});
   }
 
   // Re-read-then-write inside a transaction so a concurrent edit from
