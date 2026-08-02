@@ -44,8 +44,15 @@ async function handleOAuthClick(btn) {
   }
 
   try {
-    bridgeIntoLocalSession(result.data);
-  } catch (_e) {
+    const bridge = window.MomentumFirebaseAuth?.bridgeIntoLegacySession || bridgeIntoLocalSession;
+    bridge(result.data, true);
+  } catch (error) {
+    console.error('[auth-page] OAuth session bridge failed', {
+      code: error?.code || 'NO_CODE', message: error?.message || String(error), stack: error?.stack || '(no stack provided)',
+    });
+    setOAuthLoading(row, btn, false);
+    if (messageEl) messageEl.textContent = `Signed in, but the dashboard session could not be prepared: ${error.message}`;
+    return;
     // If the bridge itself fails for some reason, the user is still validly
     // signed in with Firebase — better to continue than to strand them on
     // the auth page with a successful sign-in and no error to show.

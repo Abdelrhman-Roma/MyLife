@@ -128,6 +128,9 @@ async function login(e) {
   }
   const email = byId('login-email').value.trim().toLowerCase();
   const pwd   = byId('login-password').value;
+  if (window.MomentumFirebaseAuth) {
+    return window.MomentumFirebaseAuth.login(email, pwd, byId('remember-me')?.checked !== false);
+  }
   const user  = getUsers().find((u) => u.email === email);
   if (!user || !(await verifyPassword(user, pwd))) { byId('login-message').textContent = 'Invalid email or password.'; return; }
   const rememberEl = byId('remember-me');
@@ -152,6 +155,9 @@ async function register(e) {
   const email    = byId('register-email').value.trim().toLowerCase();
   const password = byId('register-password').value;
   const confirm  = byId('register-confirm').value;
+  if (window.MomentumFirebaseAuth) {
+    return window.MomentumFirebaseAuth.register(name, email, password, confirm);
+  }
   const users    = getUsers();
   if (!name) { byId('register-message').textContent = 'Please enter your name.'; return; }
   if (password !== confirm) { byId('register-message').textContent = 'Passwords do not match.'; return; }

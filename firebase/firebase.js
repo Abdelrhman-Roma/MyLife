@@ -32,58 +32,32 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
-/**
- * Firebase project configuration.
- * Loaded from environment variables (Vite's `import.meta.env`) rather than
- * hardcoded here — Phase 4 production-hardening: even though Firebase Web
- * API keys are not secret in the traditional sense (they identify a project,
- * not authenticate one), hardcoding them still couples this file to one
- * environment and makes it easy to accidentally commit a different project's
- * config. Copy `.env.example` to `.env.local` and fill in your project's
- * values (Firebase Console → Project Settings → General → Your apps);
- * Vite loads `.env.local` automatically and `.gitignore` already excludes it.
- * @type {import('firebase/app').FirebaseOptions}
- */
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_API_KEY : '',
+  authDomain: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : '',
+  projectId: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : '',
+  storageBucket: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : '',
+  messagingSenderId: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : '',
+  appId: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_APP_ID : '',
 };
 
-if (!firebaseConfig.apiKey) {
-  // Fail loudly and early rather than letting every Firebase call downstream
-  // throw a cryptic "invalid-api-key" error with no context about why.
-  console.error('[firebase] Missing VITE_FIREBASE_* environment variables — copy .env.example to .env.local and fill in your project config.');
+const hasFirebaseConfig = Object.values(firebaseConfig).every((value) => typeof value === 'string' && value.trim().length > 0);
+
+if (!hasFirebaseConfig) {
+  console.warn('[firebase] Firebase is not configured in this environment. Auth and Firestore will be disabled until VITE_FIREBASE_* values are set.');
 }
 
-/**
- * Returns the single shared FirebaseApp instance, creating it on first call.
- * Safe to call from multiple files/modules — `getApps().length` guards against
- * the "already exists" error if this module is somehow evaluated twice
- * (e.g. duplicate bundles).
- * @returns {import('firebase/app').FirebaseApp}
- */
 function getFirebaseApp() {
+  if (!hasFirebaseConfig) return null;
   return getApps().length ? getApp() : initializeApp(firebaseConfig);
 }
 
 export const app = getFirebaseApp();
 
-/**
- * Firestore instance with offline persistence enabled up front via
- * `initializeFirestore` (the modern replacement for the deprecated
- * `enableIndexedDbPersistence`). `persistentMultipleTabManager` lets several
- * open tabs share one persistence layer instead of fighting over it — this
- * directly addresses the cross-tab data-loss risk documented in the Phase 4
- * audit of the old LocalStorage architecture.
- */
-export const db = initializeFirestore(app, {
+export const db = app ? initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-});
+}) : null;
 
-export const auth = getAuth(app);
+export const auth = app ? getAuth(app) : null;
 
 export default app;

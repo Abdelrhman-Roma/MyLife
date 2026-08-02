@@ -22,7 +22,8 @@ class AuthServiceImpl {
     this._listeners = new Set();
     /** @type {Promise<import('firebase/auth').User|null>} resolves once Firebase has restored (or confirmed there is no) session */
     this.ready = new Promise((resolve) => {
-      const unsubscribe = fbAuth.onAuthStateChanged((user) => {
+      let unsubscribe = () => {};
+      unsubscribe = fbAuth.onAuthStateChanged((user) => {
         this.currentUser = user;
         resolve(user);
         this._listeners.forEach((cb) => cb(user));
@@ -62,6 +63,7 @@ class AuthServiceImpl {
   signIn(email, password) {
     return tryFirebase(async () => {
       const credential = await fbAuth.signIn(email, password);
+      await this._syncProfileFromAuthUser(credential.user, 'email');
       return credential.user;
     });
   }
@@ -79,10 +81,7 @@ class AuthServiceImpl {
       if (profile.displayName) {
         await fbAuth.updateProfile(credential.user, { displayName: profile.displayName });
       }
-      await UserService.createProfile(credential.user.uid, {
-        email,
-        displayName: profile.displayName || '',
-      });
+      await this._syncProfileFromAuthUser(credential.user, 'email');
       await fbAuth.sendEmailVerification(credential.user);
       return credential.user;
     });
@@ -230,6 +229,7 @@ class AuthServiceImpl {
    */
   async _syncProfileFromAuthUser(user, providerId) {
     const existing = await UserService.getProfile(user.uid);
+    if (!existing.ok) throw existing.error.original || new Error(existing.error.message);
     const patch = {
       email: user.email || '',
       displayName: user.displayName || existing.data?.displayName || '',
@@ -237,12 +237,16 @@ class AuthServiceImpl {
       emailVerified: user.emailVerified,
       lastLoginAt: new Date().toISOString(),
       lastProvider: providerId || 'email',
+      ...(!existing.data?.workspace ? { workspace: { id: 'personal', name: 'Personal workspace', createdAt: new Date().toISOString() } } : {}),
     };
     if (existing.ok && existing.data) {
-      await UserService.updateProfile(user.uid, patch);
+      const updated = await UserService.updateProfile(user.uid, patch);
+      if (!updated.ok) throw updated.error.original || new Error(updated.error.message);
     } else {
-      await UserService.createProfile(user.uid, { email: patch.email, displayName: patch.displayName });
-      await UserService.updateProfile(user.uid, patch);
+      const created = await UserService.createProfile(user.uid, { email: patch.email, displayName: patch.displayName });
+      if (!created.ok) throw created.error.original || new Error(created.error.message);
+      const updated = await UserService.updateProfile(user.uid, patch);
+      if (!updated.ok) throw updated.error.original || new Error(updated.error.message);
     }
   }
 }

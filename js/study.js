@@ -653,7 +653,7 @@ function resourceRowHtml(r) {
         </div>
         <div class="std-session-meta">
           <span class="std-chip">${escapeHtml(r.type || 'Other')}</span>
-          ${hasLink ? `<a class="std-resource-link" href="${escapeAttr(r.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open \u2197</a>` : ''}
+          ${hasLink ? `<a class="std-resource-link" href="${escapeAttr(r.url)}" target="_blank" rel="noopener">Open \u2197</a>` : ''}
         </div>
       </div>
       <div class="std-actions">
@@ -1311,6 +1311,9 @@ function bindStudyRootEvents(root) {
     const [type, id] = el.dataset.stdEdit.split(':');
     openStudyModal(type, id);
   }));
+  // Keep resource links navigable without relying on an inline event handler
+  // (which is correctly blocked by the production CSP).
+  qa('.std-resource-link').forEach((link) => link.addEventListener('click', (event) => event.stopPropagation()));
   qa('[data-std-delete]').forEach((btn) => btn.addEventListener('click', () => {
     const [type, id] = btn.dataset.stdDelete.split(':');
     deleteEntityById(type, id);

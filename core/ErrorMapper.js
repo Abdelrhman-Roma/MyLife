@@ -43,6 +43,13 @@ const CODE_MAP = {
   'auth/weak-password': { category: 'validation', message: 'Please choose a stronger password (at least 6 characters).', retryable: false },
   'auth/invalid-email': { category: 'validation', message: 'That doesn\u2019t look like a valid email address.', retryable: false },
   'auth/too-many-requests': { category: 'validation', message: 'Too many attempts. Please wait a moment before trying again.', retryable: true },
+  'auth/operation-not-allowed': { category: 'validation', message: 'This sign-in method is not enabled in the Firebase project. Enable it in Firebase Authentication → Sign-in method.', retryable: false },
+  'auth/unauthorized-domain': { category: 'validation', message: 'This domain is not authorized for Firebase sign-in. Add it in Firebase Authentication → Settings → Authorized domains.', retryable: false },
+  'auth/invalid-api-key': { category: 'validation', message: 'Firebase rejected the API key. Check VITE_FIREBASE_API_KEY and restart the development server.', retryable: false },
+  'auth/app-not-authorized': { category: 'permission', message: 'This application is not authorized to use the configured Firebase project. Check the Firebase web app configuration.', retryable: false },
+  'auth/invalid-oauth-client-id': { category: 'validation', message: 'The OAuth client configuration is invalid. Check the Google or GitHub provider settings in Firebase.', retryable: false },
+  'auth/web-storage-unsupported': { category: 'validation', message: 'Your browser is blocking the storage Firebase needs for sign-in. Allow site storage and try again.', retryable: false },
+  'auth/internal-error': { category: 'unknown', message: 'Firebase returned an internal authentication error. Check the browser console entry for the Firebase code and message.', retryable: true },
 
   // Phase 5: OAuth provider sign-in / account-linking errors.
   'auth/popup-closed-by-user': { category: 'validation', message: 'Sign-in was closed before it finished. Please try again.', retryable: true },
@@ -80,9 +87,12 @@ export function mapFirebaseError(error) {
     return { category: 'timeout', message: 'That took too long to respond. Please try again.', code, retryable: true, original: error };
   }
 
+  const detail = String(error && error.message || '').trim();
   return {
     category: 'unknown',
-    message: 'Something went wrong. Please try again, and contact support if it keeps happening.',
+    message: code
+      ? `Authentication failed (${code})${detail ? `: ${detail}` : '.'}`
+      : (detail || 'Authentication failed before Firebase returned an error code. Check the browser console for the logged cause.'),
     code,
     retryable: true,
     original: error,

@@ -26,26 +26,37 @@
   const video = layer.querySelector('video');
   const loadVideo = async () => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const candidates = [
-      { url: `${base}assist/videos/${family}.webm`, type: 'video/webm' },
-      { url: `${base}assist/videos/${family}.mp4`, type: 'video/mp4' },
-    ];
-    let asset = null;
-    try {
+
+    // Optional video assets are not guaranteed to exist in every deployment.
+    // Avoid noisy 404s and broken console output by falling back silently.
+    const hasVideoAsset = false;
+    if (hasVideoAsset) {
+      const candidates = [
+        { url: `${base}assist/videos/${family}.webm`, type: 'video/webm' },
+        { url: `${base}assist/videos/${family}.mp4`, type: 'video/mp4' },
+      ];
+      let asset = null;
       for (const candidate of candidates) {
-        const response = await fetch(candidate.url, { method: 'HEAD', cache: 'no-store' });
-        if (response.ok) { asset = candidate; break; }
+        try {
+          const response = await fetch(candidate.url, { method: 'HEAD', cache: 'no-store' });
+          if (response.ok) { asset = candidate; break; }
+        } catch (_) {
+          break;
+        }
       }
-    } catch (_) {
-      layer.classList.add('video-fallback');
+      if (!asset) {
+        layer.classList.add('video-fallback');
+        return;
+      }
+      video.src = asset.url;
+      video.type = asset.type;
+      video.load();
+      const promise = video.play();
+      if (promise) promise.catch(() => {});
       return;
     }
-    if (!asset) { layer.classList.add('video-fallback'); return; }
-    video.src = asset.url;
-    video.type = asset.type;
-    video.load();
-    const promise = video.play();
-    if (promise) promise.catch(() => {});
+
+    layer.classList.add('video-fallback');
   };
   video.addEventListener('canplay', () => layer.classList.add('video-ready'), { once: true });
   video.addEventListener('error', () => layer.classList.add('video-fallback'), { once: true });

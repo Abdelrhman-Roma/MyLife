@@ -35,9 +35,10 @@ class UserServiceImpl {
       email: initial.email,
       displayName: initial.displayName || '',
       settings: { theme: 'dark', palette: 'deep-space', language: 'English', fontSize: 'md', radius: 'md' },
+      workspace: { id: 'personal', name: 'Personal workspace', createdAt: new Date().toISOString() },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }));
+    }, { merge: true }));
   }
 
   /** @param {string} uid */

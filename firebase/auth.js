@@ -29,12 +29,37 @@ import {
   signInWithPopup as _signInWithPopup,
   linkWithPopup as _linkWithPopup,
   unlink as _unlink,
+  setPersistence,
+  browserLocalPersistence,
 } from 'firebase/auth';
 import { auth } from './firebase.js';
 
+function logAuthError(operation, error) {
+  console.error(`[firebase-auth] ${operation} failed`, {
+    code: error?.code || 'NO_CODE',
+    message: error?.message || String(error),
+    stack: error?.stack || '(no stack provided)',
+  });
+}
+
+async function runAuth(operation, action) {
+  try {
+    return await action();
+  } catch (error) {
+    logAuthError(operation, error);
+    throw error;
+  }
+}
+
+// Firebase defaults to local persistence in browsers. Setting it explicitly
+// makes the intended session behavior deterministic and observable.
+const authPersistenceReady = auth
+  ? runAuth('setPersistence', () => setPersistence(auth, browserLocalPersistence))
+  : Promise.resolve();
+
 /** @returns {import('firebase/auth').User|null} */
 export function getCurrentUser() {
-  return auth.currentUser;
+  return auth?.currentUser || null;
 }
 
 /**
@@ -43,41 +68,60 @@ export function getCurrentUser() {
  * @returns {() => void} unsubscribe function
  */
 export function onAuthStateChanged(callback) {
-  return _onAuthStateChanged(auth, callback);
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  let unsubscribe = () => {};
+  let disposed = false;
+  authPersistenceReady.then(
+    () => { if (!disposed) unsubscribe = _onAuthStateChanged(auth, callback, (error) => logAuthError('onAuthStateChanged', error)); },
+    () => { if (!disposed) unsubscribe = _onAuthStateChanged(auth, callback, (error) => logAuthError('onAuthStateChanged', error)); },
+  );
+  return () => { disposed = true; unsubscribe(); };
 }
 
 /** @param {string} email @param {string} password */
-export function signIn(email, password) {
-  return _signIn(auth, email, password);
+export async function signIn(email, password) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  await authPersistenceReady;
+  return runAuth('signInWithEmailAndPassword', () => _signIn(auth, email, password));
 }
 
 /** @param {string} email @param {string} password */
-export function createUser(email, password) {
-  return _createUser(auth, email, password);
+export async function createUser(email, password) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  await authPersistenceReady;
+  return runAuth('createUserWithEmailAndPassword', () => _createUser(auth, email, password));
 }
 
-export function signOut() {
-  return _signOut(auth);
+export async function signOut() {
+  if (!auth) return Promise.resolve();
+  return runAuth('signOut', () => _signOut(auth));
 }
 
 /** @param {string} email */
-export function sendPasswordResetEmail(email) {
-  return _sendPasswordResetEmail(auth, email);
+export async function sendPasswordResetEmail(email) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  return runAuth('sendPasswordResetEmail', () => _sendPasswordResetEmail(auth, email));
 }
 
 /** @param {import('firebase/auth').User} user */
-export function sendEmailVerification(user) {
-  return _sendEmailVerification(user);
+export async function sendEmailVerification(user) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  return runAuth('sendEmailVerification', () => _sendEmailVerification(user));
 }
 
 /** @param {import('firebase/auth').User} user @param {{displayName?: string, photoURL?: string}} profile */
-export function updateProfile(user, profile) {
-  return _updateProfile(user, profile);
+export async function updateProfile(user, profile) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  return runAuth('updateProfile', () => _updateProfile(user, profile));
 }
 
 /** @param {import('firebase/auth').User} user */
-export function reloadUser(user) {
-  return _reload(user);
+export async function reloadUser(user) {
+  if (!auth) return Promise.resolve(user);
+  return runAuth('reload', () => _reload(user));
 }
 
 /**
@@ -89,9 +133,11 @@ export function reloadUser(user) {
  * @param {string} newPassword
  */
 export async function changePassword(user, currentPassword, newPassword) {
-  const credential = EmailAuthProvider.credential(user.email, currentPassword);
-  await _reauthenticateWithCredential(user, credential);
-  return _updatePassword(user, newPassword);
+  return runAuth('changePassword', async () => {
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await _reauthenticateWithCredential(user, credential);
+    return _updatePassword(user, newPassword);
+  });
 }
 
 export { auth };
@@ -118,8 +164,10 @@ function providerFor(providerId) {
  * rather than this file silently swallowing or reinterpreting it.
  * @param {'google'|'github'} providerId
  */
-export function signInWithProviderPopup(providerId) {
-  return _signInWithPopup(auth, providerFor(providerId));
+export async function signInWithProviderPopup(providerId) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  await authPersistenceReady;
+  return runAuth(`signInWithPopup:${providerId}`, () => _signInWithPopup(auth, providerFor(providerId)));
 }
 
 /**
@@ -128,8 +176,9 @@ export function signInWithProviderPopup(providerId) {
  * @param {import('firebase/auth').User} user
  * @param {'google'|'github'} providerId
  */
-export function linkProviderPopup(user, providerId) {
-  return _linkWithPopup(user, providerFor(providerId));
+export async function linkProviderPopup(user, providerId) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  return runAuth(`linkWithPopup:${providerId}`, () => _linkWithPopup(user, providerFor(providerId)));
 }
 
 /**
@@ -140,6 +189,7 @@ export function linkProviderPopup(user, providerId) {
  * @param {import('firebase/auth').User} user
  * @param {string} providerId - Firebase's provider id string, e.g. 'google.com'/'github.com'/'password'
  */
-export function unlinkProvider(user, providerId) {
-  return _unlink(user, providerId);
+export async function unlinkProvider(user, providerId) {
+  if (!auth) throw new Error('Firebase Auth is not configured in this environment.');
+  return runAuth(`unlink:${providerId}`, () => _unlink(user, providerId));
 }

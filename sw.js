@@ -25,14 +25,9 @@
 //     realtime streaming/long-polling connections is a well-known way to
 //     break realtime sync in subtle, hard-to-debug ways. Don't do it.
 
-const CACHE_VERSION = 'mylife-v1';
+const CACHE_VERSION = 'mylife-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = './offline.html';
-
-// Deliberately small and conservative: the true app shell plus the offline
-// fallback itself. Page-specific JS/CSS/images are cached opportunistically
-// at runtime instead (see the fetch handler) rather than risking a large
-// atomic `addAll` that fails entirely if any single URL 404s.
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -51,46 +46,63 @@ const PRECACHE_URLS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch((err) => {
-        // A single missing precache URL shouldn't brick installation of the
-        // whole worker — log and continue; the runtime cache-as-you-go path
-        // still fills in whatever didn't get precached.
-        console.warn('[sw] precache partially failed:', err);
-      })
+      .then((cache) => Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url))))
       .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((names) => Promise.all(
-        names
-          .filter((name) => name.startsWith('mylife-') && name !== STATIC_CACHE)
-          .map((name) => caches.delete(name)) // clear outdated cache versions automatically
-      ))
-      .then(() => self.clients.claim())
+    caches.keys().then((names) => Promise.all(
+      names
+        .filter((name) => name.startsWith('mylife-') && name !== STATIC_CACHE)
+        .map((name) => caches.delete(name))
+    )).then(() => self.clients.claim())
   );
 });
 
 function isSameOrigin(url) {
-  return new URL(url, self.location.origin).origin === self.location.origin;
+  try { return new URL(url, self.location.origin).origin === self.location.origin; }
+  catch { return false; }
+}
+
+function isAssetRequest(request) {
+  const url = new URL(request.url);
+  return request.method === 'GET' && request.mode !== 'navigate' && isSameOrigin(url.href) && /\.(?:js|css|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|mp4|webm|json)(?:\?|$)/i.test(url.pathname);
+}
+
+function isFingerprintedAsset(request) {
+  const { pathname } = new URL(request.url);
+  return /^\/assets\/.+-[A-Za-z0-9_-]{8}\.(?:js|css|png|jpe?g|gif|webp|svg|woff2?)$/i.test(pathname);
+}
+
+function cacheResponse(request, response) {
+  if (!response.ok || response.type !== 'basic') return response;
+  const copy = response.clone();
+  caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+  return response;
+}
+
+function networkFirst(request) {
+  return fetch(request)
+    .then((response) => cacheResponse(request, response))
+    .catch(() => caches.match(request).then((cached) => cached || Response.error()));
 }
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET') return; // never cache non-GET; let it pass through untouched
-  if (!isSameOrigin(request.url)) return; // Firebase/Firestore/Open-Meteo/fonts — never intercepted, see header note
+  if (request.method !== 'GET') return;
+  if (!isSameOrigin(request.url)) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Refresh the cached copy of this page in the background so the
-          // next offline visit has something reasonably current.
           const copy = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+          if (response.ok && request.url.startsWith(self.location.origin)) {
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+          }
           return response;
         })
         .catch(async () => (await caches.match(request)) || (await caches.match(OFFLINE_URL)))
@@ -98,19 +110,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin static asset: cache-first, then network (and backfill the cache).
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      }).catch(() => cached); // offline and not cached: let the request fail naturally
-    })
-  );
+  if (isAssetRequest(request) && isFingerprintedAsset(request)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const fetchFromNetwork = fetch(request).then((response) => {
+          return cacheResponse(request, response);
+        }).catch(() => cached || Response.error());
+
+        return cached || fetchFromNetwork;
+      })
+    );
+    return;
+  }
+
+  if (isAssetRequest(request)) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  event.respondWith(fetch(request).catch(() => caches.match(request).then((cached) => cached || caches.match(OFFLINE_URL))));
 });
 
 // ─── Web Push (unchanged from the pre-Phase-4 version) ─────────────────────

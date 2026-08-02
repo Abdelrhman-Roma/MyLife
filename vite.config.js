@@ -26,6 +26,13 @@ function copyRuntimeReferencedAssets() {
         ['sw.js', 'sw.js'],
         ['offline.html', 'offline.html'],
         ['manifest.json', 'manifest.json'], // defensive: copied even if Vite's HTML plugin also handles the <link rel="manifest"> reference
+        // Most of this established application still uses ordered classic
+        // scripts. Vite deliberately leaves those URLs untouched (rather
+        // than changing their execution order), so they must be present in
+        // dist exactly as referenced by the generated HTML.
+        ['css', 'css'],
+        ['js', 'js'],
+        ['locales', 'locales'],
         ['data', 'data'],
         ['assist', 'assist'],
       ];

@@ -59,3 +59,10 @@ export {
   serverTimestamp,
   Timestamp,
 };
+
+export function assertFirestoreReady() {
+  if (!db) {
+    throw new Error('Firestore is not configured in this environment. Configure VITE_FIREBASE_* values in .env.local.');
+  }
+  return true;
+};
