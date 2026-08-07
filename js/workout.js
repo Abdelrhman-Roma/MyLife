@@ -13,7 +13,7 @@
 import { WorkoutRepository } from '../repositories/WorkoutRepository.js';
 import { BodyMeasurementsRepository } from '../repositories/BodyMeasurementsRepository.js';
 import { ProgressPhotoRepository } from '../repositories/ProgressPhotoRepository.js';
-import { uploadDataUrl, deleteFile } from '../firebase/storage.js';
+import { ImageService } from '../services/images/ImageService.js';
 import { AuthService } from '../services/AuthService.js';
 
 /** @type {import('../repositories/WorkoutRepository.js').WorkoutRepository|null} */
@@ -185,7 +185,15 @@ async function startWorkoutSync() {
     (error) => { console.error('[workout/bodyMeasurements] realtime sync failed', error); }
   );
   photoUnsubscribe = photoRepo.subscribe(
-    (items) => { window.currentData.progressPhotos = items.map((p) => ({ ...p, dataUrl: p.url || p.dataUrl })); renderWorkoutRoot(); },
+    async (items) => {
+      const resolvedItems = await Promise.all(items.map(async (p) => {
+        const imageId = p.imageId || p.id;
+        const dataUrl = await ImageService.loadImage(imageId);
+        return { ...p, dataUrl: dataUrl || p.url || p.dataUrl };
+      }));
+      window.currentData.progressPhotos = resolvedItems;
+      renderWorkoutRoot();
+    },
     (error) => { console.error('[workout/progressPhotos] realtime sync failed', error); }
   );
 }
@@ -1495,28 +1503,6 @@ function advancedTrackingHtml() {
 
 function todayIsoWorkout() { return new Date().toISOString().slice(0, 10); }
 
-function compressImageFile(file, maxDim = 900, quality = 0.72) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let w = img.width, h = img.height;
-        if (w > h && w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
-        else if (h >= w && h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = reject;
-      img.src = reader.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 function bindAdvancedTrackingEvents() {
   const measureForm = document.querySelector('[data-wo-measure-form]');
   if (measureForm) {
@@ -1547,28 +1533,22 @@ function bindAdvancedTrackingEvents() {
       const file = photoInput.files && photoInput.files[0];
       if (!file) return;
       try {
-        const dataUrl = await compressImageFile(file);
+        const dataUrl = await ImageService.getPreview(file);
         const id = makeId();
         const entry = { id, date: todayIsoWorkout(), dataUrl };
-        // Optimistic: show the compressed photo immediately. dataUrl is only
-        // held in memory here — the only thing actually persisted is the
-        // Storage download URL (see firebase/storage.js for why: Firestore
-        // documents cap out at 1MB, and base64 adds ~33% overhead on top of
-        // the image's real size, so storing photos as data URIs risked
-        // silently failing to save for anything but tiny/heavily-compressed images).
         window.currentData.progressPhotos.push(entry);
         renderWorkoutRoot();
         showToast('Photo added', 'success');
         const user = AuthService.getCurrentUser();
         if (user && photoRepo) {
-          uploadDataUrl(`progressPhotos/${user.uid}/${id}.jpg`, dataUrl).then((downloadUrl) => {
+          ImageService.saveImage(id, dataUrl, { date: entry.date, userId: user.uid }).then(() => {
             const saved = window.currentData.progressPhotos.find((p) => p.id === id);
-            if (saved) saved.dataUrl = downloadUrl;
+            if (saved) saved.dataUrl = dataUrl;
             renderWorkoutRoot();
-            photoRepo.create({ date: entry.date, url: downloadUrl }, id);
+            photoRepo.create({ date: entry.date, imageId: id }, id);
           }).catch((error) => {
-            console.error('[workout/progressPhotos] upload failed', error);
-            showToast('Photo saved locally, but the upload failed — it may not sync to other devices.', 'danger');
+            console.error('[workout/progressPhotos] save failed', error);
+            showToast('Failed to save photo locally.', 'danger');
           });
         }
       } catch (err) {
@@ -1576,13 +1556,12 @@ function bindAdvancedTrackingEvents() {
       }
     });
   }
-  document.querySelectorAll('[data-wo-photo-delete]').forEach((btn) => btn.addEventListener('click', () => {
+  document.querySelectorAll('[data-wo-photo-delete]').forEach((btn) => btn.addEventListener('click', async () => {
     const id = btn.dataset.woPhotoDelete;
     window.currentData.progressPhotos = window.currentData.progressPhotos.filter((p) => p.id !== id);
     renderWorkoutRoot();
     if (photoRepo) photoRepo.delete(id);
-    const user = AuthService.getCurrentUser();
-    if (user) deleteFile(`progressPhotos/${user.uid}/${id}.jpg`).catch((error) => console.error('[workout/progressPhotos] delete failed', error));
+    await ImageService.deleteImage(id);
   }));
 }
 
