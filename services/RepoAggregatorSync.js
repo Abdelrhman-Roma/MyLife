@@ -38,52 +38,45 @@ import { SettingsRepository } from '../repositories/SettingsRepository.js';
 import { AuthService } from './AuthService.js';
 import { ImageService } from './images/ImageService.js';
 
+const REPO_CLASSES = {
+  tasks: TodoRepository,
+  habits: HabitRepository,
+  goals: GoalRepository,
+  events: CalendarRepository,
+  workouts: WorkoutRepository,
+  prayers: PrayerRepository,
+  meals: NutritionRepository,
+  study: StudyRepository,
+  water: WaterRepository,
+  sleep: SleepRepository,
+  bodyMeasurements: BodyMeasurementsRepository,
+  shoppingList: ShoppingRepository,
+};
+
+const SINGLETON_CLASSES = {
+  profile: ProfileRepository,
+  settings: SettingsRepository,
+};
+
 /**
- * Subscribes to all migrated repositories and mirrors their live data onto
- * window.currentData under the same keys the feature pages themselves use
- * (tasks, habits, goals, events, workouts, prayers, meals, study, water,
- * sleep, bodyMeasurements, shoppingList).
+ * Subscribes to migrated repositories lazily and mirrors their live data onto
+ * window.currentData under the same keys the feature pages themselves use.
+ *
  * @param {() => void} [onUpdate] called once per debounced batch of updates, so the caller can re-render without a render-storm
- * @returns {Promise<() => void>} unsubscribe-all function; resolves to a no-op if the user isn't authenticated
+ * @param {string[]} [initialKeys] optional list of initial data keys to subscribe to. If omitted, all keys are synced (backward-compatible).
+ * @returns {Promise<Function & { syncKeys: (keys: string[]) => void }>} unsubscribe-all function; resolves to a no-op if the user isn't authenticated
  */
-export async function startRepoAggregatorSync(onUpdate) {
+export async function startRepoAggregatorSync(onUpdate, initialKeys = null) {
   const user = await AuthService.waitUntilReady();
-  if (!user) return () => {};
+  if (!user) {
+    const noop = () => {};
+    noop.syncKeys = () => {};
+    return noop;
+  }
 
-  const repos = {
-    tasks: new TodoRepository(user.uid),
-    habits: new HabitRepository(user.uid),
-    goals: new GoalRepository(user.uid),
-    events: new CalendarRepository(user.uid),
-    workouts: new WorkoutRepository(user.uid),
-    prayers: new PrayerRepository(user.uid),
-    meals: new NutritionRepository(user.uid),
-    study: new StudyRepository(user.uid),
-    water: new WaterRepository(user.uid),
-    sleep: new SleepRepository(user.uid),
-    bodyMeasurements: new BodyMeasurementsRepository(user.uid),
-    shoppingList: new ShoppingRepository(user.uid),
-  };
-  // Profile/Settings are singleton documents (one object, not a list of
-  // items — see SingletonDocRepository.js), so they need Object.assign onto
-  // the existing render-cache object rather than a wholesale replace, the
-  // same distinction js/pages/account.js's own sync already makes.
-  const singletonRepos = {
-    profile: new ProfileRepository(user.uid),
-    settings: new SettingsRepository(user.uid),
-  };
+  const activeUnsubscribers = new Map();
+  const activeRepos = new Map();
 
-  // Debounce: the 8 repositories' onSnapshot listeners each resolve
-  // independently, often within milliseconds of each other on page load
-  // (and again, independently, whenever Firestore delivers a cache snapshot
-  // followed by a server snapshot for each — see BaseRepository.subscribe()'s
-  // own dedupe for the identical-content case). Without coalescing, every
-  // one of those calls triggered its own full Dashboard/Statistics re-render
-  // — up to 8+ re-renders in quick succession, the exact cause of the
-  // reported page-load flicker. Batching updates that land within the same
-  // short window into a single re-render call fixes this; window.currentData
-  // itself is still updated immediately and per-collection, so no data is
-  // delayed — only the expensive full re-render is batched.
   let flushTimer = null;
   const scheduleFlush = () => {
     if (!onUpdate) return;
@@ -91,18 +84,62 @@ export async function startRepoAggregatorSync(onUpdate) {
     flushTimer = setTimeout(() => onUpdate(), 30);
   };
 
-  const unsubscribers = Object.entries(repos).map(([key, repo]) =>
-    repo.subscribe(
-      (items) => { window.currentData[key] = items; scheduleFlush(); },
-      (error) => console.error(`[RepoAggregatorSync] ${key} sync failed`, error)
-    )
-  );
-  const singletonUnsubscribers = Object.entries(singletonRepos).map(([key, repo]) =>
-    repo.subscribe(
-      (data) => { if (data) Object.assign(window.currentData[key], data); scheduleFlush(); },
-      (error) => console.error(`[RepoAggregatorSync] ${key} sync failed`, error)
-    )
-  );
+  /**
+   * Dynamically adjusts subscriptions. Keeps currently active ones that are still wanted,
+   * unsubscribes from no-longer-wanted ones, and subscribes to newly-wanted ones.
+   * @param {string[]} keys
+   */
+  function syncKeys(keys) {
+    const wantedKeys = new Set(keys);
 
-  return () => { clearTimeout(flushTimer); [...unsubscribers, ...singletonUnsubscribers].forEach((unsub) => unsub()); };
+    // Always keep profile and settings synced as they are core singletons
+    wantedKeys.add('profile');
+    wantedKeys.add('settings');
+
+    // Unsubscribe from no-longer-wanted keys
+    for (const [key, unsub] of activeUnsubscribers.entries()) {
+      if (!wantedKeys.has(key)) {
+        unsub();
+        activeUnsubscribers.delete(key);
+        activeRepos.delete(key);
+      }
+    }
+
+    // Subscribe to newly-wanted keys
+    for (const key of wantedKeys) {
+      if (activeUnsubscribers.has(key)) continue;
+
+      if (REPO_CLASSES[key]) {
+        const repo = new REPO_CLASSES[key](user.uid);
+        activeRepos.set(key, repo);
+        const unsub = repo.subscribe(
+          (items) => { window.currentData[key] = items; scheduleFlush(); },
+          (error) => console.error(`[RepoAggregatorSync] ${key} sync failed`, error)
+        );
+        activeUnsubscribers.set(key, unsub);
+      } else if (SINGLETON_CLASSES[key]) {
+        const repo = new SINGLETON_CLASSES[key](user.uid);
+        activeRepos.set(key, repo);
+        const unsub = repo.subscribe(
+          (data) => { if (data) Object.assign(window.currentData[key], data); scheduleFlush(); },
+          (error) => console.error(`[RepoAggregatorSync] ${key} sync failed`, error)
+        );
+        activeUnsubscribers.set(key, unsub);
+      }
+    }
+  }
+
+  // If no initialKeys are specified, default to syncing all keys for full backward compatibility
+  const defaultKeys = initialKeys || [...Object.keys(REPO_CLASSES), ...Object.keys(SINGLETON_CLASSES)];
+  syncKeys(defaultKeys);
+
+  const dispose = () => {
+    clearTimeout(flushTimer);
+    activeUnsubscribers.forEach((unsub) => unsub());
+    activeUnsubscribers.clear();
+    activeRepos.clear();
+  };
+
+  dispose.syncKeys = syncKeys;
+  return dispose;
 }

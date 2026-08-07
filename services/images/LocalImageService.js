@@ -31,6 +31,8 @@ function getDB() {
   });
 }
 
+const IMAGE_CACHE = new Map();
+
 export class LocalImageService {
   /**
    * Saves an image in IndexedDB with a unique ID and optional metadata.
@@ -41,6 +43,7 @@ export class LocalImageService {
    */
   static async saveImage(id, dataUrl, metadata = {}) {
     if (!id) throw new Error('Image ID is required to save an image.');
+    IMAGE_CACHE.set(id, dataUrl);
     const db = await getDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, 'readwrite');
@@ -58,8 +61,11 @@ export class LocalImageService {
    */
   static async loadImage(id) {
     if (!id) return null;
+    if (IMAGE_CACHE.has(id)) {
+      return IMAGE_CACHE.get(id);
+    }
     const db = await getDB();
-    return new Promise((resolve, reject) => {
+    const dataUrl = await new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get(id);
@@ -68,6 +74,10 @@ export class LocalImageService {
       };
       request.onerror = () => reject(request.error);
     });
+    if (dataUrl) {
+      IMAGE_CACHE.set(id, dataUrl);
+    }
+    return dataUrl;
   }
 
   /**
@@ -77,6 +87,7 @@ export class LocalImageService {
    */
   static async deleteImage(id) {
     if (!id) return;
+    IMAGE_CACHE.delete(id);
     const db = await getDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, 'readwrite');
