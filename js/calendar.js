@@ -413,22 +413,33 @@ async function startCalendarSync() {
   if (!user) return; // bootShell() already redirects unauthenticated visitors
   calendarRepo = new CalendarRepository(user.uid);
   initCrossRepos(user.uid);
-  if (calendarUnsubscribe) calendarUnsubscribe();
-  calendarUnsubscribe = calendarRepo.subscribe(
-    (items) => {
-      window.currentData.events = items.map((ev) => { try { return hydrateEvent(ev); } catch (_e) { return null; } }).filter(Boolean);
-      try {
-        reconcileSourceLinkedEvents();
-        stampStatuses();
-      } catch (_e) { /* fall through — refreshCalendar's own guard renders an error state */ }
-      refreshCalendar();
-    },
-    (error) => console.error('[calendar] realtime sync failed', error)
-  );
+  if (!calendarUnsubscribe) {
+    window.__perfTrace && window.__perfTrace('calendar', 'repositorySubscribeStart');
+    let isFirstSnapshot = true;
+    calendarUnsubscribe = calendarRepo.subscribe(
+      (items) => {
+        if (isFirstSnapshot) {
+          window.__perfTrace && window.__perfTrace('calendar', 'repositorySnapshotReceived');
+          isFirstSnapshot = false;
+        }
+        window.currentData.events = items.map((ev) => { try { return hydrateEvent(ev); } catch (_e) { return null; } }).filter(Boolean);
+        try {
+          reconcileSourceLinkedEvents();
+          stampStatuses();
+        } catch (_e) { /* fall through — refreshCalendar's own guard renders an error state */ }
+        refreshCalendar();
+        window.__perfTrace && window.__perfTrace('calendar', 'pageInteractive');
+      },
+      (error) => console.error('[calendar] realtime sync failed', error)
+    );
+  }
 }
 
 function disposeCalendarPage() {
-  if (calendarUnsubscribe) { calendarUnsubscribe(); calendarUnsubscribe = null; }
+  if (calendarUnsubscribe) {
+    calendarUnsubscribe();
+    calendarUnsubscribe = null;
+  }
 }
 
 function refreshCalendar(opts = {}) {
@@ -504,26 +515,59 @@ function renderCalendarRoot(stats) {
   const root = byId('calendar-root');
   if (!root) return;
   const s = stats || computeStats();
-  root.innerHTML = `
-    ${controlsHtml()}
-    <div class="cal-body">
-      <div class="cal-main">
-        ${calState.view === 'month'
-          ? monthGridHtml()
-          : calState.view === 'agenda'
-          ? agendaHtml()
-          : timeGridHtml(calState.view === 'week' ? weekDaysFor(calState.selected) : [calState.selected])}
+
+  let shellCreated = !!byId('cal-main-container');
+
+  if (!shellCreated) {
+    root.innerHTML = `
+      <div id="cal-controls-container"></div>
+      <div class="cal-body">
+        <div class="cal-main" id="cal-main-container"></div>
+        <aside class="cal-side">
+          <div id="cal-daily-schedule-container"></div>
+          <div id="cal-upcoming-container"></div>
+          <div id="cal-quickadd-container"></div>
+        </aside>
       </div>
-      <aside class="cal-side">
-        ${dailyScheduleHtml()}
-        ${upcomingHtml()}
-        ${quickAddHtml()}
-      </aside>
-    </div>
-    ${statsSectionHtml(s)}
-    <button class="cal-fab" data-cal-add type="button" aria-label="Add event">+</button>
-  `;
+      <div id="cal-stats-container"></div>
+      <button class="cal-fab" data-cal-add type="button" aria-label="Add event">+</button>
+    `;
+  }
+
+  // Optimize: Avoid updating controls if the user is actively typing in the search input
+  const searchFocused = document.activeElement && document.activeElement.id === 'cal-search-input';
+  if (!searchFocused) {
+    const controlsContainer = byId('cal-controls-container');
+    if (controlsContainer) controlsContainer.innerHTML = controlsHtml();
+  }
+
+  const mainContainer = byId('cal-main-container');
+  if (mainContainer) {
+    mainContainer.innerHTML = calState.view === 'month'
+      ? monthGridHtml()
+      : calState.view === 'agenda'
+      ? agendaHtml()
+      : timeGridHtml(calState.view === 'week' ? weekDaysFor(calState.selected) : [calState.selected]);
+  }
+
+  const dailyScheduleContainer = byId('cal-daily-schedule-container');
+  if (dailyScheduleContainer) dailyScheduleContainer.innerHTML = dailyScheduleHtml();
+
+  const upcomingContainer = byId('cal-upcoming-container');
+  if (upcomingContainer) upcomingContainer.innerHTML = upcomingHtml();
+
+  // Avoid blowing away any active keyboard focus/interaction in quickadd
+  const quickaddFocused = document.activeElement && document.activeElement.closest('#cal-quickadd-container');
+  if (!quickaddFocused) {
+    const quickaddContainer = byId('cal-quickadd-container');
+    if (quickaddContainer) quickaddContainer.innerHTML = quickAddHtml();
+  }
+
+  const statsContainer = byId('cal-stats-container');
+  if (statsContainer) statsContainer.innerHTML = statsSectionHtml(s);
+
   bindCalendarRootEvents(root);
+
   if (calState._focusRestore) {
     const el = root.querySelector(calState._focusRestore);
     if (el) {

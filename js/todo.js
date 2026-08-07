@@ -123,14 +123,33 @@ async function initTodoPage() {
 
   todoRepo = new TodoRepository(user.uid);
   notificationRepo = new NotificationRepository(user.uid);
-  todoLoading = true;
-  todoError = null;
 
-  if (todoUnsubscribe) todoUnsubscribe();
-  todoUnsubscribe = todoRepo.subscribe(
-    (items) => { localTasks = items; todoLoading = false; todoError = null; renderTodoRoot(); },
-    (mappedError) => { todoLoading = false; todoError = mappedError; renderTodoRoot(); },
-  );
+  if (!todoUnsubscribe) {
+    todoLoading = true;
+    todoError = null;
+
+    window.__perfTrace && window.__perfTrace('todo', 'repositorySubscribeStart');
+    let isFirstSnapshot = true;
+
+    todoUnsubscribe = todoRepo.subscribe(
+      (items) => {
+        if (isFirstSnapshot) {
+          window.__perfTrace && window.__perfTrace('todo', 'repositorySnapshotReceived');
+          isFirstSnapshot = false;
+        }
+        localTasks = items;
+        todoLoading = false;
+        todoError = null;
+        renderTodoRoot();
+        window.__perfTrace && window.__perfTrace('todo', 'pageInteractive');
+      },
+      (mappedError) => {
+        todoLoading = false;
+        todoError = mappedError;
+        renderTodoRoot();
+      },
+    );
+  }
 
   renderTodoRoot(); // paint the skeleton immediately, before the first snapshot arrives
   startReminderWatch();
@@ -138,7 +157,10 @@ async function initTodoPage() {
 
 /** Called by the page router when navigating away from Todo — prevents a leaked listener/interval. */
 function disposeTodoPage() {
-  if (todoUnsubscribe) { todoUnsubscribe(); todoUnsubscribe = null; }
+  if (todoUnsubscribe) {
+    todoUnsubscribe();
+    todoUnsubscribe = null;
+  }
   if (todoReminderTimer) { clearInterval(todoReminderTimer); todoReminderTimer = null; }
 }
 

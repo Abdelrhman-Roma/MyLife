@@ -179,60 +179,81 @@ async function startPrayerSync() {
   quranLogRepo = new QuranLogRepository(user.uid);
   hadithFavoriteRepo = new HadithFavoriteRepository(user.uid);
 
-  [prayerUnsubscribe, tasbeehUnsubscribe, quranProgressUnsubscribe, quranBookmarkUnsubscribe,
-    quranFavoriteUnsubscribe, quranLogUnsubscribe, hadithFavoriteUnsubscribe].forEach((u) => u && u());
-
-  prayerUnsubscribe = prayerRepo.subscribe(
-    (items) => {
-      window.currentData.prayers = items.map((p) => ({
-        date: p.date || '', prayer: p.prayer || p.title || '', time: p.time || '',
-        status: p.status === 'Completed' ? 'Completed' : (p.status === 'Missed' ? 'Missed' : 'Pending'),
-        completedAt: p.completedAt || null,
-        ...p,
-      }));
-      reconcilePrayerDay();
-      renderPrayerRoot();
-    },
-    (error) => { console.error('[prayer] realtime sync failed', error); }
-  );
-  tasbeehUnsubscribe = tasbeehRepo.subscribe(
-    (data) => { window.currentData.tasbeeh = { ...TASBEEH_DEFAULTS, ...(data || {}) }; renderPrayerRoot(); },
-    (error) => { console.error('[prayer/tasbeeh] realtime sync failed', error); }
-  );
-  quranProgressUnsubscribe = quranProgressRepo.subscribe(
-    (data) => {
-      window.currentData.quranProgress = {
-        ...QURAN_PROGRESS_DEFAULTS, ...(data || {}),
-        readingSettings: { ...QURAN_PROGRESS_DEFAULTS.readingSettings, ...((data && data.readingSettings) || {}) },
-      };
-      quranState.fontSize = window.currentData.quranProgress.readingSettings.fontSize || 'md';
-      renderPrayerRoot();
-    },
-    (error) => { console.error('[prayer/quranProgress] realtime sync failed', error); }
-  );
-  quranBookmarkUnsubscribe = quranBookmarkRepo.subscribe(
-    (items) => { window.currentData.quranBookmarks = items; renderPrayerRoot(); },
-    (error) => { console.error('[prayer/quranBookmarks] realtime sync failed', error); }
-  );
-  quranFavoriteUnsubscribe = quranFavoriteRepo.subscribe(
-    (items) => { window.currentData.quranFavorites = items; renderPrayerRoot(); },
-    (error) => { console.error('[prayer/quranFavorites] realtime sync failed', error); }
-  );
-  quranLogUnsubscribe = quranLogRepo.subscribe(
-    (items) => { window.currentData.quranLog = items; renderPrayerRoot(); },
-    (error) => { console.error('[prayer/quranLog] realtime sync failed', error); }
-  );
-  hadithFavoriteUnsubscribe = hadithFavoriteRepo.subscribe(
-    (items) => { window.currentData.hadithCollection = items; renderPrayerRoot(); },
-    (error) => { console.error('[prayer/hadithFavorites] realtime sync failed', error); }
-  );
+  if (!prayerUnsubscribe) {
+    window.__perfTrace && window.__perfTrace('prayer', 'repositorySubscribeStart');
+    let isFirstSnapshot = true;
+    prayerUnsubscribe = prayerRepo.subscribe(
+      (items) => {
+        if (isFirstSnapshot) {
+          window.__perfTrace && window.__perfTrace('prayer', 'repositorySnapshotReceived');
+          isFirstSnapshot = false;
+        }
+        window.currentData.prayers = items.map((p) => ({
+          date: p.date || '', prayer: p.prayer || p.title || '', time: p.time || '',
+          status: p.status === 'Completed' ? 'Completed' : (p.status === 'Missed' ? 'Missed' : 'Pending'),
+          completedAt: p.completedAt || null,
+          ...p,
+        }));
+        reconcilePrayerDay();
+        renderPrayerRoot();
+        window.__perfTrace && window.__perfTrace('prayer', 'pageInteractive');
+      },
+      (error) => { console.error('[prayer] realtime sync failed', error); }
+    );
+  }
+  if (!tasbeehUnsubscribe) {
+    tasbeehUnsubscribe = tasbeehRepo.subscribe(
+      (data) => { window.currentData.tasbeeh = { ...TASBEEH_DEFAULTS, ...(data || {}) }; renderPrayerRoot(); },
+      (error) => { console.error('[prayer/tasbeeh] realtime sync failed', error); }
+    );
+  }
+  if (!quranProgressUnsubscribe) {
+    quranProgressUnsubscribe = quranProgressRepo.subscribe(
+      (data) => {
+        window.currentData.quranProgress = {
+          ...QURAN_PROGRESS_DEFAULTS, ...(data || {}),
+          readingSettings: { ...QURAN_PROGRESS_DEFAULTS.readingSettings, ...((data && data.readingSettings) || {}) },
+        };
+        quranState.fontSize = window.currentData.quranProgress.readingSettings.fontSize || 'md';
+        renderPrayerRoot();
+      },
+      (error) => { console.error('[prayer/quranProgress] realtime sync failed', error); }
+    );
+  }
+  if (!quranBookmarkUnsubscribe) {
+    quranBookmarkUnsubscribe = quranBookmarkRepo.subscribe(
+      (items) => { window.currentData.quranBookmarks = items; renderPrayerRoot(); },
+      (error) => { console.error('[prayer/quranBookmarks] realtime sync failed', error); }
+    );
+  }
+  if (!quranFavoriteUnsubscribe) {
+    quranFavoriteUnsubscribe = quranFavoriteRepo.subscribe(
+      (items) => { window.currentData.quranFavorites = items; renderPrayerRoot(); },
+      (error) => { console.error('[prayer/quranFavorites] realtime sync failed', error); }
+    );
+  }
+  if (!quranLogUnsubscribe) {
+    quranLogUnsubscribe = quranLogRepo.subscribe(
+      (items) => { window.currentData.quranLog = items; renderPrayerRoot(); },
+      (error) => { console.error('[prayer/quranLog] realtime sync failed', error); }
+    );
+  }
+  if (!hadithFavoriteUnsubscribe) {
+    hadithFavoriteUnsubscribe = hadithFavoriteRepo.subscribe(
+      (items) => { window.currentData.hadithCollection = items; renderPrayerRoot(); },
+      (error) => { console.error('[prayer/hadithFavorites] realtime sync failed', error); }
+    );
+  }
 }
 
 function disposePrayerPage() {
-  [prayerUnsubscribe, tasbeehUnsubscribe, quranProgressUnsubscribe, quranBookmarkUnsubscribe,
-    quranFavoriteUnsubscribe, quranLogUnsubscribe, hadithFavoriteUnsubscribe].forEach((u) => u && u());
-  prayerUnsubscribe = tasbeehUnsubscribe = quranProgressUnsubscribe = quranBookmarkUnsubscribe =
-    quranFavoriteUnsubscribe = quranLogUnsubscribe = hadithFavoriteUnsubscribe = null;
+  if (prayerUnsubscribe) { prayerUnsubscribe(); prayerUnsubscribe = null; }
+  if (tasbeehUnsubscribe) { tasbeehUnsubscribe(); tasbeehUnsubscribe = null; }
+  if (quranProgressUnsubscribe) { quranProgressUnsubscribe(); quranProgressUnsubscribe = null; }
+  if (quranBookmarkUnsubscribe) { quranBookmarkUnsubscribe(); quranBookmarkUnsubscribe = null; }
+  if (quranFavoriteUnsubscribe) { quranFavoriteUnsubscribe(); quranFavoriteUnsubscribe = null; }
+  if (quranLogUnsubscribe) { quranLogUnsubscribe(); quranLogUnsubscribe = null; }
+  if (hadithFavoriteUnsubscribe) { hadithFavoriteUnsubscribe(); hadithFavoriteUnsubscribe = null; }
 }
 
 // Marks overdue Pending prayers as Missed, and creates today's 5 prayers if

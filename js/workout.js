@@ -23,6 +23,7 @@ let photoRepo = null;
 let workoutUnsubscribe = null;
 let bodyUnsubscribe = null;
 let photoUnsubscribe = null;
+let progressPhotoObserver = null;
 
 const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -173,35 +174,58 @@ async function startWorkoutSync() {
   workoutRepo = new WorkoutRepository(user.uid);
   bodyRepo = new BodyMeasurementsRepository(user.uid);
   photoRepo = new ProgressPhotoRepository(user.uid);
-  if (workoutUnsubscribe) workoutUnsubscribe();
-  if (bodyUnsubscribe) bodyUnsubscribe();
-  if (photoUnsubscribe) photoUnsubscribe();
-  workoutUnsubscribe = workoutRepo.subscribe(
-    (items) => { window.currentData.workouts = items; renderWorkoutStats(); renderWorkoutRoot(); },
-    (error) => { console.error('[workout] realtime sync failed', error); }
-  );
-  bodyUnsubscribe = bodyRepo.subscribe(
-    (items) => { window.currentData.bodyMeasurements = items; renderWorkoutRoot(); },
-    (error) => { console.error('[workout/bodyMeasurements] realtime sync failed', error); }
-  );
-  photoUnsubscribe = photoRepo.subscribe(
-    async (items) => {
-      const resolvedItems = await Promise.all(items.map(async (p) => {
-        const imageId = p.imageId || p.id;
-        const dataUrl = await ImageService.loadImage(imageId);
-        return { ...p, dataUrl: dataUrl || p.url || p.dataUrl };
-      }));
-      window.currentData.progressPhotos = resolvedItems;
-      renderWorkoutRoot();
-    },
-    (error) => { console.error('[workout/progressPhotos] realtime sync failed', error); }
-  );
+
+  if (!workoutUnsubscribe) {
+    window.__perfTrace && window.__perfTrace('workout', 'repositorySubscribeStart');
+    let isFirstSnapshot = true;
+    workoutUnsubscribe = workoutRepo.subscribe(
+      (items) => {
+        if (isFirstSnapshot) {
+          window.__perfTrace && window.__perfTrace('workout', 'repositorySnapshotReceived');
+          isFirstSnapshot = false;
+        }
+        window.currentData.workouts = items;
+        renderWorkoutStats();
+        renderWorkoutRoot();
+        window.__perfTrace && window.__perfTrace('workout', 'pageInteractive');
+      },
+      (error) => { console.error('[workout] realtime sync failed', error); }
+    );
+  }
+  if (!bodyUnsubscribe) {
+    bodyUnsubscribe = bodyRepo.subscribe(
+      (items) => { window.currentData.bodyMeasurements = items; renderWorkoutRoot(); },
+      (error) => { console.error('[workout/bodyMeasurements] realtime sync failed', error); }
+    );
+  }
+  if (!photoUnsubscribe) {
+    photoUnsubscribe = photoRepo.subscribe(
+      (items) => {
+        window.currentData.progressPhotos = items;
+        renderWorkoutRoot();
+      },
+      (error) => { console.error('[workout/progressPhotos] realtime sync failed', error); }
+    );
+  }
 }
 
 function disposeWorkoutPage() {
-  if (workoutUnsubscribe) { workoutUnsubscribe(); workoutUnsubscribe = null; }
-  if (bodyUnsubscribe) { bodyUnsubscribe(); bodyUnsubscribe = null; }
-  if (photoUnsubscribe) { photoUnsubscribe(); photoUnsubscribe = null; }
+  if (workoutUnsubscribe) {
+    workoutUnsubscribe();
+    workoutUnsubscribe = null;
+  }
+  if (bodyUnsubscribe) {
+    bodyUnsubscribe();
+    bodyUnsubscribe = null;
+  }
+  if (photoUnsubscribe) {
+    photoUnsubscribe();
+    photoUnsubscribe = null;
+  }
+  if (progressPhotoObserver) {
+    progressPhotoObserver.disconnect();
+    progressPhotoObserver = null;
+  }
 }
 
 function isRestDay(s) {
@@ -710,6 +734,7 @@ function renderWorkoutRoot() {
   `;
   updateSessionClock();
   bindAdvancedTrackingEvents();
+  initLazyProgressPhotos();
 }
 
 function workoutFabHtml() {
@@ -1461,7 +1486,7 @@ function photosHtml() {
       <div class="wo-photo-grid">
         ${photos.length ? photos.map((p) => `
           <figure class="wo-photo-card">
-            <img src="${p.dataUrl}" alt="Progress photo ${escapeAttr(p.date)}" loading="lazy" />
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E" data-lazy-image-id="${p.imageId || p.id}" alt="Progress photo ${escapeAttr(p.date)}" />
             <figcaption>${escapeHtml(p.date)}</figcaption>
             <button type="button" class="std-icon-btn std-icon-danger wo-photo-delete" data-wo-photo-delete="${p.id}" aria-label="Delete photo">\u2715</button>
           </figure>
@@ -1469,6 +1494,36 @@ function photosHtml() {
       </div>
     </div>
   `;
+}
+
+function initLazyProgressPhotos() {
+  const lazyImages = document.querySelectorAll('img[data-lazy-image-id]');
+  if (!lazyImages.length) return;
+
+  if (progressPhotoObserver) {
+    progressPhotoObserver.disconnect();
+  }
+
+  progressPhotoObserver = new IntersectionObserver((entries, obs) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        const imageId = img.dataset.lazyImageId;
+        obs.unobserve(img);
+
+        window.__perfTrace && window.__perfTrace('workout', 'imagesStart', { imageId });
+        ImageService.loadImage(imageId).then((dataUrl) => {
+          if (dataUrl && img.isConnected) {
+            img.src = dataUrl;
+            img.removeAttribute('data-lazy-image-id');
+          }
+          window.__perfTrace && window.__perfTrace('workout', 'imagesEnd', { imageId });
+        }).catch((err) => console.error('[workout] failed to lazy-load image', err));
+      }
+    });
+  }, { rootMargin: '100px' });
+
+  lazyImages.forEach((img) => progressPhotoObserver.observe(img));
 }
 
 function exerciseStatsHtml() {

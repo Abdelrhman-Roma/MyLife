@@ -186,7 +186,12 @@ export class BaseRepository {
     // change (if the server copy actually differs, it still fires).
     let lastSerialized = null;
     logSync(this.moduleName, this.uid, 'subscribe attached', { path: `${this.moduleName}/${this.uid}/items` });
-    return onSnapshot(
+    if (window.__perfCounters) {
+      window.__perfCounters.subscriptions++;
+      window.__perfCounters.listeners++;
+      window.__logPerfCounters(`BaseRepository.subscribe(${this.moduleName})`);
+    }
+    const unsub = onSnapshot(
       q,
       (snap) => {
         const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -203,6 +208,14 @@ export class BaseRepository {
       },
       (error) => { logSync(this.moduleName, this.uid, 'subscribe error', error); if (onError) onError(mapFirebaseError(error)); }
     );
+    return () => {
+      if (window.__perfCounters) {
+        window.__perfCounters.unsubscriptions++;
+        window.__perfCounters.listeners--;
+        window.__logPerfCounters(`BaseRepository.unsubscribe(${this.moduleName})`);
+      }
+      unsub();
+    };
   }
 
   /**

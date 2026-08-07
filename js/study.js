@@ -200,37 +200,58 @@ async function startStudySync() {
     resource: new ResourceRepository(user.uid),
   };
 
-  if (studyUnsubscribe) studyUnsubscribe();
-  if (pomodoroUnsubscribe) pomodoroUnsubscribe();
-  Object.values(entityUnsubscribes).forEach((u) => u && u());
-  entityUnsubscribes = {};
-
-  studyUnsubscribe = studyRepo.subscribe(
-    (items) => { window.currentData.study = items; refreshStudy(); },
-    (error) => { console.error('[study] realtime sync failed', error); }
-  );
-  pomodoroUnsubscribe = pomodoroRepo.subscribe(
-    (data) => {
-      window.currentData.pomodoro = { ...window.currentData.pomodoro, ...(data || {}) };
-      resetPomodoroIfNewDay();
-      refreshStudy();
-    },
-    (error) => { console.error('[study/pomodoro] realtime sync failed', error); }
-  );
+  if (!studyUnsubscribe) {
+    window.__perfTrace && window.__perfTrace('study', 'repositorySubscribeStart');
+    let isFirstSnapshot = true;
+    studyUnsubscribe = studyRepo.subscribe(
+      (items) => {
+        if (isFirstSnapshot) {
+          window.__perfTrace && window.__perfTrace('study', 'repositorySnapshotReceived');
+          isFirstSnapshot = false;
+        }
+        window.currentData.study = items;
+        refreshStudy();
+        window.__perfTrace && window.__perfTrace('study', 'pageInteractive');
+      },
+      (error) => { console.error('[study] realtime sync failed', error); }
+    );
+  }
+  if (!pomodoroUnsubscribe) {
+    pomodoroUnsubscribe = pomodoroRepo.subscribe(
+      (data) => {
+        window.currentData.pomodoro = { ...window.currentData.pomodoro, ...(data || {}) };
+        resetPomodoroIfNewDay();
+        refreshStudy();
+      },
+      (error) => { console.error('[study/pomodoro] realtime sync failed', error); }
+    );
+  }
   Object.entries(entityRepos).forEach(([type, repo]) => {
     const meta = ENTITY_META[type];
-    entityUnsubscribes[type] = repo.subscribe(
-      (items) => { window.currentData[meta.collection] = items; refreshStudy(); },
-      (error) => { console.error(`[study/${meta.collection}] realtime sync failed`, error); }
-    );
+    if (!entityUnsubscribes[type]) {
+      entityUnsubscribes[type] = repo.subscribe(
+        (items) => { window.currentData[meta.collection] = items; refreshStudy(); },
+        (error) => { console.error(`[study/${meta.collection}] realtime sync failed`, error); }
+      );
+    }
   });
 }
 
 function disposeStudyPage() {
-  if (studyUnsubscribe) { studyUnsubscribe(); studyUnsubscribe = null; }
-  if (pomodoroUnsubscribe) { pomodoroUnsubscribe(); pomodoroUnsubscribe = null; }
-  Object.values(entityUnsubscribes).forEach((u) => u && u());
-  entityUnsubscribes = {};
+  if (studyUnsubscribe) {
+    studyUnsubscribe();
+    studyUnsubscribe = null;
+  }
+  if (pomodoroUnsubscribe) {
+    pomodoroUnsubscribe();
+    pomodoroUnsubscribe = null;
+  }
+  Object.entries(entityUnsubscribes).forEach(([type, unsub]) => {
+    if (unsub) {
+      unsub();
+      entityUnsubscribes[type] = null;
+    }
+  });
 }
 
 function refreshStudy() {
