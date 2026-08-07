@@ -20,7 +20,7 @@
 import { ProfileRepository } from '../../repositories/ProfileRepository.js';
 import { SettingsRepository } from '../../repositories/SettingsRepository.js';
 import { SecurityRepository } from '../../repositories/SecurityRepository.js';
-import { uploadDataUrl, deleteFile } from '../../firebase/storage.js';
+import { ImageService } from '../../services/images/ImageService.js';
 import { AuthService } from '../../services/AuthService.js';
 import { UserService } from '../../services/UserService.js';
 
@@ -100,8 +100,17 @@ async function startAccountSync() {
   if (securityUnsubscribe) securityUnsubscribe();
 
   profileUnsubscribe = profileRepo.subscribe(
-    (data) => {
-      if (data) Object.assign(window.currentData.profile, data);
+    async (data) => {
+      if (data) {
+        const resolvedData = { ...data };
+        if (resolvedData.photo && !resolvedData.photo.startsWith('data:')) {
+          resolvedData.photo = await ImageService.loadImage(resolvedData.photo);
+        }
+        if (resolvedData.cover && !resolvedData.cover.startsWith('data:')) {
+          resolvedData.cover = await ImageService.loadImage(resolvedData.cover);
+        }
+        Object.assign(window.currentData.profile, resolvedData);
+      }
       if (typeof window.__pageContentReinit === 'function') window.__pageContentReinit();
     },
     (error) => { console.error('[account/profile] realtime sync failed', error); }
@@ -1147,16 +1156,19 @@ function closeCropper() {
   closeModal();
 }
 
-function removePhoto(kind) {
+async function removePhoto(kind) {
   if (kind === 'avatar') window.currentData.profile.photo = null;
   else window.currentData.profile.cover = null;
   closeCropper();
   renderHero();
   renderSidebar('account');
   showToast(kind === 'avatar' ? 'Profile photo removed' : 'Cover image removed', 'default');
-  if (profileRepo) profileRepo.update({ [kind === 'avatar' ? 'photo' : 'cover']: null });
+  if (profileRepo) await profileRepo.update({ [kind === 'avatar' ? 'photo' : 'cover']: null });
   const user = AuthService.getCurrentUser();
-  if (user) deleteFile(`profile/${user.uid}/${kind}.jpg`).catch((error) => console.error('[account/profile] photo delete failed', error));
+  if (user) {
+    const imageId = `${user.uid}_${kind}`;
+    await ImageService.deleteImage(imageId);
+  }
 }
 
 function rotateCropper() {
@@ -1245,15 +1257,15 @@ function saveCroppedPhoto(kind) {
 
   const user = AuthService.getCurrentUser();
   if (!user) return;
-  const path = `${kind === 'avatar' ? 'profile' : 'profile'}/${user.uid}/${kind}.jpg`;
-  uploadDataUrl(path, dataUrl).then((downloadUrl) => {
-    if (kind === 'avatar') window.currentData.profile.photo = downloadUrl;
-    else window.currentData.profile.cover = downloadUrl;
+  const imageId = `${user.uid}_${kind}`;
+  ImageService.saveImage(imageId, dataUrl, { kind, userId: user.uid }).then(() => {
+    if (kind === 'avatar') window.currentData.profile.photo = dataUrl;
+    else window.currentData.profile.cover = dataUrl;
     renderHero();
-    if (profileRepo) profileRepo.update({ [kind === 'avatar' ? 'photo' : 'cover']: downloadUrl });
+    if (profileRepo) profileRepo.update({ [kind === 'avatar' ? 'photo' : 'cover']: imageId });
   }).catch((error) => {
-    console.error('[account/profile] photo upload failed', error);
-    showToast('Photo saved locally, but the upload failed — it may not sync to other devices.', 'danger');
+    console.error('[account/profile] photo save failed', error);
+    showToast('Failed to save photo locally.', 'danger');
   });
 }
 

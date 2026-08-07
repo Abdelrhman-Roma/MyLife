@@ -36,6 +36,7 @@ import { ShoppingRepository } from '../repositories/ShoppingRepository.js';
 import { ProfileRepository } from '../repositories/ProfileRepository.js';
 import { SettingsRepository } from '../repositories/SettingsRepository.js';
 import { AuthService } from './AuthService.js';
+import { ImageService } from './images/ImageService.js';
 
 /**
  * Subscribes to all migrated repositories and mirrors their live data onto
