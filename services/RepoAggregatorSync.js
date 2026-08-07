@@ -81,7 +81,12 @@ export async function startRepoAggregatorSync(onUpdate, initialKeys = null) {
   const scheduleFlush = () => {
     if (!onUpdate) return;
     clearTimeout(flushTimer);
-    flushTimer = setTimeout(() => onUpdate(), 30);
+    flushTimer = setTimeout(() => {
+      if (window.__pageLoading && window.currentPage) {
+        window.__pageLoading[window.currentPage] = false;
+      }
+      onUpdate();
+    }, 30);
   };
 
   /**

@@ -19,6 +19,7 @@ import { AuthService } from '../services/AuthService.js';
 /** @type {import('../repositories/CalendarRepository.js').CalendarRepository|null} */
 let calendarRepo = null;
 let calendarUnsubscribe = null;
+let calendarLoading = true;
 
 // Cross-module repositories, used only to write completion state back to the
 // SOURCE module when a linked event is toggled from the Calendar page (e.g.
@@ -416,6 +417,8 @@ async function startCalendarSync() {
   if (calendarUnsubscribe) calendarUnsubscribe();
   calendarUnsubscribe = calendarRepo.subscribe(
     (items) => {
+      calendarLoading = false;
+      if (window.__pageLoading) window.__pageLoading['calendar'] = false;
       window.currentData.events = items.map((ev) => { try { return hydrateEvent(ev); } catch (_e) { return null; } }).filter(Boolean);
       try {
         reconcileSourceLinkedEvents();
@@ -423,7 +426,7 @@ async function startCalendarSync() {
       } catch (_e) { /* fall through — refreshCalendar's own guard renders an error state */ }
       refreshCalendar();
     },
-    (error) => console.error('[calendar] realtime sync failed', error)
+    (error) => { calendarLoading = false; if (window.__pageLoading) window.__pageLoading['calendar'] = false; console.error('[calendar] realtime sync failed', error); }
   );
 }
 
@@ -470,6 +473,18 @@ function renderCalendarQuickStats(stats) {
 
 // ─── Root render (with error-state guard) ──────────────────────────────────
 function safeRenderCalendarRoot(stats) {
+  if (calendarLoading) {
+    const root = byId('calendar-root');
+    if (root) {
+      root.innerHTML = `
+        <div class="cal-skeleton" aria-hidden="true">
+          <div class="cal-skeleton-bar" style="height:64px;background:var(--surface-3);border-radius:var(--radius-sm);"></div>
+          <div class="cal-skeleton-bar" style="height:420px;background:var(--surface-3);border-radius:var(--radius-sm);margin-top:16px;"></div>
+        </div>
+      `;
+    }
+    return;
+  }
   try {
     renderCalendarRoot(stats);
   } catch (err) {

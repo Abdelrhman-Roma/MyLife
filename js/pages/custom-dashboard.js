@@ -30,6 +30,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const root = document.getElementById('custom-dashboard-root');
   if (!root) return;
 
+  // Render default/fallback shell immediately so layout is instant
+  renderShell(root, null);
+
   await AuthService.waitUntilReady();
   const user = AuthService.getCurrentUser();
   if (!user) {
@@ -40,6 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const result = await DashboardLayoutService.getLayout(uid);
   layout = result.ok ? result.data : DEFAULT_LAYOUT;
+
+  // Cleanly re-render shell with authorized user, mounting real dynamic widgets
   renderShell(root, user);
 
   // Cross-device sync: a layout change made elsewhere updates the
@@ -132,14 +137,18 @@ function buildWidgetCard(placement, user) {
         <button type="button" class="std-icon-btn std-icon-danger" data-cdash-hide title="${t ? t('Hide') : 'Hide'}">\u2715</button>
       </div>
     </header>
-    <div class="cdash-widget-body" data-widget-body></div>
+    <div class="cdash-widget-body" data-widget-body>
+      ${!user ? `<div class="skeleton" style="height:120px;width:100%;border-radius:8px;">&nbsp;</div>` : ''}
+    </div>
     ${def.dataSource === 'local-snapshot' ? '' : ''}
   `;
 
-  const body = card.querySelector('[data-widget-body]');
-  const cleanup = def.render({ root: body, user, size: placement.size, compactMode: !!layout.personalization.compactMode });
-  if (typeof cleanup === 'function') mounted.set(def.id, cleanup);
-  else mounted.set(def.id, () => {});
+  if (user) {
+    const body = card.querySelector('[data-widget-body]');
+    const cleanup = def.render({ root: body, user, size: placement.size, compactMode: !!layout.personalization.compactMode });
+    if (typeof cleanup === 'function') mounted.set(def.id, cleanup);
+    else mounted.set(def.id, () => {});
+  }
 
   bindWidgetCardEvents(card, def.id);
   return card;

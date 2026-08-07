@@ -185,13 +185,11 @@ async function startWorkoutSync() {
     (error) => { console.error('[workout/bodyMeasurements] realtime sync failed', error); }
   );
   photoUnsubscribe = photoRepo.subscribe(
-    async (items) => {
-      const resolvedItems = await Promise.all(items.map(async (p) => {
-        const imageId = p.imageId || p.id;
-        const dataUrl = await ImageService.loadImage(imageId);
-        return { ...p, dataUrl: dataUrl || p.url || p.dataUrl };
-      }));
-      window.currentData.progressPhotos = resolvedItems;
+    (items) => {
+      window.currentData.progressPhotos = items.map((p) => {
+        const existing = window.currentData.progressPhotos?.find((x) => x.id === p.id);
+        return { ...p, dataUrl: existing ? existing.dataUrl : null };
+      });
       renderWorkoutRoot();
     },
     (error) => { console.error('[workout/progressPhotos] realtime sync failed', error); }
@@ -619,6 +617,9 @@ function renderWorkoutStats() {
 }
 
 function renderWorkoutRoot() {
+  if (window.__pageLoading) {
+    window.__pageLoading['workout'] = false;
+  }
   const root = byId('workout-root');
   const p = plan();
   const selected = Array.isArray(p.trainingDaysFull) ? p.trainingDaysFull : [];
@@ -1460,8 +1461,10 @@ function photosHtml() {
       </label>
       <div class="wo-photo-grid">
         ${photos.length ? photos.map((p) => `
-          <figure class="wo-photo-card">
-            <img src="${p.dataUrl}" alt="Progress photo ${escapeAttr(p.date)}" loading="lazy" />
+          <figure class="wo-photo-card" aria-label="Progress photo ${escapeAttr(p.date)}">
+            ${p.dataUrl
+              ? `<img src="${p.dataUrl}" alt="Progress photo ${escapeAttr(p.date)}" />`
+              : `<div class="skeleton" data-lazy-photo-id="${p.imageId || p.id}" style="width:120px;height:120px;border-radius:6px;display:flex;align-items:center;justify-content:center;">&nbsp;</div>`}
             <figcaption>${escapeHtml(p.date)}</figcaption>
             <button type="button" class="std-icon-btn std-icon-danger wo-photo-delete" data-wo-photo-delete="${p.id}" aria-label="Delete photo">\u2715</button>
           </figure>
@@ -1504,6 +1507,34 @@ function advancedTrackingHtml() {
 function todayIsoWorkout() { return new Date().toISOString().slice(0, 10); }
 
 function bindAdvancedTrackingEvents() {
+  // Set up lazy-loading for progress photos via IntersectionObserver
+  const lazyPhotos = document.querySelectorAll('[data-lazy-photo-id]');
+  if (lazyPhotos.length && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(async (entry) => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const imageId = el.dataset.lazyPhotoId;
+          obs.unobserve(el);
+          try {
+            const dataUrl = await ImageService.loadImage(imageId);
+            if (dataUrl) {
+              const img = document.createElement('img');
+              img.src = dataUrl;
+              img.alt = el.parentElement.getAttribute('aria-label') || 'Progress photo';
+              el.replaceWith(img);
+              const photoObj = window.currentData.progressPhotos.find((p) => p.id === imageId || p.imageId === imageId);
+              if (photoObj) photoObj.dataUrl = dataUrl;
+            }
+          } catch (error) {
+            console.error('[workout] Lazy photo load failed', error);
+          }
+        }
+      });
+    }, { rootMargin: '100px' });
+    lazyPhotos.forEach((el) => observer.observe(el));
+  }
+
   const measureForm = document.querySelector('[data-wo-measure-form]');
   if (measureForm) {
     measureForm.addEventListener('submit', (e) => {

@@ -234,6 +234,9 @@ function disposeStudyPage() {
 }
 
 function refreshStudy() {
+  if (window.__pageLoading) {
+    window.__pageLoading['study'] = false;
+  }
   const stats = computeOverviewStats();
   renderStudyQuickStats(stats);
   safeRenderStudyRoot(stats);

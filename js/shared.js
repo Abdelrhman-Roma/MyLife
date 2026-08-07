@@ -309,13 +309,65 @@ window.MomentumLegacyData = {
 };
 
 function initPage(pageKey) {
+  if (!window.__pageLoading) window.__pageLoading = {};
+  window.__pageLoading[pageKey] = true;
+
   if (!bootShell(pageKey)) return;
   renderPageContent(pageKey);
   window.__pageContentReinit = () => renderPageContent(pageKey);
 }
 
+function renderStatsSkeleton() {
+  const grid = byId('stats-grid');
+  if (!grid) return;
+  grid.innerHTML = [0, 1, 2, 3].map(() => `
+    <article class="stat-card" style="padding: 16px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line);">
+      <div class="skeleton" style="width:50%;height:1em;margin-bottom:8px;">&nbsp;</div>
+      <div class="skeleton" style="width:30%;height:1.4em;">&nbsp;</div>
+    </article>
+  `).join('');
+}
+
+function renderListSkeleton(pageKey) {
+  const container = byId('data-list');
+  if (!container) return;
+
+  if (pageKey === 'dashboard') {
+    container.innerHTML = `
+      <div class="cdash-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        ${[0, 1, 2, 3].map(() => `
+          <div class="panel skeleton-card" aria-hidden="true" style="height:180px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;">
+            <div class="skeleton" style="width:30%;height:1.2em;margin-bottom:16px;">&nbsp;</div>
+            <div class="skeleton" style="width:70%;height:1em;margin-bottom:12px;">&nbsp;</div>
+            <div class="skeleton" style="width:50%;height:1em;">&nbsp;</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="display:grid;gap:16px;">
+      ${[0, 1, 2].map(() => `
+        <div class="panel skeleton-card" aria-hidden="true" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;">
+          <div class="skeleton" style="width:40%;height:1.2em;margin-bottom:12px;">&nbsp;</div>
+          <div class="skeleton" style="width:70%;height:1em;margin-bottom:8px;">&nbsp;</div>
+          <div class="skeleton" style="width:25%;height:1em;">&nbsp;</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 let lastPageContentSerialized = null;
 function renderPageContent(pageKey) {
+  if (window.__pageLoading && window.__pageLoading[pageKey]) {
+    renderStatsSkeleton();
+    renderListSkeleton(pageKey);
+    return;
+  }
+
   let dependencies = null;
   const page = PAGES[pageKey];
   if (pageKey === 'dashboard' || pageKey === 'statistics') {

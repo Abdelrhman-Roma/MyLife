@@ -259,6 +259,9 @@ function reconcilePrayerDay() {
 }
 
 function renderPrayerRoot() {
+  if (window.__pageLoading) {
+    window.__pageLoading['prayer'] = false;
+  }
   const root = byId('prayer-root');
   if (!root) return;
 

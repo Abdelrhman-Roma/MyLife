@@ -21,6 +21,7 @@ async function startGoalsSync() {
   goalsUnsubscribe = repo.subscribe(
     (items) => {
       window.currentData.goals = items;
+      if (window.__pageLoading) window.__pageLoading['goals'] = false;
       if (typeof window.__pageContentReinit === 'function') window.__pageContentReinit();
     },
     (error) => { console.error('[goals] realtime sync failed', error); }

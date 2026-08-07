@@ -104,6 +104,7 @@ async function startHabitsSync() {
       const today = habToday();
       window.currentData.habits.forEach((h) => { h.completed = h.completions.includes(today); });
       habitsLoading = false;
+      if (window.__pageLoading) window.__pageLoading['habits'] = false;
       renderHabitsRoot();
     },
     (error) => { console.error('[habits] realtime sync failed', error); habitsLoading = false; renderHabitsRoot(); }
@@ -114,9 +115,62 @@ function disposeHabitsPage() {
   if (habitsUnsubscribe) { habitsUnsubscribe(); habitsUnsubscribe = null; }
 }
 
+function habitsHeaderSkeletonHtml() {
+  return `
+    <section class="panel hab-header hab-header-skeleton" aria-hidden="true">
+      <div class="hab-header-top">
+        <div>
+          <p class="eyebrow skeleton" style="width:100px;">&nbsp;</p>
+          <h2 class="skeleton" style="width:140px;height:1.5em;margin-top:8px;">&nbsp;</h2>
+          <p class="muted skeleton" style="width:80px;margin-top:8px;">&nbsp;</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function habitsFiltersSkeletonHtml() {
+  return `
+    <section class="td-filter-row hab-filter-skeleton" aria-hidden="true">
+      <div class="td-filter-chips">
+        <span class="skeleton" style="width:60px;height:32px;border-radius:16px;display:inline-block;"></span>
+        <span class="skeleton" style="width:80px;height:32px;border-radius:16px;display:inline-block;margin-left:8px;"></span>
+        <span class="skeleton" style="width:80px;height:32px;border-radius:16px;display:inline-block;margin-left:8px;"></span>
+      </div>
+    </section>
+  `;
+}
+
+function habitCardSkeletonHtml() {
+  return `
+    <article class="hab-card hab-card-skeleton" aria-hidden="true" style="padding: 20px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 12px;">
+      <div class="skeleton" style="width:40%;height:1.2em;margin-bottom:12px;">&nbsp;</div>
+      <div class="skeleton" style="width:60%;height:1em;margin-bottom:16px;">&nbsp;</div>
+      <div style="display:flex;gap:8px;">
+        <span class="skeleton" style="width:80px;height:24px;border-radius:12px;"></span>
+        <span class="skeleton" style="width:60px;height:24px;border-radius:12px;"></span>
+      </div>
+    </article>
+  `;
+}
+
 function renderHabitsRoot() {
   const root = byId('habits-root');
   if (!root) return;
+
+  if (habitsLoading) {
+    if (window.__pageLoading) window.__pageLoading['habits'] = true;
+    root.innerHTML = `
+      ${habitsHeaderSkeletonHtml()}
+      ${habitsFiltersSkeletonHtml()}
+      <div class="hab-list">
+        ${[0, 1].map(habitCardSkeletonHtml).join('')}
+      </div>
+    `;
+    return;
+  }
+  if (window.__pageLoading) window.__pageLoading['habits'] = false;
+
   const habits = visibleHabits();
   root.innerHTML = `
     ${habitsHeaderHtml()}
