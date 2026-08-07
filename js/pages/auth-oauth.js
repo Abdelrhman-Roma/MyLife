@@ -93,7 +93,6 @@ function bridgeIntoLocalSession(fbUser) {
     };
     users.push(user);
     saveUsers(users); // global from shared.js
-    saveData(email, emptyData(user.name)); // global from shared.js — same "seed a fresh account" path register() uses
   }
   localStorage.setItem(SESSION_KEY, email); // global constant from shared.js — same key login()/register() use
   sessionStorage.removeItem(SESSION_KEY);

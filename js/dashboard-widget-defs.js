@@ -7,7 +7,7 @@
 //   live-api:       Weather — real Open-Meteo network data via the existing WeatherService
 //   local-snapshot: Habits, Goals, Workout, Nutrition, Study, Prayer, Calendar,
 //                   Statistics, Achievements, Water, Sleep — read once from the
-//                   existing in-memory `currentData` (their modules aren't on
+//                   existing in-memory `window.currentData` (their modules aren't on
 //                   Firestore yet; see MIGRATION_NOTES_PHASE2.md). Each of these
 //                   widgets says so plainly in its own UI, not hidden.
 //   static:         Quote, Pomodoro — no backend needed at all.
@@ -172,7 +172,7 @@ registerWidget({
 
 // ─── Local-snapshot widgets (Habits/Goals/Workout/Nutrition/Study/Prayer/
 //     Calendar/Statistics/Achievements/Water/Sleep) — read once from the
-//     existing in-memory currentData; see file header. ─────────────────────
+//     existing in-memory window.currentData; see file header. ─────────────────────
 function localSnapshotWidget(id, title, icon, category, computeRows) {
   registerWidget({
     id, title, icon, category, defaultSize: 'sm', allowedSizes: ['sm', 'md'], dataSource: 'local-snapshot',
@@ -186,41 +186,41 @@ function localSnapshotWidget(id, title, icon, category, computeRows) {
 }
 
 localSnapshotWidget('habits', 'Habits', '\ud83d\udd01', 'wellness', () =>
-  (currentData?.habits || []).slice(0, 5).map((h) => `${h.name || h.title || 'Habit'} \u2014 ${h.completed ? (t ? t('done today') : 'done today') : (t ? t('not yet today') : 'not yet today')}`));
+  (window.currentData?.habits || []).slice(0, 5).map((h) => `${h.name || h.title || 'Habit'} \u2014 ${h.completed ? (t ? t('done today') : 'done today') : (t ? t('not yet today') : 'not yet today')}`));
 
 localSnapshotWidget('goals', 'Goals', '\ud83c\udfaf', 'productivity', () =>
-  (currentData?.goals || []).slice(0, 5).map((g) => `${g.title || g.name || 'Goal'} \u2014 ${Math.round(((g.progress || 0) / (g.target || 100)) * 100)}%`));
+  (window.currentData?.goals || []).slice(0, 5).map((g) => `${g.title || g.name || 'Goal'} \u2014 ${Math.round(((g.progress || 0) / (g.target || 100)) * 100)}%`));
 
 localSnapshotWidget('workout', 'Workout', '\ud83c\udfcb\ufe0f', 'wellness', () =>
-  (currentData?.workouts || []).slice(-3).reverse().map((w) => `${w.name || w.title || 'Workout'} \u2014 ${w.completed ? (t ? t('completed') : 'completed') : (t ? t('scheduled') : 'scheduled')}`));
+  (window.currentData?.workouts || []).slice(-3).reverse().map((w) => `${w.name || w.title || 'Workout'} \u2014 ${w.completed ? (t ? t('completed') : 'completed') : (t ? t('scheduled') : 'scheduled')}`));
 
 localSnapshotWidget('nutrition', 'Nutrition', '\ud83c\udf7d\ufe0f', 'wellness', () => {
-  const meals = currentData?.meals || [];
+  const meals = window.currentData?.meals || [];
   const todayMeals = meals.filter((m) => (m.date || '').slice(0, 10) === new Date().toISOString().slice(0, 10));
   const calories = todayMeals.reduce((sum, m) => sum + (m.calories || 0), 0);
   return todayMeals.length ? [`${calories} ${t ? t('calories today') : 'calories today'} \u00b7 ${todayMeals.length} ${t ? t('meals logged') : 'meals logged'}`] : [];
 });
 
 localSnapshotWidget('prayer', 'Prayer', '\ud83d\udd4c', 'wellness', () => {
-  const today = (currentData?.prayers || []).find((p) => (p.date || '').slice(0, 10) === new Date().toISOString().slice(0, 10));
+  const today = (window.currentData?.prayers || []).find((p) => (p.date || '').slice(0, 10) === new Date().toISOString().slice(0, 10));
   if (!today) return [];
   const done = Object.values(today.completed || {}).filter(Boolean).length;
   return [`${done}/5 ${t ? t('prayers logged today') : 'prayers logged today'}`];
 });
 
 localSnapshotWidget('study', 'Study', '\ud83d\udcda', 'productivity', () => {
-  const sessions = currentData?.study || [];
+  const sessions = window.currentData?.study || [];
   const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
   return sessions.length ? [`${totalMinutes} ${t ? t('minutes logged total') : 'minutes logged total'}`] : [];
 });
 
 localSnapshotWidget('calendar', 'Calendar', '\ud83d\udcc5', 'productivity', () => {
   const todayIso = new Date().toISOString().slice(0, 10);
-  return (currentData?.events || []).filter((e) => (e.date || e.startsAt || '').slice(0, 10) === todayIso).slice(0, 5).map((e) => e.title || e.name || 'Event');
+  return (window.currentData?.events || []).filter((e) => (e.date || e.startsAt || '').slice(0, 10) === todayIso).slice(0, 5).map((e) => e.title || e.name || 'Event');
 });
 
 localSnapshotWidget('statistics', 'Statistics', '\ud83d\udcca', 'insight', () => {
-  const d = currentData || {};
+  const d = window.currentData || {};
   return [
     `${(d.tasks || []).filter((x) => x.completed).length}/${(d.tasks || []).length} ${t ? t('tasks done') : 'tasks done'}`,
     `${(d.habits || []).length} ${t ? t('habits tracked') : 'habits tracked'}`,
@@ -228,18 +228,18 @@ localSnapshotWidget('statistics', 'Statistics', '\ud83d\udcca', 'insight', () =>
 });
 
 localSnapshotWidget('achievements', 'Achievements', '\ud83c\udfc6', 'insight', () => {
-  const unlocked = currentData?.achievements?.unlocked || [];
+  const unlocked = window.currentData?.achievements?.unlocked || [];
   return unlocked.length ? [`${unlocked.length} ${t ? t('achievements unlocked') : 'achievements unlocked'}`] : [];
 });
 
 localSnapshotWidget('water', 'Water', '\ud83d\udca7', 'wellness', () => {
   const todayIso = new Date().toISOString().slice(0, 10);
-  const entries = (currentData?.water || []).filter((w) => (w.date || '').slice(0, 10) === todayIso);
+  const entries = (window.currentData?.water || []).filter((w) => (w.date || '').slice(0, 10) === todayIso);
   const total = entries.reduce((sum, w) => sum + (w.amount || w.cups || 0), 0);
   return entries.length ? [`${total} ${t ? t('logged today') : 'logged today'}`] : [];
 });
 
 localSnapshotWidget('sleep', 'Sleep', '\ud83d\ude34', 'wellness', () => {
-  const last = (currentData?.sleep || []).slice(-1)[0];
+  const last = (window.currentData?.sleep || []).slice(-1)[0];
   return last ? [`${last.hours || last.duration || '?'} ${t ? t('hours last logged') : 'hours last logged'}`] : [];
 });

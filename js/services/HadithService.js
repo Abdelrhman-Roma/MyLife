@@ -18,3 +18,4 @@ const HadithService = (() => {
 
   return { getAll, isAvailable };
 })();
+window.HadithService = HadithService;

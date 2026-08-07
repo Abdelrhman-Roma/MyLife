@@ -1,5 +1,28 @@
-// MOMENTUM - Workout page logic
-// Reuses bootShell(), persist(), currentData, escapeHtml(), escapeAttr(), makeId(), and percent() from shared.js.
+// MOMENTUM - Workout page logic (Firestore migration for the workout log)
+// Reuses bootShell(), persist(), window.currentData, escapeHtml(), escapeAttr(), makeId(), and percent() from shared.js.
+//
+// window.currentData.workouts (the per-exercise log Statistics/Dashboard read)
+// now lives at workout/{uid}/items/{id} via WorkoutRepository, synced in
+// realtime with onSnapshot. Body measurements (bodyMeasurements/{uid}/items)
+// are ALSO logged from this page (in addition to Nutrition's simpler form
+// for the same collection — see js/nutrition.js), via BodyMeasurementsRepository.
+// The workout PLAN (schedule/exercises) and progress photos have no
+// dedicated repository yet and stay on the legacy appData blob for now —
+// only finished-session log entries and body measurements are migrated.
+
+import { WorkoutRepository } from '../repositories/WorkoutRepository.js';
+import { BodyMeasurementsRepository } from '../repositories/BodyMeasurementsRepository.js';
+import { ProgressPhotoRepository } from '../repositories/ProgressPhotoRepository.js';
+import { uploadDataUrl, deleteFile } from '../firebase/storage.js';
+import { AuthService } from '../services/AuthService.js';
+
+/** @type {import('../repositories/WorkoutRepository.js').WorkoutRepository|null} */
+let workoutRepo = null;
+let bodyRepo = null;
+let photoRepo = null;
+let workoutUnsubscribe = null;
+let bodyUnsubscribe = null;
+let photoUnsubscribe = null;
 
 const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -126,10 +149,10 @@ let collapsedExercises = new Set();
 function initWorkoutPage() {
   migrateLegacyData();
   ensureWeekSchedule();
-  renderArt('workout');
   renderWorkoutStats();
   renderWorkoutRoot();
   bindWorkoutEventsOnce();
+  startWorkoutSync();
 
   window.addEventListener('beforeunload', (e) => {
     const s = openSessionId && plan().schedule.find((x) => x.id === openSessionId);
@@ -142,6 +165,35 @@ function initWorkoutPage() {
   if (dayId && plan().schedule.some((s) => s.id === dayId)) {
     openWorkoutSession(dayId);
   }
+}
+
+async function startWorkoutSync() {
+  const user = await AuthService.waitUntilReady();
+  if (!user) return; // bootShell() already redirects unauthenticated visitors
+  workoutRepo = new WorkoutRepository(user.uid);
+  bodyRepo = new BodyMeasurementsRepository(user.uid);
+  photoRepo = new ProgressPhotoRepository(user.uid);
+  if (workoutUnsubscribe) workoutUnsubscribe();
+  if (bodyUnsubscribe) bodyUnsubscribe();
+  if (photoUnsubscribe) photoUnsubscribe();
+  workoutUnsubscribe = workoutRepo.subscribe(
+    (items) => { window.currentData.workouts = items; renderWorkoutStats(); renderWorkoutRoot(); },
+    (error) => { console.error('[workout] realtime sync failed', error); }
+  );
+  bodyUnsubscribe = bodyRepo.subscribe(
+    (items) => { window.currentData.bodyMeasurements = items; renderWorkoutRoot(); },
+    (error) => { console.error('[workout/bodyMeasurements] realtime sync failed', error); }
+  );
+  photoUnsubscribe = photoRepo.subscribe(
+    (items) => { window.currentData.progressPhotos = items.map((p) => ({ ...p, dataUrl: p.url || p.dataUrl })); renderWorkoutRoot(); },
+    (error) => { console.error('[workout/progressPhotos] realtime sync failed', error); }
+  );
+}
+
+function disposeWorkoutPage() {
+  if (workoutUnsubscribe) { workoutUnsubscribe(); workoutUnsubscribe = null; }
+  if (bodyUnsubscribe) { bodyUnsubscribe(); bodyUnsubscribe = null; }
+  if (photoUnsubscribe) { photoUnsubscribe(); photoUnsubscribe = null; }
 }
 
 function isRestDay(s) {
@@ -228,7 +280,7 @@ function isLikelyValidUrl(value) {
 }
 
 function plan() {
-  return currentData.workoutPlan;
+  return window.currentData.workoutPlan;
 }
 
 // Single source of truth for a freshly-added exercise so every "add exercise"
@@ -239,7 +291,7 @@ function createNewExercise() {
 }
 
 // Shared "commit a change and repaint" helper used after every mutation to
-// plan()/currentData so the various click/change handlers don't each repeat
+// plan()/window.currentData so the various click/change handlers don't each repeat
 // the same persist + re-render sequence.
 function refreshWorkout({ art = false } = {}) {
   plan().schedule.forEach(recomputeWorkoutStatus);
@@ -507,16 +559,16 @@ function setTrainingDays(newDaysFull) {
 function syncScheduleToTodo() {
   const p = plan();
   const validIds = new Set(p.schedule.map((s) => s.id));
-  currentData.tasks = currentData.tasks.filter((t) => !t.workoutScheduleId || validIds.has(t.workoutScheduleId));
+  window.currentData.tasks = window.currentData.tasks.filter((t) => !t.workoutScheduleId || validIds.has(t.workoutScheduleId));
   p.schedule.forEach((s) => {
     const title = `${s.day} • ${s.type} workout`;
-    let task = currentData.tasks.find((t) => t.workoutScheduleId === s.id);
+    let task = window.currentData.tasks.find((t) => t.workoutScheduleId === s.id);
     if (task) {
       task.title = title;
       task.completed = isDateThisWeek(s.completionDate || s.lastCompletedDate);
     } else {
       task = { id: makeId(), title, time: '', priority: 'Medium', completed: false, workoutScheduleId: s.id };
-      currentData.tasks.push(task);
+      window.currentData.tasks.push(task);
     }
     s.taskId = task.id;
   });
@@ -994,13 +1046,14 @@ function finishSession(scheduleId) {
     const topWeight = Number(top.weight) || 0;
     const volume = logged.reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
     if (topWeight > 0) {
-      const priorBest = currentData.workouts
+      const priorBest = window.currentData.workouts
         .filter((w) => w.title === ex.name)
         .reduce((max, w) => Math.max(max, Number(w.weight) || 0), 0);
       if (topWeight > priorBest) newPRs.push({ name: ex.name, weight: topWeight, reps: Number(top.reps) || 0 });
     }
-    currentData.workouts.push({
-      id: makeId(),
+    const entryId = makeId();
+    const entry = {
+      id: entryId,
       day: s.day,
       date: s.date,
       title: ex.name,
@@ -1009,17 +1062,20 @@ function finishSession(scheduleId) {
       sets: logged.length,
       volume,
       note: '',
-    });
+    };
+    window.currentData.workouts.push(entry);
+    if (workoutRepo) { const { id, ...data } = entry; workoutRepo.create(data, id); }
   });
   // Bug fix: previously, finishing a session without logging any set data
   // (no "reps done" filled in) marked the schedule status "Done" but never
-  // added anything to currentData.workouts — the array Statistics and the
+  // added anything to window.currentData.workouts — the array Statistics and the
   // dashboard actually count from. Status and analytics could drift apart.
   // Always record a session-level entry so a finished workout is always
   // reflected in analytics, even without per-set detail.
   if (!anyLogged) {
-    currentData.workouts.push({
-      id: makeId(),
+    const entryId = makeId();
+    const entry = {
+      id: entryId,
       day: s.day,
       date: s.date,
       title: s.type || s.day,
@@ -1027,7 +1083,9 @@ function finishSession(scheduleId) {
       reps: 0,
       sets: s.exercises.length,
       note: 'Logged without set detail',
-    });
+    };
+    window.currentData.workouts.push(entry);
+    if (workoutRepo) { const { id, ...data } = entry; workoutRepo.create(data, id); }
   }
 
   s.calories = loggedSetCount ? loggedSetCount * 8 : s.exercises.length * 40;
@@ -1303,7 +1361,7 @@ function updateSessionClock() {
 function volumeByWeekHtml() {
   const dates = lastNDates(28);
   const weeks = [0, 1, 2, 3].map((i) => dates.slice(i * 7, (i + 1) * 7));
-  const values = weeks.map((days) => currentData.workouts
+  const values = weeks.map((days) => window.currentData.workouts
     .filter((w) => days.includes(w.date))
     .reduce((sum, w) => sum + (Number(w.volume) || 0), 0));
   const thisWeek = values[3];
@@ -1321,7 +1379,7 @@ function volumeByWeekHtml() {
 function muscleRecoveryHtml() {
   const now = Date.now();
   const lastTrained = {};
-  currentData.workouts.forEach((w) => {
+  window.currentData.workouts.forEach((w) => {
     const group = muscleGroupFor(w.title);
     if (!group || group === 'Cardio' || !w.date) return;
     const t = new Date(`${w.date}T12:00:00`).getTime();
@@ -1353,7 +1411,7 @@ function muscleRecoveryHtml() {
 }
 
 function measurementsHtml() {
-  const items = [...currentData.bodyMeasurements].sort((a, b) => b.date.localeCompare(a.date));
+  const items = [...window.currentData.bodyMeasurements].sort((a, b) => b.date.localeCompare(a.date));
   const latest = items[0];
   const weightSeries = [...items].reverse().map((m) => Number(m.weight) || 0).filter((v) => v > 0);
   return `
@@ -1383,7 +1441,7 @@ function measurementsHtml() {
 }
 
 function photosHtml() {
-  const photos = [...currentData.progressPhotos].sort((a, b) => b.date.localeCompare(a.date));
+  const photos = [...window.currentData.progressPhotos].sort((a, b) => b.date.localeCompare(a.date));
   return `
     <div class="workout-chart-card workout-chart-block">
       <h3>Progress photos</h3>
@@ -1407,7 +1465,7 @@ function photosHtml() {
 
 function exerciseStatsHtml() {
   const byName = {};
-  currentData.workouts.forEach((w) => {
+  window.currentData.workouts.forEach((w) => {
     const e = byName[w.title] || (byName[w.title] = { count: 0, maxWeight: 0, totalVolume: 0 });
     e.count++;
     e.maxWeight = Math.max(e.maxWeight, Number(w.weight) || 0);
@@ -1470,16 +1528,17 @@ function bindAdvancedTrackingEvents() {
         const v = fd.get(k);
         if (v !== '' && v !== null) entry[k] = Number(v);
       });
-      currentData.bodyMeasurements.push(entry);
-      persist();
+      window.currentData.bodyMeasurements.push(entry);
       renderWorkoutRoot();
       showToast('Measurement logged', 'success');
+      if (bodyRepo) { const { id, ...data } = entry; bodyRepo.create(data, id); }
     });
   }
   document.querySelectorAll('[data-wo-measure-delete]').forEach((btn) => btn.addEventListener('click', () => {
-    currentData.bodyMeasurements = currentData.bodyMeasurements.filter((m) => m.id !== btn.dataset.woMeasureDelete);
-    persist();
+    const id = btn.dataset.woMeasureDelete;
+    window.currentData.bodyMeasurements = window.currentData.bodyMeasurements.filter((m) => m.id !== id);
     renderWorkoutRoot();
+    if (bodyRepo) bodyRepo.delete(id);
   }));
 
   const photoInput = document.querySelector('[data-wo-photo-input]');
@@ -1489,25 +1548,47 @@ function bindAdvancedTrackingEvents() {
       if (!file) return;
       try {
         const dataUrl = await compressImageFile(file);
-        currentData.progressPhotos.push({ id: makeId(), date: todayIsoWorkout(), dataUrl });
-        persist();
+        const id = makeId();
+        const entry = { id, date: todayIsoWorkout(), dataUrl };
+        // Optimistic: show the compressed photo immediately. dataUrl is only
+        // held in memory here — the only thing actually persisted is the
+        // Storage download URL (see firebase/storage.js for why: Firestore
+        // documents cap out at 1MB, and base64 adds ~33% overhead on top of
+        // the image's real size, so storing photos as data URIs risked
+        // silently failing to save for anything but tiny/heavily-compressed images).
+        window.currentData.progressPhotos.push(entry);
         renderWorkoutRoot();
         showToast('Photo added', 'success');
+        const user = AuthService.getCurrentUser();
+        if (user && photoRepo) {
+          uploadDataUrl(`progressPhotos/${user.uid}/${id}.jpg`, dataUrl).then((downloadUrl) => {
+            const saved = window.currentData.progressPhotos.find((p) => p.id === id);
+            if (saved) saved.dataUrl = downloadUrl;
+            renderWorkoutRoot();
+            photoRepo.create({ date: entry.date, url: downloadUrl }, id);
+          }).catch((error) => {
+            console.error('[workout/progressPhotos] upload failed', error);
+            showToast('Photo saved locally, but the upload failed — it may not sync to other devices.', 'danger');
+          });
+        }
       } catch (err) {
         showToast('Could not save that photo \u2014 storage may be full', 'danger');
       }
     });
   }
   document.querySelectorAll('[data-wo-photo-delete]').forEach((btn) => btn.addEventListener('click', () => {
-    currentData.progressPhotos = currentData.progressPhotos.filter((p) => p.id !== btn.dataset.woPhotoDelete);
-    persist();
+    const id = btn.dataset.woPhotoDelete;
+    window.currentData.progressPhotos = window.currentData.progressPhotos.filter((p) => p.id !== id);
     renderWorkoutRoot();
+    if (photoRepo) photoRepo.delete(id);
+    const user = AuthService.getCurrentUser();
+    if (user) deleteFile(`progressPhotos/${user.uid}/${id}.jpg`).catch((error) => console.error('[workout/progressPhotos] delete failed', error));
   }));
 }
 
 function personalRecordsHtml() {
   const best = {};
-  currentData.workouts.forEach((w) => {
+  window.currentData.workouts.forEach((w) => {
     if (!w.title || !(Number(w.weight) > 0)) return;
     const cur = best[w.title];
     if (!cur || Number(w.weight) > cur.weight || (Number(w.weight) === cur.weight && Number(w.reps) > cur.reps)) {
@@ -1555,7 +1636,7 @@ function analyticsBlockHtml() {
   });
   const exPct = percent(doneEx, totalEx || 1);
 
-  const history = currentData.workouts.slice(-80);
+  const history = window.currentData.workouts.slice(-80);
   const byDate = {};
   history.forEach((w) => { if (w.date) (byDate[w.date] = byDate[w.date] || []).push(w); });
   const last7 = lastNDates(7);
@@ -2038,3 +2119,5 @@ function applyExcelFieldChange(ex, s, field, inputEl) {
       return true;
   }
 }
+
+export { initWorkoutPage, disposeWorkoutPage };

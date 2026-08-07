@@ -59,6 +59,22 @@ service cloud.firestore {
       }
     }
 
+    // Phase 6: profile/settings/security/weatherPreferences — singleton
+    // documents (one per user, see SingletonDocRepository.js), not
+    // subcollections of users/{uid}.
+    match /profile/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+    match /settings/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+    match /security/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+    match /weatherPreferences/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
     // {module}/{uid}/items/{itemId} — one rule block per module, all identical.
     match /todos/{uid}/items/{itemId} {
       allow read, write: if isOwner(uid);
@@ -75,13 +91,67 @@ service cloud.firestore {
     match /workout/{uid}/items/{itemId} {
       allow read, write: if isOwner(uid);
     }
+    match /progressPhotos/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
     match /study/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /subjects/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /assignments/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /exams/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /projects/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /studyNotes/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /resources/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /pomodoro/{uid} {
       allow read, write: if isOwner(uid);
     }
     match /prayer/{uid}/items/{itemId} {
       allow read, write: if isOwner(uid);
     }
+    match /tasbeeh/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+    match /quranProgress/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+    match /quranBookmarks/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /quranFavorites/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /quranLog/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /hadithFavorites/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
     match /nutrition/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /water/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /sleep/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /bodyMeasurements/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+    match /shopping/{uid}/items/{itemId} {
       allow read, write: if isOwner(uid);
     }
     // Phase 6 audit fix: NotificationRepository (added in Phase 2) had no

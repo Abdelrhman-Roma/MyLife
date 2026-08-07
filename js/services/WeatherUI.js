@@ -13,3 +13,4 @@ const WeatherUI = (() => {
   function recommendations(items) { return items.length ? `<section class="weather-section weather-recommendations"><h2>${t('Recommendations')}</h2>${items.map(item=>`<p>${escapeHtml(item.text)}</p>`).join('')}</section>` : ''; }
   return { widget,skeleton,error,hero,hourly,daily,details,recommendations };
 })();
+window.WeatherUI = WeatherUI;

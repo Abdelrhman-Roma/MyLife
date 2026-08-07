@@ -12,3 +12,4 @@ const WeatherGeocodingService = (() => {
     },
   };
 })();
+window.WeatherGeocodingService = WeatherGeocodingService;

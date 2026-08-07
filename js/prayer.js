@@ -1,6 +1,11 @@
-// MyLife — Prayer module (Phase 3 + Worship Module Quran integration).
-// currentData.prayers is now a real 5-daily-prayer log (auto-generated for
-// each new day by normalizeData() in shared.js), not free-form entries.
+// MyLife — Prayer module (Firestore migration + Worship Module Quran integration).
+// window.currentData.prayers is a real 5-daily-prayer log, now synced via
+// PrayerRepository (prayer/{uid}/items/*) instead of the legacy appData blob.
+// The day-rollover (marking overdue Pending as Missed, auto-creating today's
+// 5 prayers) that used to live in shared.js's normalizeData() now happens
+// here, in the realtime subscribe callback, using deterministic ids
+// (`${date}_${prayerName}`) so two devices opening the app on the same day
+// can't race each other into creating duplicate entries.
 //
 // Quran data is loaded from this project's own bundled files
 // (../quran.json, ../chapters/{id}.json — sourced from risan/quran-json)
@@ -14,6 +19,31 @@
 // anywhere in this project. No Hadith section is built here; fabricating
 // hadith text is not an option. See QuranService for the loader pattern
 // this reuses.
+
+import { PrayerRepository } from '../repositories/PrayerRepository.js';
+import { TasbeehRepository } from '../repositories/TasbeehRepository.js';
+import { QuranProgressRepository } from '../repositories/QuranProgressRepository.js';
+import { QuranBookmarkRepository } from '../repositories/QuranBookmarkRepository.js';
+import { QuranFavoriteRepository } from '../repositories/QuranFavoriteRepository.js';
+import { QuranLogRepository } from '../repositories/QuranLogRepository.js';
+import { HadithFavoriteRepository } from '../repositories/HadithFavoriteRepository.js';
+import { AuthService } from '../services/AuthService.js';
+
+/** @type {import('../repositories/PrayerRepository.js').PrayerRepository|null} */
+let prayerRepo = null;
+let tasbeehRepo = null;
+let quranProgressRepo = null;
+let quranBookmarkRepo = null;
+let quranFavoriteRepo = null;
+let quranLogRepo = null;
+let hadithFavoriteRepo = null;
+let prayerUnsubscribe = null;
+let tasbeehUnsubscribe = null;
+let quranProgressUnsubscribe = null;
+let quranBookmarkUnsubscribe = null;
+let quranFavoriteUnsubscribe = null;
+let quranLogUnsubscribe = null;
+let hadithFavoriteUnsubscribe = null;
 
 const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 const HIJRI_MONTHS = [
@@ -85,7 +115,7 @@ function prayerTodayIso() { return new Date().toISOString().slice(0, 10); }
 function dailyPrayerCompletion() {
   // Map date -> { total, completed } across every date that has entries.
   const byDate = {};
-  currentData.prayers.forEach((p) => {
+  window.currentData.prayers.forEach((p) => {
     if (!p.date) return;
     const e = byDate[p.date] || (byDate[p.date] = { total: 0, completed: 0 });
     e.total++;
@@ -118,7 +148,7 @@ function prayerStreaks() {
 
 function missedPrayerInsights(windowDays = 30) {
   const cutoff = new Date(Date.now() - windowDays * 86400000).toISOString().slice(0, 10);
-  const missed = currentData.prayers.filter((p) => p.date >= cutoff && p.date < prayerTodayIso() && p.status === 'Missed');
+  const missed = window.currentData.prayers.filter((p) => p.date >= cutoff && p.date < prayerTodayIso() && p.status === 'Missed');
   const byName = {};
   missed.forEach((p) => { byName[p.prayer] = (byName[p.prayer] || 0) + 1; });
   const worst = Object.entries(byName).sort((a, b) => b[1] - a[1])[0];
@@ -127,9 +157,105 @@ function missedPrayerInsights(windowDays = 30) {
 
 // ─── Root render ────────────────────────────────────────────────────────────
 function initPrayerPage() {
-  quranState.fontSize = currentData.quranProgress.readingSettings.fontSize || 'md';
-  renderArt('prayer');
+  quranState.fontSize = window.currentData.quranProgress.readingSettings.fontSize || 'md';
   renderPrayerRoot();
+  startPrayerSync();
+}
+
+const QURAN_PROGRESS_DEFAULTS = {
+  lastSurah: null, lastAyah: null, lastReadAt: null, readLog: {}, dailyGoal: 10, goal: null,
+  readingSettings: { mode: 'light', fontSize: 'md', lineHeight: 'comfortable', fontFamily: 'amiri', focus: false, autoScroll: false },
+};
+const TASBEEH_DEFAULTS = { count: 0, target: 33, updatedAt: null };
+
+async function startPrayerSync() {
+  const user = await AuthService.waitUntilReady();
+  if (!user) return; // bootShell() already redirects unauthenticated visitors
+  prayerRepo = new PrayerRepository(user.uid);
+  tasbeehRepo = new TasbeehRepository(user.uid);
+  quranProgressRepo = new QuranProgressRepository(user.uid);
+  quranBookmarkRepo = new QuranBookmarkRepository(user.uid);
+  quranFavoriteRepo = new QuranFavoriteRepository(user.uid);
+  quranLogRepo = new QuranLogRepository(user.uid);
+  hadithFavoriteRepo = new HadithFavoriteRepository(user.uid);
+
+  [prayerUnsubscribe, tasbeehUnsubscribe, quranProgressUnsubscribe, quranBookmarkUnsubscribe,
+    quranFavoriteUnsubscribe, quranLogUnsubscribe, hadithFavoriteUnsubscribe].forEach((u) => u && u());
+
+  prayerUnsubscribe = prayerRepo.subscribe(
+    (items) => {
+      window.currentData.prayers = items.map((p) => ({
+        date: p.date || '', prayer: p.prayer || p.title || '', time: p.time || '',
+        status: p.status === 'Completed' ? 'Completed' : (p.status === 'Missed' ? 'Missed' : 'Pending'),
+        completedAt: p.completedAt || null,
+        ...p,
+      }));
+      reconcilePrayerDay();
+      renderPrayerRoot();
+    },
+    (error) => { console.error('[prayer] realtime sync failed', error); }
+  );
+  tasbeehUnsubscribe = tasbeehRepo.subscribe(
+    (data) => { window.currentData.tasbeeh = { ...TASBEEH_DEFAULTS, ...(data || {}) }; renderPrayerRoot(); },
+    (error) => { console.error('[prayer/tasbeeh] realtime sync failed', error); }
+  );
+  quranProgressUnsubscribe = quranProgressRepo.subscribe(
+    (data) => {
+      window.currentData.quranProgress = {
+        ...QURAN_PROGRESS_DEFAULTS, ...(data || {}),
+        readingSettings: { ...QURAN_PROGRESS_DEFAULTS.readingSettings, ...((data && data.readingSettings) || {}) },
+      };
+      quranState.fontSize = window.currentData.quranProgress.readingSettings.fontSize || 'md';
+      renderPrayerRoot();
+    },
+    (error) => { console.error('[prayer/quranProgress] realtime sync failed', error); }
+  );
+  quranBookmarkUnsubscribe = quranBookmarkRepo.subscribe(
+    (items) => { window.currentData.quranBookmarks = items; renderPrayerRoot(); },
+    (error) => { console.error('[prayer/quranBookmarks] realtime sync failed', error); }
+  );
+  quranFavoriteUnsubscribe = quranFavoriteRepo.subscribe(
+    (items) => { window.currentData.quranFavorites = items; renderPrayerRoot(); },
+    (error) => { console.error('[prayer/quranFavorites] realtime sync failed', error); }
+  );
+  quranLogUnsubscribe = quranLogRepo.subscribe(
+    (items) => { window.currentData.quranLog = items; renderPrayerRoot(); },
+    (error) => { console.error('[prayer/quranLog] realtime sync failed', error); }
+  );
+  hadithFavoriteUnsubscribe = hadithFavoriteRepo.subscribe(
+    (items) => { window.currentData.hadithCollection = items; renderPrayerRoot(); },
+    (error) => { console.error('[prayer/hadithFavorites] realtime sync failed', error); }
+  );
+}
+
+function disposePrayerPage() {
+  [prayerUnsubscribe, tasbeehUnsubscribe, quranProgressUnsubscribe, quranBookmarkUnsubscribe,
+    quranFavoriteUnsubscribe, quranLogUnsubscribe, hadithFavoriteUnsubscribe].forEach((u) => u && u());
+  prayerUnsubscribe = tasbeehUnsubscribe = quranProgressUnsubscribe = quranBookmarkUnsubscribe =
+    quranFavoriteUnsubscribe = quranLogUnsubscribe = hadithFavoriteUnsubscribe = null;
+}
+
+// Marks overdue Pending prayers as Missed, and creates today's 5 prayers if
+// they don't already exist — using deterministic ids (`${date}_${name}`) so
+// two devices reconciling the same day at once can't create duplicates
+// (repo.create with an explicit id is a no-op collision, not a new doc).
+function reconcilePrayerDay() {
+  if (!prayerRepo) return;
+  const today = prayerTodayIso();
+  window.currentData.prayers.forEach((p) => {
+    if (p.date && p.date < today && p.status === 'Pending') {
+      p.status = 'Missed';
+      prayerRepo.update(p.id, { status: 'Missed' });
+    }
+  });
+  const existingToday = new Set(window.currentData.prayers.filter((p) => p.date === today).map((p) => p.prayer));
+  PRAYER_NAMES.forEach((name) => {
+    if (existingToday.has(name)) return;
+    const id = `${today}_${name}`;
+    const entry = { id, date: today, prayer: name, time: '', status: 'Pending', completedAt: null };
+    window.currentData.prayers.push(entry);
+    prayerRepo.create({ date: today, prayer: name, time: '', status: 'Pending', completedAt: null }, id);
+  });
 }
 
 function renderPrayerRoot() {
@@ -143,7 +269,7 @@ function renderPrayerRoot() {
     return;
   }
 
-  const today = currentData.prayers.filter((p) => p.date === prayerTodayIso())
+  const today = window.currentData.prayers.filter((p) => p.date === prayerTodayIso())
     .sort((a, b) => PRAYER_NAMES.indexOf(a.prayer) - PRAYER_NAMES.indexOf(b.prayer));
   const streaks = prayerStreaks();
   const missed = missedPrayerInsights();
@@ -223,10 +349,10 @@ function nextPrayerInfo() {
 
 function worshipDashboardHtml() {
   const next = nextPrayerInfo();
-  const today = currentData.prayers.filter((p) => p.date === prayerTodayIso());
+  const today = window.currentData.prayers.filter((p) => p.date === prayerTodayIso());
   const completed = today.filter((p) => p.status === 'Completed').length;
-  const tasbeeh = currentData.tasbeeh || { count: 0, target: 33 };
-  const hadithItems = currentData.hadithCollection || [];
+  const tasbeeh = window.currentData.tasbeeh || { count: 0, target: 33 };
+  const hadithItems = window.currentData.hadithCollection || [];
   const hadith = hadithItems.length ? hadithItems[dayOfYearPrayer() % hadithItems.length] : null;
   const azkar = prayerState.azkar && prayerState.azkar[dayOfYearPrayer() % prayerState.azkar.length];
   return `
@@ -247,13 +373,13 @@ function worshipDashboardHtml() {
         <div class="pr-card-heading"><div><p class="eyebrow">${t('Prayer times')}</p><h2>${t('Today')}</h2></div><span class="pr-card-mark">${completed}/5</span></div>
         <div class="pr-time-list">${PRAYER_NAMES.map((name) => `<div><span>${t(name)}</span><time>${PRAYER_TIMES[name]}</time></div>`).join('')}</div>
       </article>
-      <article class="panel pr-quran-card"><p class="eyebrow">${t('Return to the book')}</p><h2>${t('Continue Quran')}</h2><p class="muted">${currentData.quranProgress.lastSurah ? `${t('Surah')} ${currentData.quranProgress.lastSurah}, ${t('ayah')} ${currentData.quranProgress.lastAyah || 1}` : t('Begin your first reading.')}</p><button type="button" class="primary-btn" data-pr-open-quran>${t('Open reader')}</button></article>
+      <article class="panel pr-quran-card"><p class="eyebrow">${t('Return to the book')}</p><h2>${t('Continue Quran')}</h2><p class="muted">${window.currentData.quranProgress.lastSurah ? `${t('Surah')} ${window.currentData.quranProgress.lastSurah}, ${t('ayah')} ${window.currentData.quranProgress.lastAyah || 1}` : t('Begin your first reading.')}</p><button type="button" class="primary-btn" data-pr-open-quran>${t('Open reader')}</button></article>
       <article class="panel pr-remembrance-card"><p class="eyebrow">${t('Daily azkar')}</p><h2>${azkar ? escapeHtml(String(azkar.category || t('Remembrance'))) : t('Preparing remembrance')}</h2><p dir="rtl" class="pr-azkar-text">${azkar ? escapeHtml(String(azkar.zekr || '').slice(0, 150)) : t('Loading from your bundled collection...')}</p><small>${azkar ? `${azkar.count || 1} ${t('repetitions')}` : ''}</small></article>
       <article class="panel pr-hadith-card"><p class="eyebrow">${t('Daily hadith')}</p>${hadith ? `<blockquote class="pr-hadith-quote"><p>${escapeHtml(hadith.text)}</p><footer>${escapeHtml(hadith.source || t('Personal collection'))}</footer></blockquote>` : `<p class="muted">${t('No Hadith text is bundled. Add a sourced entry to your collection to show one here.')}</p>`}</article>
       <article class="panel pr-tasbeeh-card"><div class="pr-card-heading"><div><p class="eyebrow">${t('Tasbeeh')}</p><h2>${tasbeeh.count}/${tasbeeh.target}</h2></div><button type="button" class="tasbeeh-orb" data-pr-tasbeeh aria-label="${t('Count Tasbeeh')}">+</button></div><div class="td-subtask-bar"><i style="width:${Math.min(100, Math.round((tasbeeh.count / Math.max(1, tasbeeh.target)) * 100))}%"></i></div><button type="button" class="text-btn" data-pr-tasbeeh-reset>${t('Reset counter')}</button></article>
-      <article class="panel pr-stats-card"><p class="eyebrow">${t('Worship statistics')}</p><div class="pr-stat-row"><strong>${completed}/5</strong><span>${t('prayers completed today')}</span></div><div class="pr-stat-row"><strong>${prayerStreaks().current}</strong><span>${t('day streak')}</span></div><div class="pr-stat-row"><strong>${(currentData.quranProgress.readLog[prayerTodayIso()] || { verses: 0 }).verses}</strong><span>${t('verses read today')}</span></div></article>
+      <article class="panel pr-stats-card"><p class="eyebrow">${t('Worship statistics')}</p><div class="pr-stat-row"><strong>${completed}/5</strong><span>${t('prayers completed today')}</span></div><div class="pr-stat-row"><strong>${prayerStreaks().current}</strong><span>${t('day streak')}</span></div><div class="pr-stat-row"><strong>${(window.currentData.quranProgress.readLog[prayerTodayIso()] || { verses: 0 }).verses}</strong><span>${t('verses read today')}</span></div></article>
     </section>
-    <section class="dash-columns pr-lower-grid"><article class="panel"><p class="eyebrow">${t('Prayer history')}</p><h2>${t('Recent days')}</h2>${prayerHistoryHtml()}</article><article class="panel"><p class="eyebrow">${t('Achievements')}</p><h2>${t('Small acts, kept visible')}</h2><div class="pr-achievements"><span class="${completed === 5 ? 'is-unlocked' : ''}">${t('Five prayers today')}</span><span class="${prayerStreaks().current >= 3 ? 'is-unlocked' : ''}">${t('Three day return')}</span><span class="${currentData.quranProgress.readLog[prayerTodayIso()] ? 'is-unlocked' : ''}">${t('Quran opened')}</span></div></article></section>
+    <section class="dash-columns pr-lower-grid"><article class="panel"><p class="eyebrow">${t('Prayer history')}</p><h2>${t('Recent days')}</h2>${prayerHistoryHtml()}</article><article class="panel"><p class="eyebrow">${t('Achievements')}</p><h2>${t('Small acts, kept visible')}</h2><div class="pr-achievements"><span class="${completed === 5 ? 'is-unlocked' : ''}">${t('Five prayers today')}</span><span class="${prayerStreaks().current >= 3 ? 'is-unlocked' : ''}">${t('Three day return')}</span><span class="${window.currentData.quranProgress.readLog[prayerTodayIso()] ? 'is-unlocked' : ''}">${t('Quran opened')}</span></div></article></section>
   `;
 }
 
@@ -275,9 +401,18 @@ function bindWorshipEvents(root) {
   const openQuran = root.querySelector('[data-pr-open-quran]');
   if (openQuran) openQuran.addEventListener('click', () => { prayerState.tab = 'quran'; renderPrayerRoot(); });
   const tasbeeh = root.querySelector('[data-pr-tasbeeh]');
-  if (tasbeeh) tasbeeh.addEventListener('click', () => { currentData.tasbeeh.count = (currentData.tasbeeh.count || 0) + 1; currentData.tasbeeh.updatedAt = new Date().toISOString(); persist(); renderPrayerRoot(); });
+  if (tasbeeh) tasbeeh.addEventListener('click', () => {
+    window.currentData.tasbeeh.count = (window.currentData.tasbeeh.count || 0) + 1;
+    window.currentData.tasbeeh.updatedAt = new Date().toISOString();
+    renderPrayerRoot();
+    if (tasbeehRepo) tasbeehRepo.update({ count: window.currentData.tasbeeh.count, updatedAt: window.currentData.tasbeeh.updatedAt });
+  });
   const reset = root.querySelector('[data-pr-tasbeeh-reset]');
-  if (reset) reset.addEventListener('click', () => { currentData.tasbeeh.count = 0; persist(); renderPrayerRoot(); });
+  if (reset) reset.addEventListener('click', () => {
+    window.currentData.tasbeeh.count = 0;
+    renderPrayerRoot();
+    if (tasbeehRepo) tasbeehRepo.update({ count: 0 });
+  });
 }
 
 function prayerTabsHtml() {
@@ -304,31 +439,33 @@ function bindPrayerRootEvents(root) {
   const quranBtn = root.querySelector('[data-pr-quran-add]');
   if (quranBtn) quranBtn.addEventListener('click', () => { prayerState.quranModal = true; renderQuranModal(); });
   root.querySelectorAll('[data-pr-quran-delete]').forEach((btn) => btn.addEventListener('click', () => {
-    currentData.quranLog = currentData.quranLog.filter((q) => q.id !== btn.dataset.prQuranDelete);
-    persist();
+    const id = btn.dataset.prQuranDelete;
+    window.currentData.quranLog = window.currentData.quranLog.filter((q) => q.id !== id);
     renderPrayerRoot();
+    if (quranLogRepo) quranLogRepo.delete(id);
   }));
   const hadithBtn = root.querySelector('[data-pr-hadith-add]');
   if (hadithBtn) hadithBtn.addEventListener('click', () => { prayerState.hadithModal = true; renderHadithModal(); });
   root.querySelectorAll('[data-pr-hadith-delete]').forEach((btn) => btn.addEventListener('click', () => {
-    currentData.hadithCollection = currentData.hadithCollection.filter((h) => h.id !== btn.dataset.prHadithDelete);
-    persist();
+    const id = btn.dataset.prHadithDelete;
+    window.currentData.hadithCollection = window.currentData.hadithCollection.filter((h) => h.id !== id);
     renderPrayerRoot();
+    if (hadithFavoriteRepo) hadithFavoriteRepo.delete(id);
   }));
 }
 
 function togglePrayer(id) {
-  const p = currentData.prayers.find((x) => x.id === id);
-  if (!p) return;
+  const p = window.currentData.prayers.find((x) => x.id === id);
+  if (!p || !prayerRepo) return;
   p.status = p.status === 'Completed' ? 'Pending' : 'Completed';
   p.completedAt = p.status === 'Completed' ? new Date().toISOString() : null;
-  persist();
   renderPrayerRoot();
+  prayerRepo.update(id, { status: p.status, completedAt: p.completedAt });
 }
 
 // ─── Quran tracker (reference log only — never reproduces Qur'an text) ─────
 function quranTrackerHtml() {
-  const log = [...currentData.quranLog].sort((a, b) => b.date.localeCompare(a.date));
+  const log = [...window.currentData.quranLog].sort((a, b) => b.date.localeCompare(a.date));
   const totalPages = log.reduce((s, q) => s + (Number(q.pages) || 0), 0);
   return `
     <p class="eyebrow">${t('Reading log')}</p>
@@ -390,19 +527,20 @@ function renderQuranModal() {
     const fd = new FormData(e.currentTarget);
     const surah = String(fd.get('surah') || '').trim();
     if (!surah) return;
-    currentData.quranLog.push({
+    const entry = {
       id: makeId(), surah, date: String(fd.get('date') || prayerTodayIso()),
       fromAyah: fd.get('fromAyah') || '', toAyah: fd.get('toAyah') || '', pages: Number(fd.get('pages')) || 0,
-    });
-    persist();
+    };
+    window.currentData.quranLog.push(entry);
     prayerState.quranModal = false;
     renderPrayerRoot();
+    if (quranLogRepo) { const { id, ...data } = entry; quranLogRepo.create(data, id); }
   });
 }
 
 // ─── Hadith rotation (user-supplied text only) ─────────────────────────────
 function hadithRotationHtml() {
-  const items = currentData.hadithCollection;
+  const items = window.currentData.hadithCollection;
   const today = items.length ? items[dayOfYearPrayer() % items.length] : null;
   return `
     <p class="eyebrow">${t('Rotates daily from your own collection')}</p>
@@ -470,10 +608,11 @@ function renderHadithModal() {
     const fd = new FormData(e.currentTarget);
     const text = String(fd.get('text') || '').trim();
     if (!text) return;
-    currentData.hadithCollection.push({ id: makeId(), text, source: String(fd.get('source') || '').trim(), addedAt: new Date().toISOString() });
-    persist();
+    const entry = { id: makeId(), text, source: String(fd.get('source') || '').trim(), addedAt: new Date().toISOString() };
+    window.currentData.hadithCollection.push(entry);
     prayerState.hadithModal = false;
     renderPrayerRoot();
+    if (hadithFavoriteRepo) { const { id, ...data } = entry; hadithFavoriteRepo.create(data, id); }
   });
 }
 
@@ -525,7 +664,7 @@ function quranNoteBannerHtml() {
 let quranChapterListCache = null;
 
 function quranListViewHtml() {
-  const progress = currentData.quranProgress;
+  const progress = window.currentData.quranProgress;
   return `
     <section class="panel">
       <div class="td-header-top">
@@ -540,8 +679,8 @@ function quranListViewHtml() {
         ${progress.lastSurah ? `<button type="button" class="secondary-btn" data-qr-continue>\u25b6 ${t('Continue reading')}</button>` : ''}
         <button type="button" class="secondary-btn" data-qr-daily>${t('Daily verse')}</button>
         <button type="button" class="secondary-btn" data-qr-random>${t('Random verse')}</button>
-        <button type="button" class="secondary-btn" data-qr-view="bookmarks">\ud83d\udd16 ${t('Bookmarks')} (${currentData.quranBookmarks.length})</button>
-        <button type="button" class="secondary-btn" data-qr-view="favorites">\u2605 ${t('Favorites')} (${currentData.quranFavorites.length})</button>
+        <button type="button" class="secondary-btn" data-qr-view="bookmarks">\ud83d\udd16 ${t('Bookmarks')} (${window.currentData.quranBookmarks.length})</button>
+        <button type="button" class="secondary-btn" data-qr-view="favorites">\u2605 ${t('Favorites')} (${window.currentData.quranFavorites.length})</button>
         <button type="button" class="secondary-btn" data-qr-view="history">${t('Reading history')}</button>
         <button type="button" class="secondary-btn" data-qr-view="stats">${t('Reading stats')}</button>
         <button type="button" class="secondary-btn" data-qr-view="goal">\ud83c\udfaf ${t('Reading goal')}</button>
@@ -599,9 +738,9 @@ function quranSearchResultsHtml() {
 // ─── Reader view ─────────────────────────────────────────────────────────────
 function quranReadViewHtml() {
   const ch = quranState.currentSurah;
-  const settings = currentData.quranProgress.readingSettings;
-  const bookmarked = new Set(currentData.quranBookmarks.map((b) => `${b.surah}:${b.ayah}`));
-  const favorited = new Set(currentData.quranFavorites.map((f) => `${f.surah}:${f.ayah}`));
+  const settings = window.currentData.quranProgress.readingSettings;
+  const bookmarked = new Set(window.currentData.quranBookmarks.map((b) => `${b.surah}:${b.ayah}`));
+  const favorited = new Set(window.currentData.quranFavorites.map((f) => `${f.surah}:${f.ayah}`));
   const list = quranChapterListCache || [];
   const idx = list.findIndex((c) => c.id === ch.id);
   const prev = idx > 0 ? list[idx - 1] : null;
@@ -657,7 +796,7 @@ function quranReadViewHtml() {
 
 // ─── Bookmarks / Favorites list panel ──────────────────────────────────────
 function quranListPanelHtml(kind) {
-  const items = kind === 'bookmarks' ? currentData.quranBookmarks : currentData.quranFavorites;
+  const items = kind === 'bookmarks' ? window.currentData.quranBookmarks : window.currentData.quranFavorites;
   const title = kind === 'bookmarks' ? t('Bookmarks') : t('Favorites');
   return `
     <section class="panel">
@@ -684,14 +823,14 @@ const QURAN_TOTAL_VERSES = 6236; // standard total ayah count across all 114 sur
 const QURAN_GOAL_PRESETS = [7, 15, 30, 60, 90];
 
 function versesReadSince(isoDate) {
-  const p = currentData.quranProgress;
+  const p = window.currentData.quranProgress;
   return Object.entries(p.readLog)
     .filter(([d]) => d >= isoDate)
     .reduce((s, [, v]) => s + (v.verses || 0), 0);
 }
 
 function startQuranGoal(type, days) {
-  const p = currentData.quranProgress;
+  const p = window.currentData.quranProgress;
   const start = quranTodayIso();
   let endDate;
   if (type === 'ramadan') {
@@ -703,18 +842,18 @@ function startQuranGoal(type, days) {
     endDate = quranIsoFromDate(d);
   }
   p.goal = { type, startDate: start, endDate };
-  persist();
+  if (quranProgressRepo) quranProgressRepo.update({ goal: p.goal });
 }
 
 function cancelQuranGoal() {
-  currentData.quranProgress.goal = null;
-  persist();
+  window.currentData.quranProgress.goal = null;
+  if (quranProgressRepo) quranProgressRepo.update({ goal: null });
 }
 
 function quranIsoFromDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
 function quranGoalStats() {
-  const goal = currentData.quranProgress.goal;
+  const goal = window.currentData.quranProgress.goal;
   if (!goal) return null;
   const today = quranTodayIso();
   const readSinceStart = versesReadSince(goal.startDate);
@@ -726,7 +865,7 @@ function quranGoalStats() {
   const completionRatio = Math.min(1, readSinceStart / QURAN_TOTAL_VERSES);
   const dailyPages = Math.ceil((604 * (1 - completionRatio)) / daysRemaining);
   const dailySurahs = Math.ceil((114 * (1 - completionRatio)) / daysRemaining);
-  const todayLog = currentData.quranProgress.readLog[today];
+  const todayLog = window.currentData.quranProgress.readLog[today];
   const todayVerses = todayLog ? todayLog.verses : 0;
   const pct = Math.min(100, Math.round((readSinceStart / QURAN_TOTAL_VERSES) * 100));
   const overdue = today > goal.endDate && remaining > 0;
@@ -779,7 +918,7 @@ function quranGoalViewHtml() {
 
 // ─── Reading History ────────────────────────────────────────────────────────
 function quranHistoryViewHtml() {
-  const p = currentData.quranProgress;
+  const p = window.currentData.quranProgress;
   const list = quranChapterListCache || [];
   const byName = Object.fromEntries(list.map((c) => [c.id, c.transliteration]));
   const days = Object.keys(p.readLog).sort().reverse();
@@ -802,7 +941,7 @@ function quranHistoryViewHtml() {
 }
 
 function quranStatsViewHtml() {
-  const p = currentData.quranProgress;
+  const p = window.currentData.quranProgress;
   const days = Object.keys(p.readLog).sort();
   const totalVerses = days.reduce((s, d) => s + (p.readLog[d].verses || 0), 0);
   const today = p.readLog[quranTodayIso()] || { verses: 0, surahs: [] };
@@ -859,7 +998,7 @@ async function openSurah(id, ayahToJump) {
 }
 
 function logQuranReading(ch) {
-  const p = currentData.quranProgress;
+  const p = window.currentData.quranProgress;
   const today = quranTodayIso();
   const entry = p.readLog[today] || (p.readLog[today] = { verses: 0, surahs: [] });
   if (!entry.surahs.includes(ch.id)) {
@@ -869,7 +1008,7 @@ function logQuranReading(ch) {
   p.lastSurah = ch.id;
   p.lastAyah = 1;
   p.lastReadAt = new Date().toISOString();
-  persist();
+  if (quranProgressRepo) quranProgressRepo.update({ readLog: p.readLog, lastSurah: p.lastSurah, lastAyah: p.lastAyah, lastReadAt: p.lastReadAt });
 }
 
 // ─── Events ─────────────────────────────────────────────────────────────────
@@ -883,13 +1022,17 @@ function bindQuranRootEvents(root) {
 
   root.querySelectorAll('[data-qr-fontsize]').forEach((btn) => btn.addEventListener('click', () => {
     quranState.fontSize = btn.dataset.qrFontsize;
-    currentData.quranProgress.readingSettings.fontSize = quranState.fontSize;
-    persist();
+    window.currentData.quranProgress.readingSettings.fontSize = quranState.fontSize;
     renderPrayerRoot();
+    if (quranProgressRepo) quranProgressRepo.update({ readingSettings: window.currentData.quranProgress.readingSettings });
   }));
 
-  const settings = currentData.quranProgress.readingSettings;
-  const saveReadingSetting = (key, value) => { settings[key] = value; persist(); renderPrayerRoot(); };
+  const settings = window.currentData.quranProgress.readingSettings;
+  const saveReadingSetting = (key, value) => {
+    settings[key] = value;
+    renderPrayerRoot();
+    if (quranProgressRepo) quranProgressRepo.update({ readingSettings: settings });
+  };
   const modeSelect = root.querySelector('[data-qr-reading-mode]');
   if (modeSelect) modeSelect.addEventListener('change', () => saveReadingSetting('mode', modeSelect.value));
   const fontSelect = root.querySelector('[data-qr-font-family]');
@@ -903,8 +1046,8 @@ function bindQuranRootEvents(root) {
     settings.autoScroll = !settings.autoScroll;
     if (quranState.autoScrollTimer) clearInterval(quranState.autoScrollTimer);
     quranState.autoScrollTimer = settings.autoScroll ? setInterval(() => window.scrollBy({ top: 1, behavior: 'smooth' }), 120) : null;
-    persist();
     renderPrayerRoot();
+    if (quranProgressRepo) quranProgressRepo.update({ readingSettings: settings });
   });
   const fullscreenButton = root.querySelector('[data-qr-fullscreen]');
   if (fullscreenButton) fullscreenButton.addEventListener('click', () => {
@@ -962,7 +1105,7 @@ function bindQuranRootEvents(root) {
 
   const continueBtn = root.querySelector('[data-qr-continue]');
   if (continueBtn) continueBtn.addEventListener('click', () => {
-    const p = currentData.quranProgress;
+    const p = window.currentData.quranProgress;
     if (p.lastSurah) openSurah(p.lastSurah, p.lastAyah);
   });
   const dailyBtn = root.querySelector('[data-qr-daily]');
@@ -977,9 +1120,10 @@ function bindQuranRootEvents(root) {
   root.querySelectorAll('[data-qr-remove]').forEach((btn) => btn.addEventListener('click', () => {
     const [kind, id] = btn.dataset.qrRemove.split(':');
     const key = kind === 'bookmarks' ? 'quranBookmarks' : 'quranFavorites';
-    currentData[key] = currentData[key].filter((x) => x.id !== id);
-    persist();
+    const repo = kind === 'bookmarks' ? quranBookmarkRepo : quranFavoriteRepo;
+    window.currentData[key] = window.currentData[key].filter((x) => x.id !== id);
     renderPrayerRoot();
+    if (repo) repo.delete(id);
   }));
 }
 
@@ -988,17 +1132,21 @@ function toggleQuranSaved(collection, ayahId) {
   if (!ch) return;
   const verse = ch.verses.find((v) => v.id === ayahId);
   if (!verse) return;
-  const existingIdx = currentData[collection].findIndex((x) => x.surah === ch.id && x.ayah === ayahId);
+  const repo = collection === 'quranBookmarks' ? quranBookmarkRepo : quranFavoriteRepo;
+  const existingIdx = window.currentData[collection].findIndex((x) => x.surah === ch.id && x.ayah === ayahId);
   if (existingIdx >= 0) {
-    currentData[collection].splice(existingIdx, 1);
+    const [removed] = window.currentData[collection].splice(existingIdx, 1);
+    renderPrayerRoot();
+    if (repo) repo.delete(removed.id);
   } else {
-    currentData[collection].push({
+    const entry = {
       id: makeId(), surah: ch.id, ayah: ayahId, surahName: ch.transliteration,
       text: verse.text, createdAt: new Date().toISOString(),
-    });
+    };
+    window.currentData[collection].push(entry);
+    renderPrayerRoot();
+    if (repo) { const { id, ...data } = entry; repo.create(data, id); }
   }
-  persist();
-  renderPrayerRoot();
 }
 
 function copyAyah(ayahId) {
@@ -1079,3 +1227,5 @@ async function runQuranTextSearch(query) {
     renderPrayerRoot();
   }
 }
+
+export { initPrayerPage, disposePrayerPage };

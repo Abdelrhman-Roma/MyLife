@@ -31,6 +31,22 @@ import {
 import { tryFirebase, mapFirebaseError } from '../core/ErrorMapper.js';
 import { assertUid, assertId, assertPlainObject } from '../utils/validators.js';
 
+// ─── Temporary cross-device sync diagnostics ───────────────────────────────
+// Off by default (does not touch production consoles). Enable per-browser
+// from devtools with `localStorage.setItem('mylife.debugSync','1')` and
+// reload, on BOTH devices you're comparing, then watch the console on each.
+// Every log line is prefixed `[sync]` and includes the UID, module, and
+// collection path, so a laptop/phone console side-by-side makes it obvious
+// exactly which repository/step the two devices disagree on. Safe to delete
+// this block and its call sites once cross-device sync is confirmed fixed.
+function syncDebugEnabled() {
+  try { return localStorage.getItem('mylife.debugSync') === '1'; } catch { return false; }
+}
+function logSync(moduleName, uid, event, detail) {
+  if (!syncDebugEnabled()) return;
+  console.log(`[sync] ${moduleName}/${uid} — ${event}`, detail ?? '');
+}
+
 /**
  * @template T
  */
@@ -43,6 +59,7 @@ export class BaseRepository {
     assertUid(uid);
     this.moduleName = moduleName;
     this.uid = uid;
+    logSync(moduleName, uid, 'repository constructed', { path: `${moduleName}/${uid}/items` });
   }
 
   /** @returns {import('firebase/firestore').CollectionReference} the `{module}/{uid}/items` collection */
@@ -64,6 +81,7 @@ export class BaseRepository {
   get(id) {
     return tryFirebase(async () => {
       const snap = await getDoc(this.itemDoc(id));
+      logSync(this.moduleName, this.uid, 'read succeeded', { id, exists: snap.exists() });
       return snap.exists() ? { id: snap.id, ...snap.data() } : null;
     });
   }
@@ -102,7 +120,9 @@ export class BaseRepository {
     assertPlainObject(data);
     return tryFirebase(async () => {
       const ref = id ? this.itemDoc(id) : docRef(this.moduleName, this.uid, 'items', crypto.randomUUID());
+      logSync(this.moduleName, this.uid, 'write starting (create)', { id: ref.id });
       await setDoc(ref, { ...data, ownerId: this.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      logSync(this.moduleName, this.uid, 'write succeeded (create)', { id: ref.id });
       return ref.id;
     });
   }
@@ -116,7 +136,9 @@ export class BaseRepository {
   update(id, patch) {
     assertPlainObject(patch);
     return tryFirebase(async () => {
+      logSync(this.moduleName, this.uid, 'write starting (update)', { id, patch });
       await updateDoc(this.itemDoc(id), { ...patch, updatedAt: serverTimestamp() });
+      logSync(this.moduleName, this.uid, 'write succeeded (update)', { id });
       return null;
     });
   }
@@ -128,7 +150,9 @@ export class BaseRepository {
    */
   delete(id) {
     return tryFirebase(async () => {
+      logSync(this.moduleName, this.uid, 'write starting (delete)', { id });
       await deleteDoc(this.itemDoc(id));
+      logSync(this.moduleName, this.uid, 'write succeeded (delete)', { id });
       return null;
     });
   }
@@ -148,10 +172,36 @@ export class BaseRepository {
       ...(options.orderBy ? [orderBy(...options.orderBy)] : []),
     ];
     const q = constraints.length ? query(this.itemsCollection, ...constraints) : this.itemsCollection;
+    // Firestore's persistent local cache (see firebase/firebase.js) means
+    // onSnapshot commonly fires TWICE on initial subscribe: once instantly
+    // with cached data (if this device has seen this collection before),
+    // once again moments later with the server's copy. When nothing has
+    // actually changed remotely between those two, they're byte-identical —
+    // calling the page's render callback twice for the same data is exactly
+    // what was causing the reported "page flickers on load" bug, most
+    // visible on Workout (the heaviest render). Comparing serialized content
+    // and skipping a no-op re-fire fixes this at the source for every
+    // repository, without giving up the "instant render from cache" benefit
+    // (the first snapshot still fires immediately) or missing a genuine
+    // change (if the server copy actually differs, it still fires).
+    let lastSerialized = null;
+    logSync(this.moduleName, this.uid, 'subscribe attached', { path: `${this.moduleName}/${this.uid}/items` });
     return onSnapshot(
       q,
-      (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      (error) => { if (onError) onError(mapFirebaseError(error)); }
+      (snap) => {
+        const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const serialized = JSON.stringify(items);
+        logSync(this.moduleName, this.uid, 'snapshot received', {
+          count: items.length,
+          fromCache: snap.metadata.fromCache,
+          hasPendingWrites: snap.metadata.hasPendingWrites,
+          duplicateOfLast: serialized === lastSerialized,
+        });
+        if (serialized === lastSerialized) return;
+        lastSerialized = serialized;
+        callback(items);
+      },
+      (error) => { logSync(this.moduleName, this.uid, 'subscribe error', error); if (onError) onError(mapFirebaseError(error)); }
     );
   }
 

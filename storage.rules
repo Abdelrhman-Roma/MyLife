@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Owner-scoped Storage rules, matching firestore.rules' pattern: a user may
+// only read/write files under their own uid. Added in Phase 6 of the
+// enterprise refactor, alongside firebase/storage.js, specifically for
+// Profile avatar/cover images and Workout progress photos (previously
+// stored as base64 inside Firestore documents — see WORKOUT_PLAN_REPORT.md
+// and PROFILE_MIGRATION.md for why that was risky).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /profile/{uid}/{fileName} {
+      allow read, write: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+    match /progressPhotos/{uid}/{fileName} {
+      allow read, write: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

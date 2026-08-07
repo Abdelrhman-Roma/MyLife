@@ -9,3 +9,4 @@ const WeatherRecommendationService = (() => ({
   },
   apply(weather) { const recs = WeatherRecommendationService.get(weather); if (weather.data.current.temperature_2m > 35) currentData.settings.waterGoal = Math.max(currentData.settings.waterGoal || 8, 10); return recs; },
 }));
+window.WeatherRecommendationService = WeatherRecommendationService;

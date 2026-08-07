@@ -6,3 +6,4 @@ const WeatherCharts = (() => {
   }
   return { render(weather) { const h = weather.data.hourly; return `<div class="weather-chart-grid"><section><h3>${t('Temperature')}</h3>${line(h.temperature_2m, 'var(--orange)', t('Temperature chart'))}</section><section><h3>${t('Humidity')}</h3>${line(h.relative_humidity_2m, 'var(--blue)', t('Humidity chart'))}</section><section><h3>${t('Wind')}</h3>${line(h.wind_speed_10m, 'var(--purple)', t('Wind chart'))}</section></div>`; } };
 })();
+window.WeatherCharts = WeatherCharts;

@@ -25,6 +25,7 @@ document.head.appendChild(momentumSpaceScript);
 const USERS_KEY   = 'mylife.users';
 const SESSION_KEY = 'mylife.session';
 const DATA_PREFIX = 'mylife.data.';
+window.DATA_PREFIX = DATA_PREFIX; // js/pages/account.js (an ES module) needs this for its account-deletion cleanup
 const THEME_KEY   = 'mylife.theme';
 const PALETTE_KEY = 'mylife.palette';
 const PASSWORD_ITERATIONS = 100000;
@@ -169,7 +170,6 @@ async function register(e) {
   }
   users.push(user);
   saveUsers(users);
-  saveData(email, emptyData(name));
   localStorage.setItem(SESSION_KEY, email);
   navigateAfterAuth('pages/dashboard.html');
 }
@@ -248,11 +248,11 @@ function bootShell(pageKey) {
   currentUser = getSessionUser();
   if (!currentUser) { window.location.href = '../index.html'; return false; }
   currentPage = pageKey;
-  const storedData = getData(currentUser.email, currentUser.name);
+  const storedData = getData(currentUser.name);
   currentData = normalizeData(storedData, currentUser.name);
-  // Avoid a synchronous storage write on every page visit; retain the existing
-  // migration behavior when normalization actually adds or repairs data.
-  if (JSON.stringify(currentData) !== JSON.stringify(storedData)) persist();
+  window.currentData = currentData; // ES-module page controllers (habits/goals/etc.) can't see classic-script `let` bindings directly.
+  // storedData is only a one-time migration candidate. Persisted user data is
+  // always routed to Firestore at users/{auth.currentUser.uid}.
   applyTheme(currentData.settings.theme, currentData.settings.palette);
   applyAppearance(currentData.settings);
   renderSidebar(pageKey);
@@ -263,6 +263,50 @@ function bootShell(pageKey) {
   initNotificationRuntime();
   return true;
 }
+
+// Invoked by the Firestore onSnapshot listener. This redraw is what makes
+// create/edit/delete changes from another device visible without a reload.
+// Collections that have been migrated off the legacy appData blob onto their
+// own Firestore repository (habits/{uid}/items, goals/{uid}/items, etc.),
+// each kept live by that page's own onSnapshot subscription. applyRemoteData()
+// below still fires whenever ANY OTHER blob field changes (settings, tasks,
+// notifications, ...) on any device — without this list, normalizeData()
+// would rebuild these fields from the blob's stale, pre-migration snapshot
+// and clobber the real, live data every time.
+const REPO_SYNCED_COLLECTIONS = [
+  'habits', 'goals', 'events', 'prayers', 'meals', 'workouts', 'study',
+  'water', 'sleep', 'bodyMeasurements', 'shoppingList',
+  'tasbeeh', 'quranProgress', 'quranBookmarks', 'quranFavorites', 'quranLog', 'hadithCollection',
+  'subjects', 'assignments', 'exams', 'projects', 'studyNotes', 'resources', 'pomodoro',
+  'progressPhotos', 'profile', 'settings', 'security',
+];
+
+function applyRemoteData(remoteData) {
+  if (!currentUser) return;
+  const preserved = {};
+  if (currentData) {
+    // Arrays (item collections) and plain objects (singleton docs like
+    // tasbeeh/quranProgress/pomodoro) both need protecting from being
+    // clobbered by a stale legacy-blob refresh — only `null`/`undefined`
+    // (i.e. "not populated by a repository subscription yet") should fall
+    // through to normalizeData()'s default.
+    REPO_SYNCED_COLLECTIONS.forEach((key) => {
+      const value = currentData[key];
+      if (Array.isArray(value) || (value && typeof value === 'object')) preserved[key] = value;
+    });
+  }
+  currentData = normalizeData(remoteData, currentUser.name);
+  Object.assign(currentData, preserved);
+  window.currentData = currentData;
+  applyTheme(currentData.settings.theme, currentData.settings.palette);
+  applyAppearance(currentData.settings);
+  refreshChrome();
+  if (typeof window.__pageContentReinit === 'function') window.__pageContentReinit();
+}
+window.MomentumLegacyData = {
+  getInitialData: () => currentData,
+  applyRemote: applyRemoteData,
+};
 
 function initPage(pageKey) {
   if (!bootShell(pageKey)) return;
@@ -1152,9 +1196,19 @@ function addEntry(e, pageKey) {
   });
   currentData[page.collection].push(item);
   addNotification(pageKey, `${page.title}: ${item.title || t('New entry added')}`);
-  persist();
   e.currentTarget.reset();
   initPage(pageKey);
+  if (pageKey === 'goals' && window.__goalsRepo) {
+    const { id, ...data } = item;
+    window.__goalsRepo.create(data, id).then((result) => {
+      if (!result.ok) {
+        currentData.goals = currentData.goals.filter((x) => x.id !== id);
+        initPage(pageKey);
+      }
+    });
+    return;
+  }
+  persist();
 }
 
 function toggleComplete(pageKey, id) {
@@ -1165,8 +1219,12 @@ function toggleComplete(pageKey, id) {
     item.completedAt = item.completed ? new Date().toISOString() : null;
   }
   if (item && item.completed) addNotification(pageKey, `${PAGES[pageKey].title}: ${item.title || t('Completed')}`);
-  persist();
   initPage(pageKey);
+  if (pageKey === 'goals' && window.__goalsRepo && item) {
+    window.__goalsRepo.update(id, { completed: item.completed, completedAt: item.completedAt });
+    return;
+  }
+  persist();
 }
 
 function bindDeleteButtons(pageKey) {
@@ -1177,10 +1235,21 @@ function bindDeleteButtons(pageKey) {
 
 function deleteEntry(pageKey, id) {
   const col = PAGES[pageKey].collection;
+  const removed = currentData[col].find((item) => item.id === id);
+  const removedIndex = currentData[col].findIndex((item) => item.id === id);
   currentData[col] = currentData[col].filter((item) => item.id !== id);
-  persist();
   initPage(pageKey);
   showToast(t('Deleted'), 'danger');
+  if (pageKey === 'goals' && window.__goalsRepo) {
+    window.__goalsRepo.delete(id).then((result) => {
+      if (!result.ok && removed) {
+        currentData[col].splice(removedIndex, 0, removed);
+        initPage(pageKey);
+      }
+    });
+    return;
+  }
+  persist();
 }
 
 // ─── Toast ──────────────────────────────────────────────────────────────
@@ -1459,18 +1528,20 @@ function getUsers() {
 
 function saveUsers(users) { localStorage.setItem(USERS_KEY, JSON.stringify(users)); }
 
-function getData(email, name) {
-  try {
-    const saved = localStorage.getItem(DATA_PREFIX + email);
-    if (saved) return JSON.parse(saved);
-  } catch { /* corrupt data — fall through */ }
-  const data = emptyData(name);
-  saveData(email, data);
-  return data;
+function getData(name) {
+  // Business data is never read from or written to localStorage after the
+  // Firestore migration — this always seeds an empty shape, which every
+  // page's realtime repository subscription overwrites within moments.
+  // DATA_PREFIX itself is kept (see js/pages/account.js) purely so account
+  // deletion can still clean up any stale entry left by a pre-migration
+  // session; nothing writes to it anymore.
+  return emptyData(name);
 }
-
-function saveData(email, data) { localStorage.setItem(DATA_PREFIX + email, JSON.stringify(data)); }
-function persist() { saveData(currentUser.email, currentData); }
+function persist() {
+  if (!currentData) return;
+  if (window.MomentumDataSync) window.MomentumDataSync.save(currentData);
+  else window.__mylifePendingData = currentData;
+}
 
 // Passwords are never kept as plaintext for newly-created or migrated local
 // accounts. This is defense in depth only: a local-only static app cannot
@@ -1537,7 +1608,7 @@ function getCounts() {
     prayers:         currentData.prayers.filter((p) => p.status === 'Completed').length,
     prayersToday:    currentData.prayers.filter((p) => p.date === new Date().toISOString().slice(0, 10) && p.status === 'Completed').length,
     meals:           currentData.meals.length,
-    water:           currentData.water.reduce((s, i) => s + Number(i.amount || 0), 0),
+    water:           currentData.water.reduce((s, i) => s + Number(i.glasses || 0), 0),
     sleep:           currentData.sleep.length,
     study:           currentData.study.length,
   };

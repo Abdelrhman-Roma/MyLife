@@ -1,9 +1,33 @@
-// MyLife — Nutrition module (Phase 3).
-// Meals now carry a real `date` (added in shared.js's normalizeData), so
-// "today's totals" vs "meal planner" (future-dated meals) can be told apart.
-// Weight history intentionally reuses currentData.bodyMeasurements (the same
-// log Workout's Phase 3 body-measurements feature writes to) rather than
-// keeping a second, disconnected weight log.
+// MyLife — Nutrition module (Firestore migration).
+// Meals now live at nutrition/{uid}/items/{id} via NutritionRepository, synced
+// in realtime with onSnapshot — the same pattern as js/todo.js and js/habits.js.
+// Water, sleep, body measurements, and the shopping list are migrated the
+// same way (Phase 4 of the enterprise refactor) via their own repositories.
+// window.currentData.{meals,water,sleep,bodyMeasurements,shoppingList} is
+// kept as the render-facing cache. Macro-target settings still have no
+// dedicated repository yet and remain on the legacy appData blob for now.
+
+import { NutritionRepository } from '../repositories/NutritionRepository.js';
+import { WaterRepository } from '../repositories/WaterRepository.js';
+import { SleepRepository } from '../repositories/SleepRepository.js';
+import { BodyMeasurementsRepository } from '../repositories/BodyMeasurementsRepository.js';
+import { ShoppingRepository } from '../repositories/ShoppingRepository.js';
+import { SettingsRepository } from '../repositories/SettingsRepository.js';
+import { AuthService } from '../services/AuthService.js';
+
+/** @type {import('../repositories/NutritionRepository.js').NutritionRepository|null} */
+let nutritionRepo = null;
+let waterRepo = null;
+let sleepRepo = null;
+let bodyRepo = null;
+let shoppingRepo = null;
+let settingsRepo = null;
+let nutritionUnsubscribe = null;
+let waterUnsubscribe = null;
+let sleepUnsubscribe = null;
+let bodyUnsubscribe = null;
+let shoppingUnsubscribe = null;
+let settingsUnsubscribe = null;
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
@@ -14,17 +38,72 @@ function nutAddDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); r
 function nutToday() { return nutIso(new Date()); }
 
 function initNutritionPage() {
-  renderArt('nutrition');
   nutritionState.plannerDate = nutToday();
   renderNutritionRoot();
+  startNutritionSync();
+}
+
+async function startNutritionSync() {
+  const user = await AuthService.waitUntilReady();
+  if (!user) return; // bootShell() already redirects unauthenticated visitors
+  nutritionRepo = new NutritionRepository(user.uid);
+  waterRepo = new WaterRepository(user.uid);
+  sleepRepo = new SleepRepository(user.uid);
+  bodyRepo = new BodyMeasurementsRepository(user.uid);
+  shoppingRepo = new ShoppingRepository(user.uid);
+  settingsRepo = new SettingsRepository(user.uid);
+  if (nutritionUnsubscribe) nutritionUnsubscribe();
+  if (waterUnsubscribe) waterUnsubscribe();
+  if (sleepUnsubscribe) sleepUnsubscribe();
+  if (bodyUnsubscribe) bodyUnsubscribe();
+  if (shoppingUnsubscribe) shoppingUnsubscribe();
+  if (settingsUnsubscribe) settingsUnsubscribe();
+  nutritionUnsubscribe = nutritionRepo.subscribe(
+    (items) => { window.currentData.meals = items; renderNutritionRoot(); },
+    (error) => { console.error('[nutrition] realtime sync failed', error); }
+  );
+  waterUnsubscribe = waterRepo.subscribe(
+    (items) => { window.currentData.water = items; renderNutritionRoot(); },
+    (error) => { console.error('[nutrition/water] realtime sync failed', error); }
+  );
+  sleepUnsubscribe = sleepRepo.subscribe(
+    (items) => { window.currentData.sleep = items; renderNutritionRoot(); },
+    (error) => { console.error('[nutrition/sleep] realtime sync failed', error); }
+  );
+  bodyUnsubscribe = bodyRepo.subscribe(
+    (items) => { window.currentData.bodyMeasurements = items; renderNutritionRoot(); },
+    (error) => { console.error('[nutrition/bodyMeasurements] realtime sync failed', error); }
+  );
+  shoppingUnsubscribe = shoppingRepo.subscribe(
+    (items) => { window.currentData.shoppingList = items; renderNutritionRoot(); },
+    (error) => { console.error('[nutrition/shopping] realtime sync failed', error); }
+  );
+  // Only macro targets (calorie/protein/carb/fat) are read here — the rest of
+  // Settings (theme, appearance, etc.) is the Account page's concern. Both
+  // pages write the SAME underlying settings/{uid} document, so this
+  // subscription exists purely so a macro-target edit made on the Account
+  // page is reflected here too, not just the other way around.
+  settingsUnsubscribe = settingsRepo.subscribe(
+    (data) => { if (data) Object.assign(window.currentData.settings, data); renderNutritionRoot(); },
+    (error) => { console.error('[nutrition/settings] realtime sync failed', error); }
+  );
+}
+
+function disposeNutritionPage() {
+  if (nutritionUnsubscribe) { nutritionUnsubscribe(); nutritionUnsubscribe = null; }
+  if (waterUnsubscribe) { waterUnsubscribe(); waterUnsubscribe = null; }
+  if (sleepUnsubscribe) { sleepUnsubscribe(); sleepUnsubscribe = null; }
+  if (bodyUnsubscribe) { bodyUnsubscribe(); bodyUnsubscribe = null; }
+  if (shoppingUnsubscribe) { shoppingUnsubscribe(); shoppingUnsubscribe = null; }
+  if (settingsUnsubscribe) { settingsUnsubscribe(); settingsUnsubscribe = null; }
 }
 
 function renderNutritionRoot() {
   const root = byId('nutrition-root');
   if (!root) return;
-  const s = currentData.settings;
+  const s = window.currentData.settings;
   const totals = nutritionTotals();
-  const todayMeals = currentData.meals.filter((m) => (m.date || nutToday()) === nutToday());
+  const todayMeals = window.currentData.meals.filter((m) => (m.date || nutToday()) === nutToday());
 
   root.innerHTML = `
     <section class="panel">
@@ -79,9 +158,9 @@ function renderNutritionRoot() {
 
 function waterTrackerHtml() {
   const today = nutToday();
-  const glasses = currentData.water.filter((entry) => !entry.date || entry.date === today)
+  const glasses = window.currentData.water.filter((entry) => !entry.date || entry.date === today)
     .reduce((sum, entry) => sum + Number(entry.glasses || entry.amount || 1), 0);
-  const goal = Number(currentData.settings.waterGoal) || 8;
+  const goal = Number(window.currentData.settings.waterGoal) || 8;
   return `<section class="panel health-tracker" id="water">
     <p class="eyebrow">${t('Hydration')}</p><h2>${t('Water')}</h2>
     <strong class="health-tracker-value">${glasses} / ${goal} ${t('glasses')}</strong>
@@ -94,7 +173,7 @@ function waterTrackerHtml() {
 }
 
 function sleepTrackerHtml() {
-  const latest = [...currentData.sleep].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+  const latest = [...window.currentData.sleep].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
   return `<section class="panel health-tracker" id="sleep">
     <p class="eyebrow">${t('Recovery')}</p><h2>${t('Sleep')}</h2>
     <strong class="health-tracker-value">${latest ? `${latest.hours || 0} ${t('hours')}` : t('No sleep logged')}</strong>
@@ -108,7 +187,7 @@ function sleepTrackerHtml() {
 }
 
 function bodyTrackerHtml() {
-  const latest = [...currentData.bodyMeasurements].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+  const latest = [...window.currentData.bodyMeasurements].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
   return `<section class="panel health-tracker" id="measurements">
     <p class="eyebrow">${t('Progress')}</p><h2>${t('Body measurements')}</h2>
     <strong class="health-tracker-value">${latest?.weight ? `${latest.weight} kg` : t('No measurement logged')}</strong>
@@ -121,7 +200,7 @@ function bodyTrackerHtml() {
 }
 
 function nutritionGoalsHtml() {
-  const s = currentData.settings;
+  const s = window.currentData.settings;
   return `<section class="panel health-tracker" id="goals">
     <p class="eyebrow">${t('Personal targets')}</p><h2>${t('Nutrition goals')}</h2>
     <form class="health-inline-form health-goals-form" data-health-goals-form>
@@ -179,7 +258,7 @@ function mealPlannerHtml() {
     <div class="nut-planner-grid">
       ${days.map((iso) => {
         const d = new Date(`${iso}T00:00:00`);
-        const meals = currentData.meals.filter((m) => m.date === iso);
+        const meals = window.currentData.meals.filter((m) => m.date === iso);
         return `
           <div class="nut-planner-day">
             <div class="nut-planner-day-head">
@@ -197,7 +276,7 @@ function mealPlannerHtml() {
 
 // ─── Shopping list ──────────────────────────────────────────────────────────
 function shoppingListHtml() {
-  const items = currentData.shoppingList;
+  const items = window.currentData.shoppingList;
   return `
     <div class="td-header-top" style="margin-bottom:10px">
       <div><p class="eyebrow">${t('From your meal plan')}</p><h2>${t('Shopping list')}</h2></div>
@@ -219,25 +298,28 @@ function shoppingListHtml() {
 }
 
 function generateShoppingList() {
-  const upcoming = currentData.meals.filter((m) => m.date && m.date >= nutToday() && m.ingredients);
-  const existing = new Set(currentData.shoppingList.map((i) => i.item.toLowerCase()));
+  const upcoming = window.currentData.meals.filter((m) => m.date && m.date >= nutToday() && m.ingredients);
+  const existing = new Set(window.currentData.shoppingList.map((i) => i.item.toLowerCase()));
   const added = new Set();
+  const newItems = [];
   upcoming.forEach((m) => {
     m.ingredients.split(',').map((s) => s.trim()).filter(Boolean).forEach((ing) => {
       const key = ing.toLowerCase();
       if (existing.has(key) || added.has(key)) return;
       added.add(key);
-      currentData.shoppingList.push({ id: makeId(), item: ing, checked: false });
+      const entry = { id: makeId(), item: ing, checked: false };
+      newItems.push(entry);
+      window.currentData.shoppingList.push(entry);
     });
   });
-  persist();
   renderNutritionRoot();
   showToast(added.size ? `${added.size} ${t('items added')}` : t('Nothing new to add \u2014 add ingredients to planned meals first'), added.size ? 'success' : 'default');
+  if (shoppingRepo) newItems.forEach(({ id, ...data }) => shoppingRepo.create(data, id));
 }
 
 // ─── Weight history (shared with Workout's body measurements) ─────────────
 function weightHistoryHtml() {
-  const items = [...currentData.bodyMeasurements].filter((m) => m.weight).sort((a, b) => a.date.localeCompare(b.date));
+  const items = [...window.currentData.bodyMeasurements].filter((m) => m.weight).sort((a, b) => a.date.localeCompare(b.date));
   const latest = items[items.length - 1];
   return `
     <p class="eyebrow">${t('Shared with Workout \u2192 Body measurements')}</p>
@@ -270,42 +352,73 @@ function bindNutritionRootEvents(root) {
   if (genBtn) genBtn.addEventListener('click', generateShoppingList);
   const clearBtn = root.querySelector('[data-nut-shop-clear]');
   if (clearBtn) clearBtn.addEventListener('click', () => {
-    currentData.shoppingList = currentData.shoppingList.filter((i) => !i.checked);
-    persist();
+    const toRemove = window.currentData.shoppingList.filter((i) => i.checked);
+    window.currentData.shoppingList = window.currentData.shoppingList.filter((i) => !i.checked);
     renderNutritionRoot();
+    if (shoppingRepo) toRemove.forEach((i) => shoppingRepo.delete(i.id));
   });
   root.querySelectorAll('[data-nut-shop-toggle]').forEach((el) => el.addEventListener('change', () => {
-    const item = currentData.shoppingList.find((i) => i.id === el.dataset.nutShopToggle);
-    if (item) { item.checked = !item.checked; persist(); renderNutritionRoot(); }
+    const item = window.currentData.shoppingList.find((i) => i.id === el.dataset.nutShopToggle);
+    if (item) {
+      item.checked = !item.checked;
+      renderNutritionRoot();
+      if (shoppingRepo) shoppingRepo.update(item.id, { checked: item.checked });
+    }
   }));
   root.querySelectorAll('[data-nut-shop-delete]').forEach((btn) => btn.addEventListener('click', () => {
-    currentData.shoppingList = currentData.shoppingList.filter((i) => i.id !== btn.dataset.nutShopDelete);
-    persist();
+    const id = btn.dataset.nutShopDelete;
+    window.currentData.shoppingList = window.currentData.shoppingList.filter((i) => i.id !== id);
     renderNutritionRoot();
+    if (shoppingRepo) shoppingRepo.delete(id);
   }));
   root.querySelector('[data-health-water-form]')?.addEventListener('submit', (e) => {
     e.preventDefault(); const glasses = Number(new FormData(e.currentTarget).get('glasses')) || 0;
-    if (!glasses) return; currentData.water.push({ id: makeId(), glasses, date: nutToday() }); addNotification('Nutrition', `${glasses} ${t('glasses')} ${t('of water logged')}`); renderNutritionRoot();
+    if (!glasses) return;
+    const entry = { id: makeId(), glasses, date: nutToday() };
+    window.currentData.water.push(entry);
+    addNotification('Nutrition', `${glasses} ${t('glasses')} ${t('of water logged')}`);
+    renderNutritionRoot();
+    if (waterRepo) { const { id, ...data } = entry; waterRepo.create(data, id); }
   });
   root.querySelector('[data-health-sleep-form]')?.addEventListener('submit', (e) => {
     e.preventDefault(); const fd = new FormData(e.currentTarget); const hours = Number(fd.get('hours'));
-    if (!Number.isFinite(hours)) return; currentData.sleep.push({ id: makeId(), hours, quality: String(fd.get('quality')), date: nutToday() }); addNotification('Nutrition', `${hours} ${t('hours')} ${t('of sleep logged')}`); renderNutritionRoot();
+    if (!Number.isFinite(hours)) return;
+    const entry = { id: makeId(), hours, quality: String(fd.get('quality')), date: nutToday() };
+    window.currentData.sleep.push(entry);
+    addNotification('Nutrition', `${hours} ${t('hours')} ${t('of sleep logged')}`);
+    renderNutritionRoot();
+    if (sleepRepo) { const { id, ...data } = entry; sleepRepo.create(data, id); }
   });
   root.querySelector('[data-health-body-form]')?.addEventListener('submit', (e) => {
     e.preventDefault(); const fd = new FormData(e.currentTarget); const weight = Number(fd.get('weight'));
-    if (!weight) return; currentData.bodyMeasurements.push({ id: makeId(), weight, waist: Number(fd.get('waist')) || 0, date: nutToday() }); addNotification('Nutrition', t('Body measurement saved')); renderNutritionRoot();
+    if (!weight) return;
+    const entry = { id: makeId(), weight, waist: Number(fd.get('waist')) || 0, date: nutToday() };
+    window.currentData.bodyMeasurements.push(entry);
+    addNotification('Nutrition', t('Body measurement saved'));
+    renderNutritionRoot();
+    if (bodyRepo) { const { id, ...data } = entry; bodyRepo.create(data, id); }
   });
   root.querySelector('[data-health-goals-form]')?.addEventListener('submit', (e) => {
     e.preventDefault(); const fd = new FormData(e.currentTarget);
-    ['calorieTarget', 'proteinTarget', 'carbTarget', 'fatTarget'].forEach((key) => { currentData.settings[key] = Number(fd.get(key)) || 0; });
-    persist(); renderNutritionRoot();
+    const patch = {};
+    ['calorieTarget', 'proteinTarget', 'carbTarget', 'fatTarget'].forEach((key) => { patch[key] = Number(fd.get(key)) || 0; window.currentData.settings[key] = patch[key]; });
+    renderNutritionRoot();
+    if (settingsRepo) settingsRepo.update(patch);
   });
 }
 
 function deleteMeal(id) {
-  currentData.meals = currentData.meals.filter((m) => m.id !== id);
-  persist();
+  if (!nutritionRepo) return;
+  const removed = window.currentData.meals.find((m) => m.id === id);
+  const removedIndex = window.currentData.meals.findIndex((m) => m.id === id);
+  window.currentData.meals = window.currentData.meals.filter((m) => m.id !== id);
   renderNutritionRoot();
+  nutritionRepo.delete(id).then((result) => {
+    if (!result.ok && removed) {
+      window.currentData.meals.splice(removedIndex, 0, removed);
+      renderNutritionRoot();
+    }
+  });
 }
 
 function openMealModal(id, defaultDate) {
@@ -323,7 +436,7 @@ function renderMealModal() {
   const existing = document.querySelector('[data-nut-modal]');
   if (existing) existing.remove();
   if (!nutritionState.modal) return;
-  const editing = nutritionState.modal === 'new' ? null : currentData.meals.find((m) => m.id === nutritionState.modal);
+  const editing = nutritionState.modal === 'new' ? null : window.currentData.meals.find((m) => m.id === nutritionState.modal);
 
   document.body.insertAdjacentHTML('beforeend', `
     <div class="td-modal-overlay" data-nut-modal role="dialog" aria-modal="true" aria-label="${editing ? t('Edit meal') : t('New meal')}">
@@ -382,14 +495,26 @@ function renderMealModal() {
       fat: Number(fd.get('fat')) || 0,
       ingredients: String(fd.get('ingredients') || ''),
     };
+    if (!nutritionRepo) return;
     if (editing) {
       Object.assign(editing, data);
+      closeMealModal();
+      renderNutritionRoot();
+      nutritionRepo.update(editing.id, data);
     } else {
-      currentData.meals.push({ id: makeId(), ...data });
+      const optimisticId = makeId();
+      window.currentData.meals.push({ id: optimisticId, ...data });
       addNotification('Nutrition', `${t('Meal logged')}: ${title}`);
+      closeMealModal();
+      renderNutritionRoot();
+      nutritionRepo.create(data, optimisticId).then((result) => {
+        if (!result.ok) {
+          window.currentData.meals = window.currentData.meals.filter((x) => x.id !== optimisticId);
+          renderNutritionRoot();
+        }
+      });
     }
-    persist();
-    closeMealModal();
-    renderNutritionRoot();
   });
 }
+
+export { initNutritionPage, disposeNutritionPage };

@@ -9,3 +9,4 @@ const WeatherCacheService = (() => {
     clear() { localStorage.removeItem(key()); },
   };
 })();
+window.WeatherCacheService = WeatherCacheService;

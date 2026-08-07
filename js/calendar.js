@@ -1,7 +1,52 @@
-// MOMENTUM — Calendar page logic (refactor)
-// Reuses bootShell(), persist(), currentData, escapeHtml(), escapeAttr(), makeId(),
+// MOMENTUM — Calendar page logic (Firestore migration)
+// Reuses bootShell(), window.currentData, escapeHtml(), escapeAttr(), makeId(),
 // selected(), labelize() and percent() from shared.js. Self-contained: does not
 // modify shared.js or any global stylesheet.
+//
+// Events now live at calendar/{uid}/items/{id} via CalendarRepository, synced
+// in realtime with onSnapshot. window.currentData.events is kept as the
+// render-facing cache (populated from Firestore, not the legacy appData
+// blob), and every write below goes straight to CalendarRepository.
+
+import { CalendarRepository } from '../repositories/CalendarRepository.js';
+import { TodoRepository } from '../repositories/TodoRepository.js';
+import { HabitRepository } from '../repositories/HabitRepository.js';
+import { GoalRepository } from '../repositories/GoalRepository.js';
+import { PrayerRepository } from '../repositories/PrayerRepository.js';
+import { StudyRepository } from '../repositories/StudyRepository.js';
+import { AuthService } from '../services/AuthService.js';
+
+/** @type {import('../repositories/CalendarRepository.js').CalendarRepository|null} */
+let calendarRepo = null;
+let calendarUnsubscribe = null;
+
+// Cross-module repositories, used only to write completion state back to the
+// SOURCE module when a linked event is toggled from the Calendar page (e.g.
+// checking off a Habit's calendar mirror should also mark the Habit itself
+// done in Firestore, not just in this tab's in-memory copy). Workout's
+// schedule/plan has no dedicated repository (only its finished-session log
+// does), so it's intentionally left legacy-blob-only here.
+let crossRepos = {};
+
+async function initCrossRepos(uid) {
+  crossRepos = {
+    tasks: new TodoRepository(uid),
+    habit: new HabitRepository(uid),
+    goals: new GoalRepository(uid),
+    prayer: new PrayerRepository(uid),
+    study: new StudyRepository(uid),
+  };
+}
+
+/** Strips the `id` field so it isn't duplicated inside the Firestore document body. */
+function stripId(obj) { const { id, ...rest } = obj; return rest; }
+
+function applyCalendarWrite(write) {
+  if (!calendarRepo || !write) return;
+  if (write.type === 'create') calendarRepo.create(write.data, write.id);
+  else if (write.type === 'update') calendarRepo.update(write.id, write.data);
+  else if (write.type === 'delete') calendarRepo.delete(write.id);
+}
 
 const CAL_MONTH_NAMES       = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const CAL_MONTH_NAMES_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -47,10 +92,11 @@ const CAL_REMINDER_OPTIONS = [
 // event is created already-completed and is read-only.
 const SOURCE_MODULE_META = {
   tasks:     { category: 'todo',  label: 'Task',    page: 'todo.html',      completable: true,
-               getCollection: () => currentData.tasks || [],
-               getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; } },
+               getCollection: () => window.currentData.tasks || [],
+               getCompleted: (i) => !!i.completed,
+               setCompleted: (i, v) => { i.completed = v; if (crossRepos.tasks) crossRepos.tasks.update(i.id, { completed: v }); } },
   habit:     { category: 'habit', label: 'Habit',   page: 'habits.html',    completable: true,
-               getCollection: () => currentData.habits || [],
+               getCollection: () => window.currentData.habits || [],
                getCompleted: (i) => !!i.completed,
                setCompleted: (i, v) => {
                  i.completed = v;
@@ -58,23 +104,34 @@ const SOURCE_MODULE_META = {
                  i.completions = i.completions || [];
                  if (v && !i.completions.includes(today)) i.completions.push(today);
                  if (!v) i.completions = i.completions.filter((d) => d !== today);
+                 if (crossRepos.habit) crossRepos.habit.update(i.id, { completed: v, completions: i.completions });
                } },
   goals:     { category: 'goal',  label: 'Goal',    page: 'goals.html',     completable: true,
-               getCollection: () => currentData.goals || [],
-               getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; } },
+               getCollection: () => window.currentData.goals || [],
+               getCompleted: (i) => !!i.completed,
+               setCompleted: (i, v) => { i.completed = v; if (crossRepos.goals) crossRepos.goals.update(i.id, { completed: v }); } },
   prayer:    { category: 'prayer',label: 'Prayer',  page: 'prayer.html',    completable: true,
-               getCollection: () => currentData.prayers || [],
+               getCollection: () => window.currentData.prayers || [],
                getCompleted: (i) => i.status === 'Completed',
-               setCompleted: (i, v) => { i.status = v ? 'Completed' : 'Pending'; i.completedAt = v ? new Date().toISOString() : null; } },
+               setCompleted: (i, v) => {
+                 i.status = v ? 'Completed' : 'Pending';
+                 i.completedAt = v ? new Date().toISOString() : null;
+                 if (crossRepos.prayer) crossRepos.prayer.update(i.id, { status: i.status, completedAt: i.completedAt });
+               } },
   workout:   { category: 'workout', label: 'Workout', page: 'workout.html', completable: true,
-               getCollection: () => (currentData.workoutPlan && currentData.workoutPlan.schedule) || [],
+               getCollection: () => (window.currentData.workoutPlan && window.currentData.workoutPlan.schedule) || [],
                getCompleted: (i) => i.status === 'Done', setCompleted: (i, v) => { i.status = v ? 'Done' : 'Not Started'; } },
-  nutrition: { category: 'nutrition', label: 'Nutrition', page: 'nutrition.html', completable: false, getCollection: () => currentData.meals || [] },
-  water:     { category: 'water', label: 'Water',   page: 'nutrition.html#water', completable: false, getCollection: () => currentData.water || [] },
-  sleep:     { category: 'sleep', label: 'Sleep',    page: 'nutrition.html#sleep', completable: false, getCollection: () => currentData.sleep || [] },
+  nutrition: { category: 'nutrition', label: 'Nutrition', page: 'nutrition.html', completable: false, getCollection: () => window.currentData.meals || [] },
+  water:     { category: 'water', label: 'Water',   page: 'nutrition.html#water', completable: false, getCollection: () => window.currentData.water || [] },
+  sleep:     { category: 'sleep', label: 'Sleep',    page: 'nutrition.html#sleep', completable: false, getCollection: () => window.currentData.sleep || [] },
   study:     { category: 'study', label: 'Study',    page: 'study.html',     completable: true,
-               getCollection: () => currentData.study || [],
-               getCompleted: (i) => !!i.completed, setCompleted: (i, v) => { i.completed = v; i.status = v ? 'Completed' : 'Planned'; } },
+               getCollection: () => window.currentData.study || [],
+               getCompleted: (i) => !!i.completed,
+               setCompleted: (i, v) => {
+                 i.completed = v;
+                 i.status = v ? 'Completed' : 'Planned';
+                 if (crossRepos.study) crossRepos.study.update(i.id, { completed: v, status: i.status });
+               } },
 };
 
 let calState = {
@@ -173,8 +230,8 @@ function hydrateEvent(raw) {
 }
 
 function hydrateAllEvents() {
-  if (!Array.isArray(currentData.events)) currentData.events = [];
-  currentData.events = currentData.events.map((ev) => {
+  if (!Array.isArray(window.currentData.events)) window.currentData.events = [];
+  window.currentData.events = window.currentData.events.map((ev) => {
     try { return hydrateEvent(ev); } catch (_e) { return null; }
   }).filter(Boolean);
 }
@@ -197,7 +254,7 @@ function occursOn(ev, iso) {
 //   Calendar checkbox  -> writes back into the source collection immediately.
 //   Source page change -> pulled into the linked calendar event on next load.
 function findLinkedEvent(sourceModule, sourceId) {
-  return (currentData.events || []).find((e) => e.sourceModule === sourceModule && e.sourceId === sourceId);
+  return (window.currentData.events || []).find((e) => e.sourceModule === sourceModule && e.sourceId === sourceId);
 }
 
 function materializeSourceEvent(sourceModule, item, defaults) {
@@ -214,64 +271,73 @@ function materializeSourceEvent(sourceModule, item, defaults) {
     });
     if (!meta.completable) ev.completedAt = ev.createdAt;
     else if (ev.completed) ev.completedAt = ev.createdAt;
-    currentData.events.push(ev);
+    window.currentData.events.push(ev);
     addNotification('Calendar', `${t('Event added')}: ${ev.title || t('Event')}`);
+    if (calendarRepo) calendarRepo.create(stripId(ev), ev.id);
     return;
   }
-  if (ev.title !== title) { ev.title = title; ev.updatedAt = nowStamp(); }
-  if (defaults.date && ev.date !== defaults.date) { ev.date = defaults.date; ev.updatedAt = nowStamp(); }
-  if (defaults.repeatRule && ev.repeatRule !== defaults.repeatRule) { ev.repeatRule = defaults.repeatRule; ev.updatedAt = nowStamp(); }
-  if (defaults.startTime !== undefined && ev.startTime !== defaults.startTime) { ev.startTime = defaults.startTime; ev.updatedAt = nowStamp(); }
+  const changed = {};
+  if (ev.title !== title) { ev.title = title; ev.updatedAt = nowStamp(); changed.title = ev.title; }
+  if (defaults.date && ev.date !== defaults.date) { ev.date = defaults.date; ev.updatedAt = nowStamp(); changed.date = ev.date; }
+  if (defaults.repeatRule && ev.repeatRule !== defaults.repeatRule) { ev.repeatRule = defaults.repeatRule; ev.updatedAt = nowStamp(); changed.repeatRule = ev.repeatRule; }
+  if (defaults.startTime !== undefined && ev.startTime !== defaults.startTime) { ev.startTime = defaults.startTime; ev.updatedAt = nowStamp(); changed.startTime = ev.startTime; }
   if (meta.completable) {
     const srcCompleted = !!meta.getCompleted(item);
     if (ev.completed !== srcCompleted) {
       ev.completed = srcCompleted;
       ev.completedAt = srcCompleted ? nowStamp() : null;
       ev.updatedAt = nowStamp();
+      changed.completed = ev.completed;
+      changed.completedAt = ev.completedAt;
     }
   }
+  if (calendarRepo && Object.keys(changed).length) calendarRepo.update(ev.id, { ...changed, updatedAt: ev.updatedAt });
 }
 
 function reconcileSourceLinkedEvents() {
-  (currentData.tasks || []).forEach((t) => materializeSourceEvent('tasks', t, {
+  (window.currentData.tasks || []).forEach((t) => materializeSourceEvent('tasks', t, {
     title: t.title || 'Task',
     date: t.dueDate || todayISO(),
     repeatRule: t.recurring ? (t.recurring.freq || 'Daily') : (t.dueDate ? 'None' : 'Daily'),
     priority: t.priority,
     startTime: t.time || '',
   }));
-  (currentData.habits || []).forEach((h) => materializeSourceEvent('habit', h, { title: h.title || 'Habit', date: todayISO(), repeatRule: 'Daily' }));
-  (currentData.prayers || []).forEach((p) => materializeSourceEvent('prayer', p, {
+  (window.currentData.habits || []).forEach((h) => materializeSourceEvent('habit', h, { title: h.title || 'Habit', date: todayISO(), repeatRule: 'Daily' }));
+  (window.currentData.prayers || []).forEach((p) => materializeSourceEvent('prayer', p, {
     title: p.prayer || p.title || 'Prayer',
     date: p.date || todayISO(),
     repeatRule: p.date ? 'None' : 'Daily',
     startTime: p.time || '',
   }));
-  (currentData.goals || []).forEach((g) => materializeSourceEvent('goals', g, { title: g.title || 'Goal', date: g.deadline || todayISO(), repeatRule: g.deadline ? 'None' : 'Daily' }));
-  ((currentData.workoutPlan && currentData.workoutPlan.schedule) || []).forEach((w) => {
+  (window.currentData.goals || []).forEach((g) => materializeSourceEvent('goals', g, { title: g.title || 'Goal', date: g.deadline || todayISO(), repeatRule: g.deadline ? 'None' : 'Daily' }));
+  ((window.currentData.workoutPlan && window.currentData.workoutPlan.schedule) || []).forEach((w) => {
     if (w.date) materializeSourceEvent('workout', w, { title: w.type || 'Workout', date: w.date, repeatRule: 'None' });
   });
-  (currentData.meals || []).forEach((m) => materializeSourceEvent('nutrition', m, { title: m.title || 'Meal logged', date: m.date || todayISO(), repeatRule: 'None' }));
-  (currentData.water || []).forEach((w) => materializeSourceEvent('water', w, { title: `Water${w.amount ? ` · ${w.amount} glasses` : ''}`, date: todayISO(), repeatRule: 'None' }));
-  (currentData.sleep || []).forEach((s) => materializeSourceEvent('sleep', s, { title: s.title || 'Sleep logged', date: todayISO(), repeatRule: 'None' }));
-  (currentData.study || []).forEach((s) => materializeSourceEvent('study', s, { title: s.topic ? `${s.title} · ${s.topic}` : (s.title || 'Study session'), date: s.date || todayISO(), repeatRule: 'None', priority: s.priority, startTime: s.startTime }));
+  (window.currentData.meals || []).forEach((m) => materializeSourceEvent('nutrition', m, { title: m.title || 'Meal logged', date: m.date || todayISO(), repeatRule: 'None' }));
+  (window.currentData.water || []).forEach((w) => materializeSourceEvent('water', w, { title: `Water${w.glasses ? ` · ${w.glasses} glasses` : ''}`, date: todayISO(), repeatRule: 'None' }));
+  (window.currentData.sleep || []).forEach((s) => materializeSourceEvent('sleep', s, { title: s.title || 'Sleep logged', date: todayISO(), repeatRule: 'None' }));
+  (window.currentData.study || []).forEach((s) => materializeSourceEvent('study', s, { title: s.topic ? `${s.title} · ${s.topic}` : (s.title || 'Study session'), date: s.date || todayISO(), repeatRule: 'None', priority: s.priority, startTime: s.startTime }));
 
   // Prune links whose source record was deleted elsewhere in the app.
-  currentData.events = (currentData.events || []).filter((ev) => {
+  const prunedIds = [];
+  window.currentData.events = (window.currentData.events || []).filter((ev) => {
     if (!ev.sourceModule) return true;
     const meta = SOURCE_MODULE_META[ev.sourceModule];
     if (!meta) return true;
-    return meta.getCollection().some((i) => i.id === ev.sourceId);
+    const stillExists = meta.getCollection().some((i) => i.id === ev.sourceId);
+    if (!stillExists) prunedIds.push(ev.id);
+    return stillExists;
   });
+  if (calendarRepo) prunedIds.forEach((id) => calendarRepo.delete(id));
 }
 
 function stampStatuses() {
-  (currentData.events || []).forEach((ev) => { ev.status = computeStatus(ev); });
+  (window.currentData.events || []).forEach((ev) => { ev.status = computeStatus(ev); });
 }
 
 function getVisibleEventsForDate(iso) {
   const q = calState.search.trim().toLowerCase();
-  return (currentData.events || [])
+  return (window.currentData.events || [])
     .filter((ev) => occursOn(ev, iso))
     .map((ev) => ({ ...ev, occurrenceDate: iso }))
     .filter((ev) => {
@@ -321,7 +387,7 @@ function computeStreak(realEvents) {
 
 function computeStats() {
   const todayIso = todayISO();
-  const realEvents = currentData.events || [];
+  const realEvents = window.currentData.events || [];
   const todayCount = getVisibleEventsForDate(todayIso).length;
   const completedCount = realEvents.filter((e) => e.completed).length;
   const upcomingCount = realEvents.filter((e) => !e.completed && e.date >= todayIso).length;
@@ -335,23 +401,38 @@ function computeStats() {
 // ─── Init / refresh ─────────────────────────────────────────────────────────
 function initCalendarPage() {
   calState.selected = todayISO();
-  try {
-    hydrateAllEvents();
-    reconcileSourceLinkedEvents();
-    stampStatuses();
-    persist();
-  } catch (_e) { /* fall through — refreshCalendar's own guard renders an error state */ }
+  if (!Array.isArray(window.currentData.events)) window.currentData.events = [];
   bindCalendarGlobalListeners();
   startReminderLoop();
+  startCalendarSync();
   refreshCalendar();
 }
 
+async function startCalendarSync() {
+  const user = await AuthService.waitUntilReady();
+  if (!user) return; // bootShell() already redirects unauthenticated visitors
+  calendarRepo = new CalendarRepository(user.uid);
+  initCrossRepos(user.uid);
+  if (calendarUnsubscribe) calendarUnsubscribe();
+  calendarUnsubscribe = calendarRepo.subscribe(
+    (items) => {
+      window.currentData.events = items.map((ev) => { try { return hydrateEvent(ev); } catch (_e) { return null; } }).filter(Boolean);
+      try {
+        reconcileSourceLinkedEvents();
+        stampStatuses();
+      } catch (_e) { /* fall through — refreshCalendar's own guard renders an error state */ }
+      refreshCalendar();
+    },
+    (error) => console.error('[calendar] realtime sync failed', error)
+  );
+}
+
+function disposeCalendarPage() {
+  if (calendarUnsubscribe) { calendarUnsubscribe(); calendarUnsubscribe = null; }
+}
+
 function refreshCalendar(opts = {}) {
-  if (opts.persistData) {
-    reconcileSourceLinkedEvents();
-    stampStatuses();
-    persist();
-  }
+  if (opts.write) applyCalendarWrite(opts.write);
   const stats = computeStats();
   renderCalendarQuickStats(stats);
   safeRenderCalendarRoot(stats);
@@ -805,18 +886,18 @@ function statsSectionHtml(s) {
 
 // ─── CRUD ───────────────────────────────────────────────────────────────────
 function moveEventToDate(id, iso) {
-  const ev = (currentData.events || []).find((e) => e.id === id);
+  const ev = (window.currentData.events || []).find((e) => e.id === id);
   if (!ev || ev.sourceModule) return;
   ev.date = iso;
   ev.updatedAt = nowStamp();
-  refreshCalendar({ persistData: true });
+  refreshCalendar({ write: { type: 'update', id, data: { date: ev.date, updatedAt: ev.updatedAt } } });
 }
 
 // Method 1: complete directly inside the Calendar. For source-linked events
 // this writes straight back into the origin collection (Todo/Habits/Goals/
 // Prayer/Workout) so both sides agree immediately — no conflicting states.
 function toggleEventComplete(id) {
-  const ev = (currentData.events || []).find((e) => e.id === id);
+  const ev = (window.currentData.events || []).find((e) => e.id === id);
   if (!ev) return;
   const meta = ev.sourceModule ? SOURCE_MODULE_META[ev.sourceModule] : null;
   if (meta && !meta.completable) return; // log-type source: read-only, nothing to flip
@@ -828,25 +909,25 @@ function toggleEventComplete(id) {
     const item = meta.getCollection().find((i) => i.id === ev.sourceId);
     if (item) meta.setCompleted(item, next);
   }
-  refreshCalendar({ persistData: true });
+  refreshCalendar({ write: { type: 'update', id, data: { completed: ev.completed, completedAt: ev.completedAt, updatedAt: ev.updatedAt } } });
 }
 
 function deleteCalendarEvent(id) {
-  const ev = (currentData.events || []).find((e) => e.id === id);
+  const ev = (window.currentData.events || []).find((e) => e.id === id);
   if (!ev || ev.sourceModule) return; // linked events are managed at the source
-  currentData.events = currentData.events.filter((e) => e.id !== id);
-  refreshCalendar({ persistData: true });
+  window.currentData.events = window.currentData.events.filter((e) => e.id !== id);
+  refreshCalendar({ write: { type: 'delete', id } });
 }
 
 function duplicateCalendarEvent(id) {
-  const ev = (currentData.events || []).find((e) => e.id === id);
+  const ev = (window.currentData.events || []).find((e) => e.id === id);
   if (!ev) return;
   const copy = hydrateEvent({
     ...ev, id: makeId(), title: `${ev.title} (Copy)`,
     sourceModule: null, sourceId: null, completed: false, completedAt: null,
   });
-  currentData.events.push(copy);
-  refreshCalendar({ persistData: true });
+  window.currentData.events.push(copy);
+  refreshCalendar({ write: { type: 'create', id: copy.id, data: stripId(copy) } });
 }
 
 function handleQuickAdd(e) {
@@ -859,14 +940,15 @@ function handleQuickAdd(e) {
   const fd = new FormData(e.currentTarget);
   const title = String(fd.get('title') || '').trim();
   if (!title) return;
-  currentData.events.push(hydrateEvent({
+  const newEvent = hydrateEvent({
     id: makeId(), title,
     date: String(fd.get('date') || todayISO()),
     startTime: String(fd.get('time') || ''),
     category: String(fd.get('category') || 'event'),
-  }));
-  calState.selected = String(fd.get('date') || calState.selected);
-  refreshCalendar({ persistData: true });
+  });
+  window.currentData.events.push(newEvent);
+  calState.selected = newEvent.date;
+  refreshCalendar({ write: { type: 'create', id: newEvent.id, data: stripId(newEvent) } });
 }
 
 // ─── Add / Edit event modal ─────────────────────────────────────────────────
@@ -884,7 +966,7 @@ function openEventModal(id) {
 
 function renderEventModal() {
   closeEventModal();
-  const editing = calState.modalEventId ? (currentData.events || []).find((e) => e.id === calState.modalEventId) : null;
+  const editing = calState.modalEventId ? (window.currentData.events || []).find((e) => e.id === calState.modalEventId) : null;
   const ev = editing || {
     title: '', description: '', category: 'event', date: calState.selected || todayISO(),
     startTime: '', endTime: '', priority: 'Medium', repeatRule: 'None', reminder: 'None', color: '', notes: '',
@@ -951,14 +1033,16 @@ function renderEventModal() {
       color: String(fd.get('color') || ''),
       notes: String(fd.get('notes') || '').trim(),
     };
-    if (editing) {
-      Object.assign(editing, hydrateEvent({ ...editing, ...data, updatedAt: nowStamp() }));
-    } else {
-      currentData.events.push(hydrateEvent({ id: makeId(), completed: false, ...data }));
-    }
     calState.selected = data.date;
     closeEventModal();
-    refreshCalendar({ persistData: true });
+    if (editing) {
+      Object.assign(editing, hydrateEvent({ ...editing, ...data, updatedAt: nowStamp() }));
+      refreshCalendar({ write: { type: 'update', id: editing.id, data: { ...data, updatedAt: editing.updatedAt } } });
+    } else {
+      const created = hydrateEvent({ id: makeId(), completed: false, ...data });
+      window.currentData.events.push(created);
+      refreshCalendar({ write: { type: 'create', id: created.id, data: stripId(created) } });
+    }
   });
   const first = overlay.querySelector('input[name="title"]');
   if (first && !linked) first.focus();
@@ -993,7 +1077,7 @@ function fireReminder(ev) {
 function checkReminders() {
   const now = Date.now();
   window.__calFiredReminders = window.__calFiredReminders || new Set();
-  (currentData.events || []).forEach((ev) => {
+  (window.currentData.events || []).forEach((ev) => {
     if (!ev.reminder || ev.reminder === 'None' || ev.completed || !ev.startTime) return;
     const dt = new Date(`${ev.date}T${ev.startTime}:00`);
     const fireAt = dt.getTime() - Number(ev.reminder) * 60000;
@@ -1067,7 +1151,7 @@ function bindResizeHandlers(root) {
       e.preventDefault(); e.stopPropagation();
       const id = handle.dataset.calResize;
       const block = handle.closest('[data-cal-block]');
-      const ev = (currentData.events || []).find((x) => x.id === id);
+      const ev = (window.currentData.events || []).find((x) => x.id === id);
       if (!ev || !block) return;
       const startY = e.clientY;
       const startHeight = block.offsetHeight;
@@ -1157,3 +1241,5 @@ function bindCalendarRootEvents(root) {
   bindResizeHandlers(root);
   bindSwipe(root);
 }
+
+export { initCalendarPage, disposeCalendarPage };

@@ -1,6 +1,30 @@
-// MOMENTUM — Study page logic
-// Reuses bootShell(), persist(), currentData, escapeHtml(), escapeAttr(), makeId(),
+// MOMENTUM — Study page logic (Firestore migration, now complete for this page)
+// Reuses bootShell(), window.currentData, escapeHtml(), escapeAttr(), makeId(),
 // selected(), labelize(), percent() from shared.js. Self-contained: does not
+// modify shared.js. Every ENTITY_META type (session/subject/assignment/exam/
+// project/note/resource) now has its own repository — see studyRepos below —
+// and Pomodoro settings live at pomodoro/{uid} via PomodoroRepository.
+
+import { StudyRepository } from '../repositories/StudyRepository.js';
+import { SubjectRepository } from '../repositories/SubjectRepository.js';
+import { AssignmentRepository } from '../repositories/AssignmentRepository.js';
+import { ExamRepository } from '../repositories/ExamRepository.js';
+import { ProjectRepository } from '../repositories/ProjectRepository.js';
+import { StudyNoteRepository } from '../repositories/StudyNoteRepository.js';
+import { ResourceRepository } from '../repositories/ResourceRepository.js';
+import { PomodoroRepository } from '../repositories/PomodoroRepository.js';
+import { AuthService } from '../services/AuthService.js';
+
+/** @type {import('../repositories/StudyRepository.js').StudyRepository|null} */
+let studyRepo = null;
+let studyUnsubscribe = null;
+// Maps each ENTITY_META type (except 'session', which keeps its own
+// `studyRepo` variable above for backward compatibility with existing code
+// that already reads it directly) to its repository instance + unsubscribe.
+let entityRepos = {};
+let entityUnsubscribes = {};
+let pomodoroRepo = null;
+let pomodoroUnsubscribe = null;
 // modify any global stylesheet.
 //
 // Scope notes (documented rather than silently skipped):
@@ -71,19 +95,19 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 const DAY_SHORT   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 // ─── Lookup helpers ─────────────────────────────────────────────────────────
-function subjectById(id) { return (currentData.subjects || []).find((s) => s.id === id) || null; }
+function subjectById(id) { return (window.currentData.subjects || []).find((s) => s.id === id) || null; }
 function subjectLabel(id) { const s = subjectById(id); return s ? `${s.icon || '📘'} ${s.name}` : 'General'; }
 function subjectColor(id) { const s = subjectById(id); return s ? s.color : '#8b93a6'; }
 
-// ─── Derived stats (all computed from real currentData, nothing fabricated) ─
+// ─── Derived stats (all computed from real window.currentData, nothing fabricated) ─
 function totalMinutesBetween(startIso, endIso) {
-  return (currentData.study || [])
+  return (window.currentData.study || [])
     .filter((s) => s.completed && s.date >= startIso && s.date <= endIso)
     .reduce((sum, s) => sum + Number(s.duration || 0), 0);
 }
 
 function computeStreaks() {
-  const days = new Set((currentData.study || []).filter((s) => s.completed && s.date).map((s) => s.date));
+  const days = new Set((window.currentData.study || []).filter((s) => s.completed && s.date).map((s) => s.date));
   let current = 0;
   for (let i = 0; i < 400; i++) {
     const iso = toISO(addDays(new Date(), -i));
@@ -111,7 +135,7 @@ function computeOverviewStats() {
   const today = todayISO();
   const weekStart = toISO(addDays(new Date(), -6));
   const monthStart = toISO(addDays(new Date(), -29));
-  const sessions = currentData.study || [];
+  const sessions = window.currentData.study || [];
   const completed = sessions.filter((s) => s.completed);
   const todayMinutes = totalMinutesBetween(today, today);
   const weekMinutes = totalMinutesBetween(weekStart, today);
@@ -133,14 +157,14 @@ function computeOverviewStats() {
 }
 
 function computeAchievements(stats) {
-  const completed = (currentData.study || []).filter((s) => s.completed);
+  const completed = (window.currentData.study || []).filter((s) => s.completed);
   const totalHours = completed.reduce((sum, s) => sum + Number(s.duration || 0), 0) / 60;
   const hasEarly = completed.some((s) => s.startTime && s.startTime < '07:00');
   const hasLate = completed.some((s) => s.startTime && s.startTime >= '22:00');
   const perfectWeek = Array.from({ length: 7 }, (_, i) => toISO(addDays(new Date(), -i)))
     .every((iso) => completed.some((s) => s.date === iso));
-  const doneAssignments = (currentData.assignments || []).filter((a) => a.status === 'Completed').length;
-  const wellPreparedExams = (currentData.exams || []).filter((e) => Number(e.preparation || 0) >= 90).length;
+  const doneAssignments = (window.currentData.assignments || []).filter((a) => a.status === 'Completed').length;
+  const wellPreparedExams = (window.currentData.exams || []).filter((e) => Number(e.preparation || 0) >= 90).length;
   return [
     { id: 'streak7', label: '7 Day Streak', icon: '🔥', earned: stats.currentStreak >= 7 },
     { id: 'streak30', label: '30 Day Streak', icon: '🏆', earned: stats.currentStreak >= 30 },
@@ -156,26 +180,71 @@ function computeAchievements(stats) {
 
 // ─── Init / refresh ─────────────────────────────────────────────────────────
 function initStudyPage() {
-  try {
-    resetPomodoroIfNewDay();
-    persist();
-  } catch (_e) { /* handled by the render guard */ }
   bindStudyGlobalListeners();
   startStudyTicker();
+  startStudySync();
   refreshStudy();
 }
 
-function refreshStudy(opts = {}) {
-  if (opts.persistData) persist();
+async function startStudySync() {
+  const user = await AuthService.waitUntilReady();
+  if (!user) return; // bootShell() already redirects unauthenticated visitors
+  studyRepo = new StudyRepository(user.uid);
+  pomodoroRepo = new PomodoroRepository(user.uid);
+  entityRepos = {
+    subject: new SubjectRepository(user.uid),
+    assignment: new AssignmentRepository(user.uid),
+    exam: new ExamRepository(user.uid),
+    project: new ProjectRepository(user.uid),
+    note: new StudyNoteRepository(user.uid),
+    resource: new ResourceRepository(user.uid),
+  };
+
+  if (studyUnsubscribe) studyUnsubscribe();
+  if (pomodoroUnsubscribe) pomodoroUnsubscribe();
+  Object.values(entityUnsubscribes).forEach((u) => u && u());
+  entityUnsubscribes = {};
+
+  studyUnsubscribe = studyRepo.subscribe(
+    (items) => { window.currentData.study = items; refreshStudy(); },
+    (error) => { console.error('[study] realtime sync failed', error); }
+  );
+  pomodoroUnsubscribe = pomodoroRepo.subscribe(
+    (data) => {
+      window.currentData.pomodoro = { ...window.currentData.pomodoro, ...(data || {}) };
+      resetPomodoroIfNewDay();
+      refreshStudy();
+    },
+    (error) => { console.error('[study/pomodoro] realtime sync failed', error); }
+  );
+  Object.entries(entityRepos).forEach(([type, repo]) => {
+    const meta = ENTITY_META[type];
+    entityUnsubscribes[type] = repo.subscribe(
+      (items) => { window.currentData[meta.collection] = items; refreshStudy(); },
+      (error) => { console.error(`[study/${meta.collection}] realtime sync failed`, error); }
+    );
+  });
+}
+
+function disposeStudyPage() {
+  if (studyUnsubscribe) { studyUnsubscribe(); studyUnsubscribe = null; }
+  if (pomodoroUnsubscribe) { pomodoroUnsubscribe(); pomodoroUnsubscribe = null; }
+  Object.values(entityUnsubscribes).forEach((u) => u && u());
+  entityUnsubscribes = {};
+}
+
+function refreshStudy() {
   const stats = computeOverviewStats();
   renderStudyQuickStats(stats);
   safeRenderStudyRoot(stats);
 }
 
 function resetPomodoroIfNewDay() {
-  const p = currentData.pomodoro;
-  if (p.lastResetDate !== todayISO()) { p.sessionsToday = 0; p.lastResetDate = todayISO(); }
+  const p = window.currentData.pomodoro;
+  let changed = false;
+  if (p.lastResetDate !== todayISO()) { p.sessionsToday = 0; p.lastResetDate = todayISO(); changed = true; }
   pomodoro.remaining = (p.mode === 'Custom' ? p.workMin : POMODORO_PRESETS[p.mode]?.work || p.workMin) * 60;
+  if (changed && pomodoroRepo) pomodoroRepo.update({ sessionsToday: p.sessionsToday, lastResetDate: p.lastResetDate });
 }
 
 // ─── Quick stats strip (#stats-grid) ────────────────────────────────────────
@@ -279,7 +348,7 @@ function headerHtml() {
             <label>Subject
               <select data-std-filter="subjectId">
                 <option value="all">All subjects</option>
-                ${(currentData.subjects || []).map((sub) => `<option value="${sub.id}" ${studyState.filters.subjectId === sub.id ? 'selected' : ''}>${escapeHtml(sub.name)}</option>`).join('')}
+                ${(window.currentData.subjects || []).map((sub) => `<option value="${sub.id}" ${studyState.filters.subjectId === sub.id ? 'selected' : ''}>${escapeHtml(sub.name)}</option>`).join('')}
               </select>
             </label>
             <label>Priority
@@ -355,7 +424,7 @@ function matchesSearch(haystackParts) {
 // ─── Today's Study Plan ─────────────────────────────────────────────────────
 function todayPlanHtml() {
   const today = todayISO();
-  const items = (currentData.study || [])
+  const items = (window.currentData.study || [])
     .filter((s) => s.date === today)
     .filter((s) => matchesFilters(s))
     .filter((s) => matchesSearch([s.title, s.topic, s.notes]))
@@ -407,7 +476,7 @@ function sessionCardHtml(sess) {
 }
 
 // ─── Current Session (big timer card) ───────────────────────────────────────
-function activeSession() { return (currentData.study || []).find((s) => s.status === 'In Progress') || null; }
+function activeSession() { return (window.currentData.study || []).find((s) => s.status === 'In Progress') || null; }
 
 function currentSessionHtml() {
   const sess = activeSession();
@@ -454,7 +523,7 @@ function currentSessionHtml() {
 
 // ─── Pomodoro Timer ──────────────────────────────────────────────────────────
 function pomodoroHtml() {
-  const p = currentData.pomodoro;
+  const p = window.currentData.pomodoro;
   return `
     <section class="panel std-pomodoro">
       <div class="std-panel-head">
@@ -572,11 +641,11 @@ const ENTITY_FIELDS = {
 
 // ─── Subjects ───────────────────────────────────────────────────────────────
 function subjectsHtml() {
-  const items = (currentData.subjects || []).filter((s) => matchesSearch([s.name, s.teacher, s.notes]));
+  const items = (window.currentData.subjects || []).filter((s) => matchesSearch([s.name, s.teacher, s.notes]));
   const assignmentCounts = {};
-  (currentData.assignments || []).forEach((a) => { assignmentCounts[a.subjectId] = (assignmentCounts[a.subjectId] || 0) + 1; });
+  (window.currentData.assignments || []).forEach((a) => { assignmentCounts[a.subjectId] = (assignmentCounts[a.subjectId] || 0) + 1; });
   const upcomingExam = {};
-  (currentData.exams || []).forEach((e) => { if (!upcomingExam[e.subjectId] || e.date < upcomingExam[e.subjectId]) upcomingExam[e.subjectId] = e.date; });
+  (window.currentData.exams || []).forEach((e) => { if (!upcomingExam[e.subjectId] || e.date < upcomingExam[e.subjectId]) upcomingExam[e.subjectId] = e.date; });
   return `
     <section class="panel std-subjects">
       <div class="std-panel-head">
@@ -604,7 +673,7 @@ function subjectsHtml() {
 
 // ─── Assignments ────────────────────────────────────────────────────────────
 function assignmentsHtml() {
-  const items = (currentData.assignments || [])
+  const items = (window.currentData.assignments || [])
     .filter((a) => matchesFilters(a, { difficultyKey: null }))
     .filter((a) => matchesSearch([a.title, a.notes]))
     .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
@@ -623,7 +692,7 @@ function assignmentsHtml() {
 
 function resourcesHtml() {
   const f = studyState.filters;
-  const items = (currentData.resources || [])
+  const items = (window.currentData.resources || [])
     .filter((r) => f.subjectId === 'all' || r.subjectId === f.subjectId)
     .filter((r) => matchesSearch([r.title, r.notes, r.url]))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
@@ -693,7 +762,7 @@ function assignmentRowHtml(a) {
 
 // ─── Exams ──────────────────────────────────────────────────────────────────
 function examsHtml() {
-  const items = (currentData.exams || [])
+  const items = (window.currentData.exams || [])
     .filter((e) => matchesSearch([e.room, e.instructor, e.notes]))
     .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
   return `
@@ -730,7 +799,7 @@ function examCardHtml(e) {
 
 // ─── Projects ───────────────────────────────────────────────────────────────
 function projectsHtml() {
-  const items = (currentData.projects || []).filter((p) => matchesSearch([p.title, p.notes, p.members]));
+  const items = (window.currentData.projects || []).filter((p) => matchesSearch([p.title, p.notes, p.members]));
   return `
     <section class="panel std-projects">
       <div class="std-panel-head">
@@ -779,10 +848,10 @@ function studyCalendarHtml() {
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
   const gridStart = addDays(first, -first.getDay());
   const marked = new Set([
-    ...(currentData.study || []).map((s) => s.date),
-    ...(currentData.assignments || []).map((a) => a.dueDate),
-    ...(currentData.exams || []).map((e) => e.date),
-    ...(currentData.projects || []).map((p) => p.deadline),
+    ...(window.currentData.study || []).map((s) => s.date),
+    ...(window.currentData.assignments || []).map((a) => a.dueDate),
+    ...(window.currentData.exams || []).map((e) => e.date),
+    ...(window.currentData.projects || []).map((p) => p.deadline),
   ].filter(Boolean));
   const cells = Array.from({ length: 42 }, (_, i) => {
     const d = addDays(gridStart, i);
@@ -805,7 +874,7 @@ function studyCalendarHtml() {
 
 // ─── Quick Notes ─────────────────────────────────────────────────────────────
 function notesHtml() {
-  const items = (currentData.studyNotes || [])
+  const items = (window.currentData.studyNotes || [])
     .filter((n) => !!n.archived === studyState.notesShowArchived)
     .filter((n) => matchesSearch([n.text]))
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt.localeCompare(a.updatedAt));
@@ -865,7 +934,7 @@ function analyticsHtml(s) {
   const maxDaily = Math.max(1, ...daily.map((d) => d.minutes));
 
   const bySubject = {};
-  (currentData.study || []).filter((x) => x.completed).forEach((x) => { bySubject[x.subjectId || 'none'] = (bySubject[x.subjectId || 'none'] || 0) + Number(x.duration || 0); });
+  (window.currentData.study || []).filter((x) => x.completed).forEach((x) => { bySubject[x.subjectId || 'none'] = (bySubject[x.subjectId || 'none'] || 0) + Number(x.duration || 0); });
   const subjectTotal = Object.values(bySubject).reduce((a, b) => a + b, 0) || 1;
   const subjectRows = Object.entries(bySubject).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
@@ -933,9 +1002,9 @@ function scoreRingHtml(label, pct) {
 // ─── Recent Activity ─────────────────────────────────────────────────────────
 function recentActivityHtml() {
   const items = [
-    ...(currentData.study || []).filter((s) => s.completed).map((s) => ({ ts: s.completedAt || s.updatedAt || '', text: `Completed "${s.title}"${s.topic ? ` — ${s.topic}` : ''}`, icon: '📖' })),
-    ...(currentData.assignments || []).filter((a) => a.status === 'Completed').map((a) => ({ ts: a.updatedAt || '', text: `Finished assignment "${a.title}"`, icon: '📝' })),
-    ...(currentData.studyNotes || []).map((n) => ({ ts: n.updatedAt || '', text: `Updated a note`, icon: '🗒' })),
+    ...(window.currentData.study || []).filter((s) => s.completed).map((s) => ({ ts: s.completedAt || s.updatedAt || '', text: `Completed "${s.title}"${s.topic ? ` — ${s.topic}` : ''}`, icon: '📖' })),
+    ...(window.currentData.assignments || []).filter((a) => a.status === 'Completed').map((a) => ({ ts: a.updatedAt || '', text: `Finished assignment "${a.title}"`, icon: '📝' })),
+    ...(window.currentData.studyNotes || []).map((n) => ({ ts: n.updatedAt || '', text: `Updated a note`, icon: '🗒' })),
   ].filter((i) => i.ts).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
   return `
     <section class="panel std-recent">
@@ -948,30 +1017,37 @@ function recentActivityHtml() {
 // ─── Session lifecycle actions ──────────────────────────────────────────────
 function startSession(id) {
   const running = activeSession();
-  if (running && running.id !== id) { running.status = 'Paused'; running.updatedAt = nowStamp(); }
-  const sess = (currentData.study || []).find((s) => s.id === id);
+  if (running && running.id !== id) {
+    running.status = 'Paused';
+    running.updatedAt = nowStamp();
+    if (studyRepo) studyRepo.update(running.id, { status: running.status, updatedAt: running.updatedAt });
+  }
+  const sess = (window.currentData.study || []).find((s) => s.id === id);
   if (!sess) return;
   sess.status = 'In Progress';
   sess.updatedAt = nowStamp();
-  refreshStudy({ persistData: true });
+  refreshStudy();
+  if (studyRepo) studyRepo.update(id, { status: sess.status, updatedAt: sess.updatedAt });
 }
 function pauseSession(id) {
-  const sess = (currentData.study || []).find((s) => s.id === id);
+  const sess = (window.currentData.study || []).find((s) => s.id === id);
   if (!sess) return;
   sess.status = 'Paused';
   sess.updatedAt = nowStamp();
-  refreshStudy({ persistData: true });
+  refreshStudy();
+  if (studyRepo) studyRepo.update(id, { status: sess.status, updatedAt: sess.updatedAt });
 }
 function stopSession(id) {
-  const sess = (currentData.study || []).find((s) => s.id === id);
+  const sess = (window.currentData.study || []).find((s) => s.id === id);
   if (!sess) return;
   sess.status = 'Planned';
   sess.elapsedSeconds = 0;
   sess.updatedAt = nowStamp();
-  refreshStudy({ persistData: true });
+  refreshStudy();
+  if (studyRepo) studyRepo.update(id, { status: sess.status, elapsedSeconds: 0, updatedAt: sess.updatedAt });
 }
 function completeSession(id) {
-  const sess = (currentData.study || []).find((s) => s.id === id);
+  const sess = (window.currentData.study || []).find((s) => s.id === id);
   if (!sess) return;
   sess.status = 'Completed';
   sess.completed = true;
@@ -979,7 +1055,8 @@ function completeSession(id) {
   sess.completedAt = nowStamp();
   sess.updatedAt = nowStamp();
   if (studyState.focusMode) closeFocusMode();
-  refreshStudy({ persistData: true });
+  refreshStudy();
+  if (studyRepo) studyRepo.update(id, { status: sess.status, completed: true, progress: 100, completedAt: sess.completedAt, updatedAt: sess.updatedAt });
 }
 
 function handleSessionAction(action, id) {
@@ -1016,13 +1093,13 @@ function startStudyTicker() {
       }
     }
     softRefreshCounter++;
-    if (needsPersist) persist();
+    if (needsPersist && sess && studyRepo) studyRepo.update(sess.id, { elapsedSeconds: sess.elapsedSeconds });
     if (softRefreshCounter >= 15) { softRefreshCounter = 0; refreshStudy(); }
   }, 1000);
 }
 
 function handlePomodoroPhaseEnd() {
-  const p = currentData.pomodoro;
+  const p = window.currentData.pomodoro;
   playBeep();
   if (pomodoro.phase === 'work') {
     p.sessionsToday += 1;
@@ -1034,8 +1111,8 @@ function handlePomodoroPhaseEnd() {
     pomodoro.remaining = (p.mode === 'Custom' ? p.workMin : POMODORO_PRESETS[p.mode]?.work || p.workMin) * 60;
     showToast('Break over — back to focus.');
   }
-  persist();
   refreshStudy();
+  if (pomodoroRepo) pomodoroRepo.update({ sessionsToday: p.sessionsToday });
 }
 
 function playBeep() {
@@ -1127,7 +1204,7 @@ function renderFieldHtml(item, [name, label, type, options]) {
     return `<label>${label}<select name="${name}">${options.map((o) => `<option ${selected(value, o)}>${o}</option>`).join('')}</select></label>`;
   }
   if (type === 'subjects') {
-    return `<label>${label}<select name="${name}"><option value="">General (no subject)</option>${(currentData.subjects || []).map((s) => `<option value="${s.id}" ${value === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}</select></label>`;
+    return `<label>${label}<select name="${name}"><option value="">General (no subject)</option>${(window.currentData.subjects || []).map((s) => `<option value="${s.id}" ${value === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}</select></label>`;
   }
   if (type === 'reminder') {
     return `<label>${label}<select name="${name}">${STUDY_REMINDER_OPTIONS.map(([v, l]) => `<option value="${v}" ${value === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
@@ -1161,7 +1238,7 @@ function renderStudyModal() {
   const { type, id } = studyState.modal || {};
   if (!type) return;
   const meta = ENTITY_META[type];
-  const collection = currentData[meta.collection] || [];
+  const collection = window.currentData[meta.collection] || [];
   const editing = id ? collection.find((x) => x.id === id) : null;
   const fields = ENTITY_FIELDS[type];
   document.body.insertAdjacentHTML('beforeend', `
@@ -1200,19 +1277,30 @@ function renderStudyModal() {
     });
     saveEntity(type, editing, data);
     closeStudyModal();
-    refreshStudy({ persistData: true });
+    refreshStudy();
   });
   const firstInput = overlay.querySelector('input, textarea, select');
   if (firstInput) firstInput.focus();
 }
 
+function repoForType(type) {
+  if (type === 'session') return studyRepo;
+  return entityRepos[type] || null;
+}
+
 function saveEntity(type, editing, data) {
   const meta = ENTITY_META[type];
   const now = nowStamp();
+  const repo = repoForType(type);
   if (editing) {
     Object.assign(editing, data, { updatedAt: now });
     if (type === 'assignment') editing.completed = editing.status === 'Completed';
     if (type === 'session') editing.completed = editing.status === 'Completed';
+    if (repo) {
+      const patch = { ...data, updatedAt: now };
+      if (type === 'assignment' || type === 'session') patch.completed = editing.completed;
+      repo.update(editing.id, patch);
+    }
     return;
   }
   const base = { id: makeId(), createdAt: now, updatedAt: now, ...data };
@@ -1220,14 +1308,17 @@ function saveEntity(type, editing, data) {
   if (type === 'assignment') base.completed = data.status === 'Completed';
   if (type === 'project') base.tasks = [];
   if (type === 'note') { base.pinned = false; base.archived = false; if (!base.color) base.color = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)]; }
-  currentData[meta.collection].push(base);
+  window.currentData[meta.collection].push(base);
   addNotification('Study', `${t('New study item')}: ${base.title || base.name || type}`);
+  if (repo) { const { id, ...rest } = base; repo.create(rest, id); }
 }
 
 function deleteEntityById(type, id) {
   const meta = ENTITY_META[type];
-  currentData[meta.collection] = (currentData[meta.collection] || []).filter((x) => x.id !== id);
-  refreshStudy({ persistData: true });
+  const repo = repoForType(type);
+  window.currentData[meta.collection] = (window.currentData[meta.collection] || []).filter((x) => x.id !== id);
+  refreshStudy();
+  if (repo) repo.delete(id);
 }
 
 // ─── Export / Import ─────────────────────────────────────────────────────────
@@ -1241,15 +1332,15 @@ function downloadBlob(content, filename, mime) {
 }
 function exportStudyJson() {
   const payload = {
-    study: currentData.study, subjects: currentData.subjects, assignments: currentData.assignments,
-    exams: currentData.exams, projects: currentData.projects, studyNotes: currentData.studyNotes,
-    resources: currentData.resources,
+    study: window.currentData.study, subjects: window.currentData.subjects, assignments: window.currentData.assignments,
+    exams: window.currentData.exams, projects: window.currentData.projects, studyNotes: window.currentData.studyNotes,
+    resources: window.currentData.resources,
   };
   downloadBlob(JSON.stringify(payload, null, 2), 'mylife-study.json', 'application/json');
 }
 function exportStudyCsv() {
   const rows = [['Subject', 'Topic', 'Date', 'Start Time', 'Duration (min)', 'Priority', 'Difficulty', 'Status']];
-  (currentData.study || []).forEach((s) => rows.push([s.title, s.topic, s.date, s.startTime, s.duration, s.priority, s.difficulty, s.status]));
+  (window.currentData.study || []).forEach((s) => rows.push([s.title, s.topic, s.date, s.startTime, s.duration, s.priority, s.difficulty, s.status]));
   const csv = rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
   downloadBlob(csv, 'mylife-study-sessions.csv', 'text/csv');
 }
@@ -1320,23 +1411,25 @@ function bindStudyRootEvents(root) {
   }));
 
   qa('[data-std-assignment-toggle]').forEach((chk) => chk.addEventListener('change', () => {
-    const a = (currentData.assignments || []).find((x) => x.id === chk.dataset.stdAssignmentToggle);
+    const a = (window.currentData.assignments || []).find((x) => x.id === chk.dataset.stdAssignmentToggle);
     if (!a) return;
     a.status = chk.checked ? 'Completed' : 'Not Started';
     a.completed = chk.checked;
     a.progress = chk.checked ? 100 : a.progress;
     a.updatedAt = nowStamp();
-    refreshStudy({ persistData: true });
+    refreshStudy();
+    if (entityRepos.assignment) entityRepos.assignment.update(a.id, { status: a.status, completed: a.completed, progress: a.progress, updatedAt: a.updatedAt });
   }));
 
   qa('[data-std-project-task]').forEach((chk) => chk.addEventListener('change', () => {
     const [pid, tid] = chk.dataset.stdProjectTask.split(':');
-    const p = (currentData.projects || []).find((x) => x.id === pid);
+    const p = (window.currentData.projects || []).find((x) => x.id === pid);
     if (!p) return;
     const t = (p.tasks || []).find((x) => x.id === tid);
     if (t) t.done = chk.checked;
     p.progress = p.tasks.length ? Math.round((p.tasks.filter((x) => x.done).length / p.tasks.length) * 100) : p.progress;
-    refreshStudy({ persistData: true });
+    refreshStudy();
+    if (entityRepos.project) entityRepos.project.update(p.id, { tasks: p.tasks, progress: p.progress });
   }));
   qa('[data-std-project-task-add]').forEach((form) => form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1344,44 +1437,64 @@ function bindStudyRootEvents(root) {
     const input = form.querySelector('input[name="title"]');
     const title = input.value.trim();
     if (!title) return;
-    const p = (currentData.projects || []).find((x) => x.id === pid);
+    const p = (window.currentData.projects || []).find((x) => x.id === pid);
     if (!p) return;
     p.tasks = p.tasks || [];
     p.tasks.push({ id: makeId(), title, done: false });
-    refreshStudy({ persistData: true });
+    refreshStudy();
+    if (entityRepos.project) entityRepos.project.update(p.id, { tasks: p.tasks });
   }));
 
   qa('[data-std-note-pin]').forEach((btn) => btn.addEventListener('click', () => {
-    const n = (currentData.studyNotes || []).find((x) => x.id === btn.dataset.stdNotePin);
-    if (n) { n.pinned = !n.pinned; n.updatedAt = nowStamp(); refreshStudy({ persistData: true }); }
+    const n = (window.currentData.studyNotes || []).find((x) => x.id === btn.dataset.stdNotePin);
+    if (n) {
+      n.pinned = !n.pinned; n.updatedAt = nowStamp();
+      refreshStudy();
+      if (entityRepos.note) entityRepos.note.update(n.id, { pinned: n.pinned, updatedAt: n.updatedAt });
+    }
   }));
   qa('[data-std-note-archive]').forEach((btn) => btn.addEventListener('click', () => {
-    const n = (currentData.studyNotes || []).find((x) => x.id === btn.dataset.stdNoteArchive);
-    if (n) { n.archived = !n.archived; n.updatedAt = nowStamp(); refreshStudy({ persistData: true }); }
+    const n = (window.currentData.studyNotes || []).find((x) => x.id === btn.dataset.stdNoteArchive);
+    if (n) {
+      n.archived = !n.archived; n.updatedAt = nowStamp();
+      refreshStudy();
+      if (entityRepos.note) entityRepos.note.update(n.id, { archived: n.archived, updatedAt: n.updatedAt });
+    }
   }));
   const archiveToggle = q('[data-std-notes-toggle-archive]');
   if (archiveToggle) archiveToggle.addEventListener('click', () => { studyState.notesShowArchived = !studyState.notesShowArchived; refreshStudy(); });
 
   qa('[data-std-pomo-mode]').forEach((btn) => btn.addEventListener('click', () => {
-    const p = currentData.pomodoro;
+    const p = window.currentData.pomodoro;
     p.mode = btn.dataset.stdPomoMode;
     if (POMODORO_PRESETS[p.mode]) { p.workMin = POMODORO_PRESETS[p.mode].work; p.breakMin = POMODORO_PRESETS[p.mode].break; }
     pomodoro.running = false;
     pomodoro.phase = 'work';
     pomodoro.remaining = p.workMin * 60;
-    refreshStudy({ persistData: true });
+    refreshStudy();
+    if (pomodoroRepo) pomodoroRepo.update({ mode: p.mode, workMin: p.workMin, breakMin: p.breakMin });
   }));
   const workInput = q('#std-pomo-work');
   const breakInput = q('#std-pomo-break');
-  if (workInput) workInput.addEventListener('change', () => { currentData.pomodoro.workMin = Number(workInput.value || 25); if (!pomodoro.running && pomodoro.phase === 'work') pomodoro.remaining = currentData.pomodoro.workMin * 60; persist(); });
-  if (breakInput) breakInput.addEventListener('change', () => { currentData.pomodoro.breakMin = Number(breakInput.value || 5); if (!pomodoro.running && pomodoro.phase === 'break') pomodoro.remaining = currentData.pomodoro.breakMin * 60; persist(); });
+  if (workInput) workInput.addEventListener('change', () => {
+    window.currentData.pomodoro.workMin = Number(workInput.value || 25);
+    if (!pomodoro.running && pomodoro.phase === 'work') pomodoro.remaining = window.currentData.pomodoro.workMin * 60;
+    if (pomodoroRepo) pomodoroRepo.update({ workMin: window.currentData.pomodoro.workMin });
+  });
+  if (breakInput) breakInput.addEventListener('change', () => {
+    window.currentData.pomodoro.breakMin = Number(breakInput.value || 5);
+    if (!pomodoro.running && pomodoro.phase === 'break') pomodoro.remaining = window.currentData.pomodoro.breakMin * 60;
+    if (pomodoroRepo) pomodoroRepo.update({ breakMin: window.currentData.pomodoro.breakMin });
+  });
 
   qa('[data-std-pomo-action]').forEach((btn) => btn.addEventListener('click', () => {
     const action = btn.dataset.stdPomoAction;
     if (action === 'start') pomodoro.running = true;
     else if (action === 'pause') pomodoro.running = false;
-    else if (action === 'reset') { pomodoro.running = false; pomodoro.phase = 'work'; pomodoro.remaining = (currentData.pomodoro.mode === 'Custom' ? currentData.pomodoro.workMin : POMODORO_PRESETS[currentData.pomodoro.mode]?.work || currentData.pomodoro.workMin) * 60; }
+    else if (action === 'reset') { pomodoro.running = false; pomodoro.phase = 'work'; pomodoro.remaining = (window.currentData.pomodoro.mode === 'Custom' ? window.currentData.pomodoro.workMin : POMODORO_PRESETS[window.currentData.pomodoro.mode]?.work || window.currentData.pomodoro.workMin) * 60; }
     else if (action === 'skip') handlePomodoroPhaseEnd();
     refreshStudy();
   }));
 }
+
+export { initStudyPage, disposeStudyPage };

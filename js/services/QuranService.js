@@ -53,3 +53,4 @@ const QuranService = (() => {
 
   return { getChapterList, getChapter, getAllChapters };
 })();
+window.QuranService = QuranService;

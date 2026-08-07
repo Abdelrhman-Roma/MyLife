@@ -19,3 +19,4 @@ const WeatherService = (() => {
   }
   return { fetchWeather };
 })();
+window.WeatherService = WeatherService;

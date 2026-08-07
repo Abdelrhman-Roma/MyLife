@@ -47,3 +47,4 @@ const NetworkUtils = (() => {
 
   return { fetchWithRetry };
 })();
+window.NetworkUtils = NetworkUtils;

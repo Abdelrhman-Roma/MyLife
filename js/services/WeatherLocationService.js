@@ -20,3 +20,4 @@ const WeatherLocationService = (() => {
     fromSearch(result) { const location = { latitude: result.latitude, longitude: result.longitude, name: result.name, country: result.country || '', timezone: result.timezone || '', source: 'search' }; localStorage.setItem(PERMISSION_KEY, 'manual'); set(location); return location; },
   };
 })();
+window.WeatherLocationService = WeatherLocationService;

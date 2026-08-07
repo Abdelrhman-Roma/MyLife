@@ -29,15 +29,17 @@ function bridgeIntoLegacySession(user, remember) {
     };
     users.push(legacyUser);
     saveUsers(users);
-    saveData(email, emptyData(legacyUser.name));
   }
-  if (remember) {
-    localStorage.setItem(SESSION_KEY, email);
-    sessionStorage.removeItem(SESSION_KEY);
-  } else {
-    sessionStorage.setItem(SESSION_KEY, email);
-    localStorage.removeItem(SESSION_KEY);
-  }
+  // Always localStorage, regardless of `remember`: firebase/auth.js sets
+  // Firebase Auth's own persistence to browserLocalPersistence unconditionally
+  // (a deliberate, documented choice — see that file), so Firebase itself
+  // stays signed in across tabs/restarts no matter what this checkbox says.
+  // Honoring `remember` here by falling back to sessionStorage used to mean
+  // this local session gate would sign the user out on a new tab or restart
+  // while Firebase still considered them authenticated — a real, reproducible
+  // "session restore" bug for anyone who unchecked "remember me" at login.
+  localStorage.setItem(SESSION_KEY, email);
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 async function login(email, password, remember) {

@@ -10,3 +10,4 @@ const WeatherCodes = (() => {
   };
   return { get(code, isDay = 1) { const [label, kind] = groups[code] || ['Unknown conditions','cloudy']; return { label: t(label), kind, night: kind === 'clear' && !isDay }; } };
 })();
+window.WeatherCodes = WeatherCodes;

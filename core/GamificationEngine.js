@@ -263,7 +263,7 @@ async function buildStatsSnapshot(uid, streakRepo, metadata) {
   const prayerStreak = await streakRepo.getByKind('prayer');
   const hour = new Date().getHours();
 
-  const d = (typeof currentData !== 'undefined' && currentData) || {};
+  const d = (typeof window.currentData !== 'undefined' && window.currentData) || {};
   return {
     totalTasksCompleted: (d.tasks || []).filter((x) => x.completed).length,
     totalWorkoutsCompleted: (d.workouts || []).filter((x) => x.completed).length,

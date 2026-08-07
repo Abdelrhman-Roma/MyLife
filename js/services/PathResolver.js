@@ -28,3 +28,4 @@ const PathResolver = (() => {
     isFileProtocol: () => window.location.protocol === 'file:',
   };
 })();
+window.PathResolver = PathResolver;

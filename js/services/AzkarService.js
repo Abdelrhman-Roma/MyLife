@@ -43,3 +43,4 @@ const AzkarService = (() => {
 
   return { getAll, getCategories, getByCategory, search };
 })();
+window.AzkarService = AzkarService;

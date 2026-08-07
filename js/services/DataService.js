@@ -94,3 +94,4 @@ const DataService = (() => {
 
   return { fetchJson, cacheGet, cacheSet, clearCache };
 })();
+window.DataService = DataService;

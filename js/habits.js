@@ -1,13 +1,24 @@
-// MyLife — Habits module (Phase 3).
-// currentData.habits keeps `.completed` as a real, synced field meaning
-// "completed today" (kept in sync with the new `.completions[]` history log
-// by normalizeData()'s day-rollover pass in shared.js) — so getCounts(),
-// the Dashboard, Statistics, and achievements all keep working unchanged.
+// MyLife — Habits module (Firestore migration).
+//
+// Habits now live at habits/{uid}/items/{id} via HabitRepository, synced in
+// realtime with onSnapshot — the same pattern as js/todo.js. window.currentData.habits
+// is kept as the render-facing cache (so every render function below is
+// unchanged), but it is now populated FROM Firestore, not from the legacy
+// currentData/appData blob, and writes go straight to HabitRepository instead
+// of persist(). `.completed` remains a real field meaning "completed today".
+
+import { HabitRepository } from '../repositories/HabitRepository.js';
+import { AuthService } from '../services/AuthService.js';
 
 const HABIT_DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const HABIT_HEATMAP_WEEKS = 12;
 
 let habitState = { filter: 'all', category: 'all', modal: null };
+
+/** @type {import('../repositories/HabitRepository.js').HabitRepository|null} */
+let habitRepo = null;
+let habitsUnsubscribe = null;
+let habitsLoading = true;
 
 function habIso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function habAddDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -73,13 +84,34 @@ function habitHeatmapCells(h) {
 
 function allHabitCategories() {
   const set = new Set();
-  currentData.habits.forEach((h) => { if (h.category) set.add(h.category); });
+  window.currentData.habits.forEach((h) => { if (h.category) set.add(h.category); });
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 function initHabitsPage() {
-  renderArt('habits');
   renderHabitsRoot();
+  startHabitsSync();
+}
+
+async function startHabitsSync() {
+  const user = await AuthService.waitUntilReady();
+  if (!user) return; // bootShell() already redirects unauthenticated visitors
+  habitRepo = new HabitRepository(user.uid);
+  if (habitsUnsubscribe) habitsUnsubscribe();
+  habitsUnsubscribe = habitRepo.subscribe(
+    (items) => {
+      window.currentData.habits = items.map((h) => ({ completed: false, completions: [], difficulty: 'Medium', weeklyTarget: 7, ...h, completions: Array.isArray(h.completions) ? h.completions : [] }));
+      const today = habToday();
+      window.currentData.habits.forEach((h) => { h.completed = h.completions.includes(today); });
+      habitsLoading = false;
+      renderHabitsRoot();
+    },
+    (error) => { console.error('[habits] realtime sync failed', error); habitsLoading = false; renderHabitsRoot(); }
+  );
+}
+
+function disposeHabitsPage() {
+  if (habitsUnsubscribe) { habitsUnsubscribe(); habitsUnsubscribe = null; }
 }
 
 function renderHabitsRoot() {
@@ -98,8 +130,8 @@ function renderHabitsRoot() {
 }
 
 function habitsHeaderHtml() {
-  const total = currentData.habits.length;
-  const done = currentData.habits.filter((h) => h.completed).length;
+  const total = window.currentData.habits.length;
+  const done = window.currentData.habits.filter((h) => h.completed).length;
   return `
     <section class="panel hab-header">
       <div class="hab-header-top">
@@ -133,7 +165,7 @@ function habitsFiltersHtml() {
 }
 
 function visibleHabits() {
-  return currentData.habits.filter((h) => {
+  return window.currentData.habits.filter((h) => {
     if (habitState.filter === 'today' && h.completed) return false;
     if (habitState.filter === 'done' && !h.completed) return false;
     if (habitState.category !== 'all' && h.category !== habitState.category) return false;
@@ -198,20 +230,35 @@ function bindHabitsRootEvents(root) {
 function toggleHabitToday(id) { toggleHabitDate(id, habToday()); }
 
 function toggleHabitDate(id, iso) {
-  const h = currentData.habits.find((x) => x.id === id);
-  if (!h) return;
+  const h = window.currentData.habits.find((x) => x.id === id);
+  if (!h || !habitRepo) return;
+  const previousCompletions = [...(h.completions || [])];
   h.completions = h.completions || [];
   if (h.completions.includes(iso)) h.completions = h.completions.filter((d) => d !== iso);
   else h.completions.push(iso);
   h.completed = h.completions.includes(habToday());
-  persist();
   renderHabitsRoot();
+  habitRepo.update(id, { completions: h.completions, completed: h.completed }).then((result) => {
+    if (!result.ok) {
+      h.completions = previousCompletions;
+      h.completed = h.completions.includes(habToday());
+      renderHabitsRoot();
+    }
+  });
 }
 
 function deleteHabit(id) {
-  currentData.habits = currentData.habits.filter((x) => x.id !== id);
-  persist();
+  if (!habitRepo) return;
+  const removed = window.currentData.habits.find((x) => x.id === id);
+  const removedIndex = window.currentData.habits.findIndex((x) => x.id === id);
+  window.currentData.habits = window.currentData.habits.filter((x) => x.id !== id);
   renderHabitsRoot();
+  habitRepo.delete(id).then((result) => {
+    if (!result.ok && removed) {
+      window.currentData.habits.splice(removedIndex, 0, removed);
+      renderHabitsRoot();
+    }
+  });
 }
 
 function openHabitModal(id) { habitState.modal = id || 'new'; renderHabitModal(); }
@@ -221,7 +268,7 @@ function renderHabitModal() {
   const existing = document.querySelector('[data-hab-modal]');
   if (existing) existing.remove();
   if (!habitState.modal) return;
-  const editing = habitState.modal === 'new' ? null : currentData.habits.find((x) => x.id === habitState.modal);
+  const editing = habitState.modal === 'new' ? null : window.currentData.habits.find((x) => x.id === habitState.modal);
   const cats = allHabitCategories();
 
   document.body.insertAdjacentHTML('beforeend', `
@@ -277,14 +324,26 @@ function renderHabitModal() {
       difficulty: String(fd.get('difficulty') || 'Medium'),
       weeklyTarget: Math.max(1, Math.min(7, Number(fd.get('weeklyTarget')) || 7)),
     };
+    if (!habitRepo) return;
     if (editing) {
       Object.assign(editing, data);
+      closeHabitModal();
+      renderHabitsRoot();
+      habitRepo.update(editing.id, data);
     } else {
-      currentData.habits.push({ id: makeId(), completed: false, completions: [], createdAt: new Date().toISOString(), ...data });
+      const optimisticId = makeId();
+      window.currentData.habits.push({ id: optimisticId, completed: false, completions: [], createdAt: new Date().toISOString(), ...data });
       addNotification('Habits', `${t('Habit added')}: ${title}`);
+      closeHabitModal();
+      renderHabitsRoot();
+      habitRepo.create({ completions: [], ...data }, optimisticId).then((result) => {
+        if (!result.ok) {
+          window.currentData.habits = window.currentData.habits.filter((x) => x.id !== optimisticId);
+          renderHabitsRoot();
+        }
+      });
     }
-    persist();
-    closeHabitModal();
-    renderHabitsRoot();
   });
 }
+
+export { initHabitsPage, disposeHabitsPage };

@@ -1,7 +1,35 @@
-// MOMENTUM — Profile & Settings page controller.
+// MOMENTUM — Profile & Settings page controller (Firestore migration, Phase 6).
 // Renders the merged account experience (overview, personal info, appearance,
 // notifications, productivity, statistics, achievements, security, backup, about)
 // on top of the shared shell (sidebar/topbar) from js/shared.js.
+//
+// Profile, Settings, and Security now live at profile/{uid}, settings/{uid},
+// and security/{uid} (singleton documents — see
+// repositories/SingletonDocRepository.js) instead of the legacy appData
+// blob. Password changes now go through the real Firebase Auth
+// AuthService.changePassword() instead of the old local-only
+// verifyPassword()/setPassword() shim (see changePassword() below) — that
+// shim never actually changed the user's real Firebase password, only a
+// vestigial local copy nothing else reads.
+//
+// Achievements/XP display is UNCHANGED this phase — this page runs its own,
+// separate achievement system from core/GamificationEngine.js's real one
+// (see ACHIEVEMENT_COMPARISON.md); migrating the display requires a product
+// decision on which system is canonical, not a data-source swap.
+
+import { ProfileRepository } from '../../repositories/ProfileRepository.js';
+import { SettingsRepository } from '../../repositories/SettingsRepository.js';
+import { SecurityRepository } from '../../repositories/SecurityRepository.js';
+import { uploadDataUrl, deleteFile } from '../../firebase/storage.js';
+import { AuthService } from '../../services/AuthService.js';
+import { UserService } from '../../services/UserService.js';
+
+let profileRepo = null;
+let settingsRepo = null;
+let securityRepo = null;
+let profileUnsubscribe = null;
+let settingsUnsubscribe = null;
+let securityUnsubscribe = null;
 
 const ACCOUNT_SECTIONS = [
   ['overview',      'Overview',                '◔'],
@@ -54,11 +82,60 @@ function initAccountPage() {
   const initial = (location.hash || '#overview').replace('#', '') || 'overview';
   requestAnimationFrame(() => scrollToSection(initial, true));
   window.__pageContentReinit = () => { syncAchievements(); renderHero(); renderNav(); renderContent(); };
+  startAccountSync();
 }
+
+const PROFILE_FIELDS = ['firstName', 'lastName', 'username', 'phone', 'birthday', 'gender', 'country', 'city', 'location', 'timezone', 'headline', 'bio', 'photo', 'cover'];
+const SECURITY_FIELDS = ['twoFactor', 'lastPasswordChange'];
+
+async function startAccountSync() {
+  const user = await AuthService.waitUntilReady();
+  if (!user) return; // bootShell() already redirects unauthenticated visitors
+  profileRepo = new ProfileRepository(user.uid);
+  settingsRepo = new SettingsRepository(user.uid);
+  securityRepo = new SecurityRepository(user.uid);
+
+  if (profileUnsubscribe) profileUnsubscribe();
+  if (settingsUnsubscribe) settingsUnsubscribe();
+  if (securityUnsubscribe) securityUnsubscribe();
+
+  profileUnsubscribe = profileRepo.subscribe(
+    (data) => {
+      if (data) Object.assign(window.currentData.profile, data);
+      if (typeof window.__pageContentReinit === 'function') window.__pageContentReinit();
+    },
+    (error) => { console.error('[account/profile] realtime sync failed', error); }
+  );
+  settingsUnsubscribe = settingsRepo.subscribe(
+    (data) => {
+      if (data) {
+        Object.assign(window.currentData.settings, data);
+        applyTheme(window.currentData.settings.theme, window.currentData.settings.palette);
+        applyAppearance(window.currentData.settings);
+      }
+      if (typeof window.__pageContentReinit === 'function') window.__pageContentReinit();
+    },
+    (error) => { console.error('[account/settings] realtime sync failed', error); }
+  );
+  securityUnsubscribe = securityRepo.subscribe(
+    (data) => {
+      if (data) Object.assign(window.currentData.security, data);
+      if (typeof window.__pageContentReinit === 'function') window.__pageContentReinit();
+    },
+    (error) => { console.error('[account/security] realtime sync failed', error); }
+  );
+}
+
+function disposeAccountPage() {
+  if (profileUnsubscribe) { profileUnsubscribe(); profileUnsubscribe = null; }
+  if (settingsUnsubscribe) { settingsUnsubscribe(); settingsUnsubscribe = null; }
+  if (securityUnsubscribe) { securityUnsubscribe(); securityUnsubscribe = null; }
+}
+window.addEventListener('beforeunload', disposeAccountPage);
 
 // ─── Hero ───────────────────────────────────────────────────────────────
 function renderHero() {
-  const p = currentData.profile;
+  const p = window.currentData.profile;
   const xpInfo = levelInfo(p);
   const score = productivityScore();
   byId('account-hero').innerHTML = `
@@ -209,15 +286,15 @@ function sectionBody(key) {
 // ─── Overview ───────────────────────────────────────────────────────────
 function overviewHtml() {
   const c = getCounts();
-  const s = currentData.settings;
+  const s = window.currentData.settings;
   const n = nutritionTotals();
-  const avgSleep = currentData.sleep.length
-    ? (currentData.sleep.reduce((sum, i) => sum + Number(i.hours || 0), 0) / currentData.sleep.length).toFixed(1)
+  const avgSleep = window.currentData.sleep.length
+    ? (window.currentData.sleep.reduce((sum, i) => sum + Number(i.hours || 0), 0) / window.currentData.sleep.length).toFixed(1)
     : '0';
   const cards = [
     ['Tasks completed',    `${c.completedTasks}/${c.tasks}`],
     ['Habits completed',   `${c.completedHabits}/${c.habits}`],
-    ['Study hours',        (currentData.study.reduce((s2, i) => s2 + Number(i.minutes || 0), 0) / 60).toFixed(1)],
+    ['Study hours',        (window.currentData.study.reduce((s2, i) => s2 + Number(i.minutes || 0), 0) / 60).toFixed(1)],
     ['Workout sessions',   c.workouts],
     ['Prayer consistency', `${percent(c.prayers, (s.prayerGoal || 5) * 4)}%`],
     ['Water streak',       `${c.water} glasses logged`],
@@ -241,7 +318,7 @@ function overviewHtml() {
       </div>
       <div class="data-card stacked">
         <h3>Bio</h3>
-        <p>${escapeHtml(currentData.profile.bio || 'No bio added yet.')}</p>
+        <p>${escapeHtml(window.currentData.profile.bio || 'No bio added yet.')}</p>
       </div>
     </div>
   `;
@@ -249,7 +326,7 @@ function overviewHtml() {
 
 // ─── Personal information ─────────────────────────────────────────────
 function personalHtml() {
-  const p = currentData.profile;
+  const p = window.currentData.profile;
   const [firstName, ...rest] = currentUser.name.split(' ');
   const lastName = rest.join(' ');
   return `
@@ -313,7 +390,7 @@ function timezoneOptions(current) {
 
 // ─── Appearance ─────────────────────────────────────────────────────────
 function appearanceHtml() {
-  const s = currentData.settings;
+  const s = window.currentData.settings;
   return `
     <div class="appearance-block">
       <h3>${t('Theme')}</h3>
@@ -375,7 +452,7 @@ function toggleRow(key, title, desc, checked, disabled = false) {
 
 // ─── Notifications ──────────────────────────────────────────────────────
 function notificationsHtml() {
-  const n = currentData.notifications;
+  const n = window.currentData.notifications;
   const reminders = [
     ['task', 'Task reminders'], ['habit', 'Habit reminders'], ['workout', 'Workout reminders'],
     ['study', 'Study reminders'], ['prayer', 'Prayer reminders'], ['goal', 'Goal reminders'],
@@ -396,7 +473,7 @@ function notificationsHtml() {
 
 // ─── Productivity ───────────────────────────────────────────────────────
 function productivityHtml() {
-  const s = currentData.settings;
+  const s = window.currentData.settings;
   return `
     <form class="account-form" id="productivity-form" novalidate>
       <div class="form-grid">
@@ -418,8 +495,8 @@ function productivityHtml() {
     </form>
     <h3 class="section-subhead">Reviews</h3>
     <div class="toggles">
-      ${toggleRow('notif:weeklyReview', 'Weekly review reminder', 'A nudge every Sunday to reflect on the week.', !!currentData.notifications.weeklyReview)}
-      ${toggleRow('notif:monthlyReview', 'Monthly review reminder', 'A nudge on the 1st to plan the month ahead.', !!currentData.notifications.monthlyReview)}
+      ${toggleRow('notif:weeklyReview', 'Weekly review reminder', 'A nudge every Sunday to reflect on the week.', !!window.currentData.notifications.weeklyReview)}
+      ${toggleRow('notif:monthlyReview', 'Monthly review reminder', 'A nudge on the 1st to plan the month ahead.', !!window.currentData.notifications.monthlyReview)}
     </div>
   `;
 }
@@ -427,7 +504,7 @@ function productivityHtml() {
 // ─── Statistics ─────────────────────────────────────────────────────────
 function statisticsHtml() {
   const c = getCounts();
-  const s = currentData.settings;
+  const s = window.currentData.settings;
   const n = nutritionTotals();
   const rows = [
     ['Tasks', c.completedTasks, c.tasks],
@@ -465,21 +542,21 @@ function nutritionSummaryCard2(label, value, target, suffix = '') {
 // ─── Achievements ───────────────────────────────────────────────────────
 function syncAchievements() {
   const c = getCounts();
-  const unlocked = new Set(currentData.achievements.unlocked || []);
+  const unlocked = new Set(window.currentData.achievements.unlocked || []);
   let changed = false;
   ACHIEVEMENT_DEFS.forEach(([id, , , , test]) => {
     if (test(c) && !unlocked.has(id)) { unlocked.add(id); changed = true; }
   });
   if (changed) {
-    currentData.achievements.unlocked = Array.from(unlocked);
-    currentData.profile.xp = computeXp();
+    window.currentData.achievements.unlocked = Array.from(unlocked);
+    window.currentData.profile.xp = computeXp();
     persist();
   }
 }
 
 function achievementsHtml() {
   const c = getCounts();
-  const unlocked = new Set(currentData.achievements.unlocked || []);
+  const unlocked = new Set(window.currentData.achievements.unlocked || []);
   return `
     <div class="achievement-grid">
       ${ACHIEVEMENT_DEFS.map(([id, icon, title, desc, , progressFn]) => {
@@ -500,7 +577,7 @@ function achievementsHtml() {
 
 // ─── Security ───────────────────────────────────────────────────────────
 function securityHtml() {
-  const sec = currentData.security;
+  const sec = window.currentData.security;
   return `
     <div class="account-panel-section">
       <h3>Change password</h3>
@@ -714,9 +791,9 @@ function bindSectionEvents() {
 
   document.querySelectorAll('.theme-card').forEach((btn) => {
     btn.addEventListener('click', () => {
-      currentData.settings.palette = btn.dataset.palette;
-      persist();
-      applyTheme(currentData.settings.theme, currentData.settings.palette);
+      window.currentData.settings.palette = btn.dataset.palette;
+      if (settingsRepo) settingsRepo.update({ palette: window.currentData.settings.palette });
+      applyTheme(window.currentData.settings.theme, window.currentData.settings.palette);
       document.querySelectorAll('.theme-card').forEach((s) => {
         s.classList.toggle('active', s === btn);
         s.setAttribute('aria-pressed', String(s === btn));
@@ -768,7 +845,7 @@ function bindProfilePhotoControls() {
       byId('avatar-edit-btn').setAttribute('aria-expanded', 'false');
       if (action === 'change') openPhotoPicker('avatar-file-input');
       else if (action === 'remove') removePhoto('avatar');
-      else if (action === 'view') openPhotoViewer(currentData.profile.photo);
+      else if (action === 'view') openPhotoViewer(window.currentData.profile.photo);
       else if (action === 'edit-profile') scrollToSection('personal');
     });
   }
@@ -801,8 +878,9 @@ function savePersonal(e) {
   const last  = String(form.get('lastName') || '').trim();
   if (!first) { byId('personal-message').textContent = 'First name is required.'; return; }
 
-  currentUser.name = [first, last].filter(Boolean).join(' ');
-  Object.assign(currentData.profile, {
+  const displayName = [first, last].filter(Boolean).join(' ');
+  currentUser.name = displayName; // keeps the local session chrome (sidebar greeting, etc.) in sync — see js/shared.js's bootShell()
+  const patch = {
     firstName: first,
     lastName:  last,
     username:  String(form.get('username') || '').trim(),
@@ -816,13 +894,15 @@ function savePersonal(e) {
     language:  String(form.get('language') || getLang()),
     headline:  String(form.get('headline') || '').trim(),
     bio:       String(form.get('bio') || '').trim(),
-  });
+  };
+  Object.assign(window.currentData.profile, patch);
   saveUsers(getUsers().map((u) => (u.email === currentUser.email ? currentUser : u)));
-  persist();
   byId('personal-message').textContent = 'Saved.';
   renderHero();
   renderSidebar('account');
   window.setTimeout(() => { const m = byId('personal-message'); if (m) m.textContent = ''; }, 2500);
+  if (profileRepo) profileRepo.update(patch);
+  if (AuthService.getCurrentUser()) UserService.updateProfile(AuthService.getCurrentUser().uid, { displayName });
 }
 
 function saveProductivity(e) {
@@ -832,28 +912,29 @@ function saveProductivity(e) {
     return;
   }
   const form = new FormData(e.currentTarget);
+  const patch = {};
   ['studyGoal', 'workoutGoal', 'waterGoal', 'sleepGoal', 'habitGoal', 'prayerGoal', 'calorieTarget', 'proteinTarget', 'carbTarget', 'fatTarget']
-    .forEach((key) => { currentData.settings[key] = Number(form.get(key)) || 0; });
-  persist();
+    .forEach((key) => { patch[key] = Number(form.get(key)) || 0; window.currentData.settings[key] = patch[key]; });
   byId('productivity-message').textContent = 'Targets saved.';
   window.setTimeout(() => { const m = byId('productivity-message'); if (m) m.textContent = ''; }, 2500);
+  if (settingsRepo) settingsRepo.update(patch);
 }
 
 function handleSegmented(group, value) {
   if (group === 'theme') {
-    currentData.settings.theme = value;
-    applyTheme(value, currentData.settings.palette);
+    window.currentData.settings.theme = value;
+    applyTheme(value, window.currentData.settings.palette);
   } else {
-    currentData.settings[group] = value;
-    applyAppearance(currentData.settings);
+    window.currentData.settings[group] = value;
+    applyAppearance(window.currentData.settings);
   }
-  persist();
+  if (settingsRepo) settingsRepo.update({ [group]: value });
 }
 
 function handleToggle(key, checked) {
   if (key === 'notif:desktop' && checked) {
     if (!('Notification' in window)) {
-      currentData.notifications.desktop = false;
+      window.currentData.notifications.desktop = false;
       persist();
       renderContent();
       showToast('Desktop notifications are not supported by this browser.', 'danger');
@@ -861,7 +942,7 @@ function handleToggle(key, checked) {
     }
     if (Notification.permission === 'default') {
       Notification.requestPermission().then((permission) => {
-        currentData.notifications.desktop = permission === 'granted';
+        window.currentData.notifications.desktop = permission === 'granted';
         persist();
         renderContent();
         showToast(permission === 'granted' ? 'Desktop notifications enabled.' : 'Desktop notification permission was not granted.', permission === 'granted' ? 'success' : 'danger');
@@ -869,7 +950,7 @@ function handleToggle(key, checked) {
       return;
     }
     if (Notification.permission === 'denied') {
-      currentData.notifications.desktop = false;
+      window.currentData.notifications.desktop = false;
       persist();
       renderContent();
       showToast('Allow notifications in your browser settings to enable reminders.', 'danger');
@@ -877,14 +958,17 @@ function handleToggle(key, checked) {
     }
   }
   if (key.startsWith('notif:')) {
-    currentData.notifications[key.slice(6)] = checked;
+    window.currentData.notifications[key.slice(6)] = checked;
+    persist(); // Notifications preferences remain on the legacy blob — see the Phase 5 audit's documented split-brain; out of scope for this phase.
   } else if (key.startsWith('security:')) {
-    currentData.security[key.slice(9)] = checked;
+    const field = key.slice(9);
+    window.currentData.security[field] = checked;
+    if (securityRepo) securityRepo.update({ [field]: checked });
   } else {
-    currentData.settings[key] = checked;
-    applyAppearance(currentData.settings);
+    window.currentData.settings[key] = checked;
+    applyAppearance(window.currentData.settings);
+    if (settingsRepo) settingsRepo.update({ [key]: checked });
   }
-  persist();
 }
 
 async function changePassword(e) {
@@ -894,13 +978,16 @@ async function changePassword(e) {
   const next    = String(form.get('next') || '');
   const confirm = String(form.get('confirm') || '');
   const msg = byId('password-message');
-  if (!(await verifyPassword(currentUser, current))) { msg.textContent = 'Current password is incorrect.'; return; }
   if (next.length < 6) { msg.textContent = 'New password must be at least 6 characters.'; return; }
   if (next !== confirm) { msg.textContent = 'New passwords do not match.'; return; }
-  if (!(await setPassword(currentUser, next))) { msg.textContent = 'Your browser cannot securely update the local password.'; return; }
-  currentData.security.lastPasswordChange = new Date().toISOString();
-  saveUsers(getUsers().map((u) => (u.email === currentUser.email ? currentUser : u)));
-  persist();
+  if (!AuthService.getCurrentUser()) { msg.textContent = 'You need to be signed in to change your password.'; return; }
+  const result = await AuthService.changePassword(current, next);
+  if (!result.ok) {
+    msg.textContent = result.error?.message || 'Could not update your password. Please try again.';
+    return;
+  }
+  window.currentData.security.lastPasswordChange = new Date().toISOString();
+  if (securityRepo) securityRepo.update({ lastPasswordChange: window.currentData.security.lastPasswordChange });
   msg.textContent = 'Password updated.';
   e.currentTarget.reset();
 }
@@ -914,7 +1001,7 @@ function confirmDeleteAccount() {
     onConfirm: () => {
       const users = getUsers().filter((u) => u.email !== currentUser.email);
       saveUsers(users);
-      localStorage.removeItem(DATA_PREFIX + currentUser.email);
+      localStorage.removeItem(window.DATA_PREFIX + currentUser.email);
       logout();
     },
   });
@@ -928,9 +1015,9 @@ function confirmResetStatistics() {
     danger: true,
     onConfirm: () => {
       ['tasks', 'habits', 'goals', 'events', 'workouts', 'prayers', 'meals', 'water', 'sleep', 'study', 'subjects', 'assignments', 'exams', 'projects', 'studyNotes']
-        .forEach((key) => { currentData[key] = []; });
-      currentData.achievements.unlocked = [];
-      currentData.profile.xp = 0;
+        .forEach((key) => { window.currentData[key] = []; });
+      window.currentData.achievements.unlocked = [];
+      window.currentData.profile.xp = 0;
       persist();
       renderHero();
       renderContent();
@@ -965,7 +1052,7 @@ function onImportFile(e) {
     try {
       const parsed = JSON.parse(reader.result);
       if (!parsed || !parsed.data) throw new Error('Invalid file');
-      currentData = normalizeData(parsed.data, currentUser.name);
+      window.currentData = normalizeData(parsed.data, currentUser.name);
       persist();
       renderHero();
       renderContent();
@@ -1061,13 +1148,15 @@ function closeCropper() {
 }
 
 function removePhoto(kind) {
-  if (kind === 'avatar') currentData.profile.photo = null;
-  else currentData.profile.cover = null;
-  persist();
+  if (kind === 'avatar') window.currentData.profile.photo = null;
+  else window.currentData.profile.cover = null;
   closeCropper();
   renderHero();
   renderSidebar('account');
   showToast(kind === 'avatar' ? 'Profile photo removed' : 'Cover image removed', 'default');
+  if (profileRepo) profileRepo.update({ [kind === 'avatar' ? 'photo' : 'cover']: null });
+  const user = AuthService.getCurrentUser();
+  if (user) deleteFile(`profile/${user.uid}/${kind}.jpg`).catch((error) => console.error('[account/profile] photo delete failed', error));
 }
 
 function rotateCropper() {
@@ -1141,13 +1230,31 @@ function saveCroppedPhoto(kind) {
   ctx.restore();
 
   const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
-  if (kind === 'avatar') currentData.profile.photo = dataUrl;
-  else currentData.profile.cover = dataUrl;
-  persist();
+  // Optimistic: show the cropped result immediately rather than waiting on
+  // the upload round-trip. window.currentData.profile.{photo,cover} briefly
+  // holds the raw data URL, then gets replaced with the real Storage
+  // download URL once the upload finishes — that's the only thing actually
+  // persisted (see PROFILE_MIGRATION.md for why base64-in-Firestore was
+  // risky enough to build Firebase Storage support for).
+  if (kind === 'avatar') window.currentData.profile.photo = dataUrl;
+  else window.currentData.profile.cover = dataUrl;
   closeCropper();
   renderHero();
   renderSidebar('account');
   showToast(kind === 'avatar' ? 'Profile photo updated.' : 'Cover image updated.', 'success');
+
+  const user = AuthService.getCurrentUser();
+  if (!user) return;
+  const path = `${kind === 'avatar' ? 'profile' : 'profile'}/${user.uid}/${kind}.jpg`;
+  uploadDataUrl(path, dataUrl).then((downloadUrl) => {
+    if (kind === 'avatar') window.currentData.profile.photo = downloadUrl;
+    else window.currentData.profile.cover = downloadUrl;
+    renderHero();
+    if (profileRepo) profileRepo.update({ [kind === 'avatar' ? 'photo' : 'cover']: downloadUrl });
+  }).catch((error) => {
+    console.error('[account/profile] photo upload failed', error);
+    showToast('Photo saved locally, but the upload failed — it may not sync to other devices.', 'danger');
+  });
 }
 
 // openModal() / closeModal() are provided by shared.js (used across pages).
