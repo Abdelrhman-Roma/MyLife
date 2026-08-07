@@ -314,7 +314,33 @@ function initPage(pageKey) {
   window.__pageContentReinit = () => renderPageContent(pageKey);
 }
 
+let lastPageContentSerialized = null;
 function renderPageContent(pageKey) {
+  let dependencies = null;
+  const page = PAGES[pageKey];
+  if (pageKey === 'dashboard' || pageKey === 'statistics') {
+    dependencies = {
+      tasks: currentData.tasks,
+      habits: currentData.habits,
+      goals: currentData.goals,
+      events: currentData.events,
+      workouts: currentData.workouts,
+      prayers: currentData.prayers,
+      meals: currentData.meals,
+      water: currentData.water,
+      sleep: currentData.sleep,
+      study: currentData.study,
+    };
+  } else if (page && page.collection) {
+    dependencies = currentData[page.collection];
+  } else {
+    dependencies = currentData;
+  }
+
+  const serialized = pageKey + '|' + JSON.stringify(dependencies);
+  if (serialized === lastPageContentSerialized) return;
+  lastPageContentSerialized = serialized;
+
   renderStats();
   renderForm(pageKey);
   renderList(pageKey);
@@ -669,10 +695,17 @@ function macroBoard(rows) {
 }
 
 // ─── Stats strip ──────────────────────────────────────────────────────────────
+let lastStatsSerialized = null;
+let lastStatsPageKey = null;
 function renderStats() {
   const grid = byId('stats-grid');
   if (!grid) return; // Dashboard has its own hero/ring stats instead of the generic strip
   const counts = getCounts();
+  const serialized = JSON.stringify(counts);
+  if (serialized === lastStatsSerialized && currentPage === lastStatsPageKey) return;
+  lastStatsSerialized = serialized;
+  lastStatsPageKey = currentPage;
+
   const stats = [
     [t('Tasks done'),    `${counts.completedTasks}/${counts.tasks}`,   percent(counts.completedTasks, counts.tasks || 1)],
     [t('Habits done'),   `${counts.completedHabits}/${counts.habits}`, percent(counts.completedHabits, counts.habits || 1)],
