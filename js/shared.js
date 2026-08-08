@@ -51,6 +51,26 @@ const PLANET_ASSETS = { dashboard:'jupiter.jpg', todo:'moon.jpg', habits:'mars.j
 // Pages not listed keep the app's existing per-page accent color as-is.
 const PLANET_TIER = { dashboard:'jupiter', statistics:'jupiter', account:'jupiter', workout:'mars', habits:'mars', goals:'mars' };
 
+const performanceDebug = typeof localStorage !== 'undefined' && localStorage.getItem("mylife.performanceDebug") === "1";
+window.__perfTrace = function(page, eventName, detail = {}) {
+  if (!performanceDebug) return;
+  const time = performance.now();
+  console.log(`[PERF TRACE] Page: ${page} | Event: ${eventName} | Time: ${time.toFixed(2)}ms`, detail);
+};
+if (performanceDebug) {
+  window.__perfCounters = {
+    subscriptions: 0,
+    unsubscriptions: 0,
+    listeners: 0,
+    pageInit: 0,
+    pageDisposal: 0,
+    renderCalls: 0,
+  };
+  window.__logPerfCounters = function(msg = "") {
+    console.log(`[PERF COUNTERS] ${msg} ->`, JSON.stringify(window.__perfCounters));
+  };
+}
+
 // Inline SVG icons (24x24 viewbox, 2px stroke, currentColor) used in the account
 // menu instead of emoji so the icon language stays vector, themeable, and
 // consistent across light/dark/palette modes (per UI/UX design-system guidance).
@@ -245,6 +265,11 @@ function openPasswordReset() {
 
 // ─── Page init ────────────────────────────────────────────────────────────────
 function bootShell(pageKey) {
+  if (window.__perfCounters) {
+    window.__perfCounters.pageInit++;
+    window.__logPerfCounters(`bootShell(${pageKey})`);
+  }
+  window.__perfTrace && window.__perfTrace(pageKey, 'pageInitStart');
   currentUser = getSessionUser();
   if (!currentUser) { window.location.href = '../index.html'; return false; }
   currentPage = pageKey;
@@ -261,6 +286,7 @@ function bootShell(pageKey) {
   renderTopbar(pageKey);
   renderArt(pageKey);
   initNotificationRuntime();
+  window.__perfTrace && window.__perfTrace(pageKey, 'pageInitEnd');
   return true;
 }
 
@@ -341,9 +367,15 @@ function renderPageContent(pageKey) {
   if (serialized === lastPageContentSerialized) return;
   lastPageContentSerialized = serialized;
 
+  window.__perfTrace && window.__perfTrace(pageKey, 'renderStart');
+  if (window.__perfCounters) {
+    window.__perfCounters.renderCalls++;
+    window.__logPerfCounters(`renderPageContent(${pageKey})`);
+  }
   renderStats();
   renderForm(pageKey);
   renderList(pageKey);
+  window.__perfTrace && window.__perfTrace(pageKey, 'renderEnd');
 }
 
 // Re-renders the shared chrome (sidebar/topbar/art) and lets the current
@@ -966,6 +998,9 @@ function renderDashboard() {
   const eventsToday = (currentData.events || []).filter((e) => e.date === new Date().toISOString().slice(0, 10)).length;
   const quote = MOTIVATION_LINES[dayOfYear() % MOTIVATION_LINES.length];
 
+  const existingWeatherSlot = document.querySelector('[data-dashboard-weather]');
+  const existingWeatherHtml = existingWeatherSlot ? existingWeatherSlot.innerHTML : '';
+
   byId('data-list').innerHTML = `
     <section class="dash-hero" aria-label="${t('Overview')}">
       <div class="dash-hero-greeting">
@@ -995,7 +1030,7 @@ function renderDashboard() {
       <a class="dash-quick-action" href="nutrition.html#water"><span aria-hidden="true">+</span>${t('Log water')}</a>
     </section>
 
-    <section class="dash-section" data-dashboard-weather aria-label="${t('Weather')}"></section>
+    <section class="dash-section" data-dashboard-weather aria-label="${t('Weather')}">${existingWeatherHtml}</section>
 
     <section class="dash-section" aria-label="${t('Today')}">
       <h3 class="dash-section-title">${t('Today')}</h3>

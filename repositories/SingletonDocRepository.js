@@ -72,10 +72,23 @@ export class SingletonDocRepository {
    * @returns {() => void} unsubscribe
    */
   subscribe(callback, onError) {
-    return onSnapshot(
+    if (window.__perfCounters) {
+      window.__perfCounters.subscriptions++;
+      window.__perfCounters.listeners++;
+      window.__logPerfCounters(`SingletonDocRepository.subscribe(${this.moduleName})`);
+    }
+    const unsub = onSnapshot(
       this.docRef,
       (snap) => callback(snap.exists() ? snap.data() : null),
       (error) => { if (onError) onError(mapFirebaseError(error)); }
     );
+    return () => {
+      if (window.__perfCounters) {
+        window.__perfCounters.unsubscriptions++;
+        window.__perfCounters.listeners--;
+        window.__logPerfCounters(`SingletonDocRepository.unsubscribe(${this.moduleName})`);
+      }
+      unsub();
+    };
   }
 }

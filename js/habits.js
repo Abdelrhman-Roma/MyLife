@@ -97,21 +97,36 @@ async function startHabitsSync() {
   const user = await AuthService.waitUntilReady();
   if (!user) return; // bootShell() already redirects unauthenticated visitors
   habitRepo = new HabitRepository(user.uid);
-  if (habitsUnsubscribe) habitsUnsubscribe();
-  habitsUnsubscribe = habitRepo.subscribe(
-    (items) => {
-      window.currentData.habits = items.map((h) => ({ completed: false, completions: [], difficulty: 'Medium', weeklyTarget: 7, ...h, completions: Array.isArray(h.completions) ? h.completions : [] }));
-      const today = habToday();
-      window.currentData.habits.forEach((h) => { h.completed = h.completions.includes(today); });
-      habitsLoading = false;
-      renderHabitsRoot();
-    },
-    (error) => { console.error('[habits] realtime sync failed', error); habitsLoading = false; renderHabitsRoot(); }
-  );
+  if (!habitsUnsubscribe) {
+    window.__perfTrace && window.__perfTrace('habits', 'repositorySubscribeStart');
+    let isFirstSnapshot = true;
+    habitsUnsubscribe = habitRepo.subscribe(
+      (items) => {
+        if (isFirstSnapshot) {
+          window.__perfTrace && window.__perfTrace('habits', 'repositorySnapshotReceived');
+          isFirstSnapshot = false;
+        }
+        window.currentData.habits = items.map((h) => ({ completed: false, completions: [], difficulty: 'Medium', weeklyTarget: 7, ...h, completions: Array.isArray(h.completions) ? h.completions : [] }));
+        const today = habToday();
+        window.currentData.habits.forEach((h) => { h.completed = h.completions.includes(today); });
+        habitsLoading = false;
+        renderHabitsRoot();
+        window.__perfTrace && window.__perfTrace('habits', 'pageInteractive');
+      },
+      (error) => {
+        console.error('[habits] realtime sync failed', error);
+        habitsLoading = false;
+        renderHabitsRoot();
+      }
+    );
+  }
 }
 
 function disposeHabitsPage() {
-  if (habitsUnsubscribe) { habitsUnsubscribe(); habitsUnsubscribe = null; }
+  if (habitsUnsubscribe) {
+    habitsUnsubscribe();
+    habitsUnsubscribe = null;
+  }
 }
 
 function renderHabitsRoot() {

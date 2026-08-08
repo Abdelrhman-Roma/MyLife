@@ -52,41 +52,58 @@ async function startNutritionSync() {
   bodyRepo = new BodyMeasurementsRepository(user.uid);
   shoppingRepo = new ShoppingRepository(user.uid);
   settingsRepo = new SettingsRepository(user.uid);
-  if (nutritionUnsubscribe) nutritionUnsubscribe();
-  if (waterUnsubscribe) waterUnsubscribe();
-  if (sleepUnsubscribe) sleepUnsubscribe();
-  if (bodyUnsubscribe) bodyUnsubscribe();
-  if (shoppingUnsubscribe) shoppingUnsubscribe();
-  if (settingsUnsubscribe) settingsUnsubscribe();
-  nutritionUnsubscribe = nutritionRepo.subscribe(
-    (items) => { window.currentData.meals = items; renderNutritionRoot(); },
-    (error) => { console.error('[nutrition] realtime sync failed', error); }
-  );
-  waterUnsubscribe = waterRepo.subscribe(
-    (items) => { window.currentData.water = items; renderNutritionRoot(); },
-    (error) => { console.error('[nutrition/water] realtime sync failed', error); }
-  );
-  sleepUnsubscribe = sleepRepo.subscribe(
-    (items) => { window.currentData.sleep = items; renderNutritionRoot(); },
-    (error) => { console.error('[nutrition/sleep] realtime sync failed', error); }
-  );
-  bodyUnsubscribe = bodyRepo.subscribe(
-    (items) => { window.currentData.bodyMeasurements = items; renderNutritionRoot(); },
-    (error) => { console.error('[nutrition/bodyMeasurements] realtime sync failed', error); }
-  );
-  shoppingUnsubscribe = shoppingRepo.subscribe(
-    (items) => { window.currentData.shoppingList = items; renderNutritionRoot(); },
-    (error) => { console.error('[nutrition/shopping] realtime sync failed', error); }
-  );
+
+  if (!nutritionUnsubscribe) {
+    window.__perfTrace && window.__perfTrace('nutrition', 'repositorySubscribeStart');
+    let isFirstSnapshot = true;
+    nutritionUnsubscribe = nutritionRepo.subscribe(
+      (items) => {
+        if (isFirstSnapshot) {
+          window.__perfTrace && window.__perfTrace('nutrition', 'repositorySnapshotReceived');
+          isFirstSnapshot = false;
+        }
+        window.currentData.meals = items;
+        renderNutritionRoot();
+        window.__perfTrace && window.__perfTrace('nutrition', 'pageInteractive');
+      },
+      (error) => { console.error('[nutrition] realtime sync failed', error); }
+    );
+  }
+  if (!waterUnsubscribe) {
+    waterUnsubscribe = waterRepo.subscribe(
+      (items) => { window.currentData.water = items; renderNutritionRoot(); },
+      (error) => { console.error('[nutrition/water] realtime sync failed', error); }
+    );
+  }
+  if (!sleepUnsubscribe) {
+    sleepUnsubscribe = sleepRepo.subscribe(
+      (items) => { window.currentData.sleep = items; renderNutritionRoot(); },
+      (error) => { console.error('[nutrition/sleep] realtime sync failed', error); }
+    );
+  }
+  if (!bodyUnsubscribe) {
+    bodyUnsubscribe = bodyRepo.subscribe(
+      (items) => { window.currentData.bodyMeasurements = items; renderNutritionRoot(); },
+      (error) => { console.error('[nutrition/bodyMeasurements] realtime sync failed', error); }
+    );
+  }
+  if (!shoppingUnsubscribe) {
+    shoppingUnsubscribe = shoppingRepo.subscribe(
+      (items) => { window.currentData.shoppingList = items; renderNutritionRoot(); },
+      (error) => { console.error('[nutrition/shopping] realtime sync failed', error); }
+    );
+  }
   // Only macro targets (calorie/protein/carb/fat) are read here — the rest of
   // Settings (theme, appearance, etc.) is the Account page's concern. Both
   // pages write the SAME underlying settings/{uid} document, so this
   // subscription exists purely so a macro-target edit made on the Account
   // page is reflected here too, not just the other way around.
-  settingsUnsubscribe = settingsRepo.subscribe(
-    (data) => { if (data) Object.assign(window.currentData.settings, data); renderNutritionRoot(); },
-    (error) => { console.error('[nutrition/settings] realtime sync failed', error); }
-  );
+  if (!settingsUnsubscribe) {
+    settingsUnsubscribe = settingsRepo.subscribe(
+      (data) => { if (data) Object.assign(window.currentData.settings, data); renderNutritionRoot(); },
+      (error) => { console.error('[nutrition/settings] realtime sync failed', error); }
+    );
+  }
 }
 
 function disposeNutritionPage() {

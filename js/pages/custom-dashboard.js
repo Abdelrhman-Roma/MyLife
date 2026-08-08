@@ -25,6 +25,7 @@ const mounted = new Map();
 let uid = null;
 let dragId = null;
 let saveTimer = null;
+let layoutUnsubscribe = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   const root = document.getElementById('custom-dashboard-root');
@@ -46,12 +47,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   // personalization/order here too. Widget content itself isn't touched by
   // this — only re-applies personalization CSS vars and, if the widget SET
   // genuinely differs (added/removed elsewhere), reconciles the grid.
-  DashboardLayoutService.subscribeLayout(uid, (remoteLayout) => {
-    layout = remoteLayout;
-    applyPersonalization(root);
-    reconcileWidgetSet(root, user);
-  });
+  if (!layoutUnsubscribe) {
+    layoutUnsubscribe = DashboardLayoutService.subscribeLayout(uid, (remoteLayout) => {
+      layout = remoteLayout;
+      applyPersonalization(root);
+      reconcileWidgetSet(root, user);
+    });
+  }
 });
+
+function disposeCustomDashboard() {
+  if (layoutUnsubscribe) {
+    layoutUnsubscribe();
+    layoutUnsubscribe = null;
+  }
+  [...mounted.keys()].forEach((id) => {
+    unmountWidget(id);
+  });
+  clearTimeout(saveTimer);
+}
+window.addEventListener('beforeunload', disposeCustomDashboard);
 
 function persistLayout() {
   clearTimeout(saveTimer);
