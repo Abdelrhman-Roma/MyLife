@@ -226,6 +226,11 @@ function disposeWorkoutPage() {
     progressPhotoObserver.disconnect();
     progressPhotoObserver = null;
   }
+  if (sessionClockInterval) {
+    clearInterval(sessionClockInterval);
+    sessionClockInterval = null;
+  }
+  clearRestTimer();
 }
 
 function isRestDay(s) {

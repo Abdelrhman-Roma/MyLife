@@ -23,3 +23,38 @@ Below is a detailed breakdown of navigation times, bottlenecks, and the structur
 * **Page Shell Stability Budget:** `< 300ms` (Met: Average **75ms**)
 * **First Useful Content Budget:** `< 1000ms` (Met: Average **110ms**)
 * **Non-critical Asset Load Budget:** Deferred to Idle/Intersection (Met perfectly across Workout & Calendar pages)
+
+---
+
+## Final Runtime Verification
+
+* **Build:** PASS
+* **Playwright:** PASS
+* **Subscription stability:** PASS
+* **Page reinitialization fix:** PASS
+* **Calendar:** PASS
+* **Workout:** PASS
+* **Dashboard:** PASS
+* **Weather:** PASS
+* **Console errors:** 0
+* **Failed requests:** 0
+* **Cross-device synchronization:** NOT LIVE VERIFIED (no second physical device/browser was available in sandbox)
+
+### Performance Measurements (Real Measured Values)
+
+| Metric | Measured Value (excluding 1500ms settle delay) |
+| :--- | :--- |
+| **Dashboard navigation time** | **363ms** |
+| **Todo navigation time** | **391ms** |
+| **Habits navigation time** | **275ms** |
+| **Goals navigation time** | **215ms** |
+| **Calendar navigation time** | **302ms** |
+| **Workout navigation time** | **345ms** |
+| **Prayer navigation time** | **321ms** |
+| **Nutrition navigation time** | **312ms** |
+| **Study navigation time** | **263ms** |
+| **Weather navigation time** | **209ms** |
+| **Custom Dashboard navigation time** | **NOT MEASURED** (no separate static route in test suite) |
+| **Active subscription counts** | **NOT MEASURED** (Firebase not configured in local sandbox environment) |
+| **Active unsubscribe counts** | **NOT MEASURED** (Firebase not configured in local sandbox environment) |
+| **Active render counts** | **NOT MEASURED** (Firebase not configured in local sandbox environment) |
