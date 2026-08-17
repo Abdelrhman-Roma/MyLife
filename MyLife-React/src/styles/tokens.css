@@ -1,0 +1,298 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — Momentum Celestial Theme
+   Extracted from original MyLife/Momentum application
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ROOT VARIABLES — Deep Space Theme (Default)
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Spacing Scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Color — Backgrounds */
+  --bg: #060914;
+  --surface: rgba(14, 21, 42, 0.78);
+  --surface-2: rgba(24, 34, 63, 0.72);
+  --surface-3: #101a33;
+  --nav: rgba(7, 11, 25, 0.9);
+
+  /* Color — Text & UI */
+  --ink: #f5f7ff;
+  --muted: #aab6d2;
+  --nav-muted: #98a7c9;
+  --line: rgba(185, 204, 255, 0.16);
+
+  /* Color — Accents */
+  --blue: #78b8ff;
+  --green: #71ddbd;
+  --purple: #bda5ff;
+  --orange: #ffd078;
+  --red: #ff909c;
+
+  /* Color — UI Focus */
+  --focus-ring: rgba(120, 184, 255, 0.55);
+
+  /* Effects */
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  --shadow-card: 0 12px 35px rgba(0, 0, 0, 0.16);
+  --shadow-inset: 0 1px 0 0 rgba(255, 255, 255, 0.4) inset;
+
+  /* Border Radius */
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 24px;
+
+  /* Tap Target */
+  --tap: 44px;
+
+  /* Typography */
+  --font-family: Inter, 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Z-Index Layers */
+  --z-base: 1;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal: 40;
+  --z-tooltip: 50;
+  --z-notification: 60;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LIGHT THEME — Solar Light
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root[data-theme='light'] {
+  /* Backgrounds */
+  --bg: #f4f8ff;
+  --surface: rgba(220, 230, 245, 0.85);
+  --surface-2: rgba(210, 220, 240, 0.78);
+  --surface-3: #e8f0ff;
+  --nav: rgba(255, 255, 255, 0.95);
+
+  /* Text & UI */
+  --ink: #061027;
+  --muted: #556080;
+  --nav-muted: #7a8ca0;
+  --line: rgba(100, 120, 160, 0.18);
+
+  /* Accents */
+  --blue: #2563eb;
+  --green: #0ea5a0;
+  --purple: #7c6ee0;
+  --orange: #fb923c;
+  --red: #ef4444;
+
+  /* Focus */
+  --focus-ring: rgba(37, 99, 235, 0.45);
+
+  /* Shadows */
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 12px 35px rgba(0, 0, 0, 0.06);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SYSTEM THEME — Respects OS Preference
+   ───────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    --bg: #f4f8ff;
+    --surface: rgba(220, 230, 245, 0.85);
+    --surface-2: rgba(210, 220, 240, 0.78);
+    --surface-3: #e8f0ff;
+    --nav: rgba(255, 255, 255, 0.95);
+    --ink: #061027;
+    --muted: #556080;
+    --nav-muted: #7a8ca0;
+    --line: rgba(100, 120, 160, 0.18);
+    --blue: #2563eb;
+    --green: #0ea5a0;
+    --purple: #7c6ee0;
+    --orange: #fb923c;
+    --red: #ef4444;
+    --focus-ring: rgba(37, 99, 235, 0.45);
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 12px 35px rgba(0, 0, 0, 0.06);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ALTERNATIVE THEMES — Planetary Palette
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* EARTH THEME */
+:root[data-theme='earth'] {
+  --bg: #041219;
+  --surface: rgba(10, 35, 61, 0.78);
+  --surface-2: rgba(15, 40, 70, 0.72);
+  --surface-3: #0a2731;
+  --nav: rgba(5, 15, 30, 0.9);
+  --ink: #e0f2f7;
+  --muted: #8db5d0;
+  --line: rgba(56, 189, 248, 0.16);
+  --blue: #38bdf8;
+  --green: #34d399;
+  --purple: #7dd3c0;
+  --orange: #fbbf24;
+  --red: #f87171;
+}
+
+/* MARS THEME */
+:root[data-theme='mars'] {
+  --bg: #180705;
+  --surface: rgba(87, 32, 20, 0.78);
+  --surface-2: rgba(100, 40, 25, 0.72);
+  --surface-3: #20100c;
+  --nav: rgba(20, 8, 5, 0.9);
+  --ink: #fed7d7;
+  --muted: #f0a89e;
+  --line: rgba(249, 115, 22, 0.16);
+  --blue: #f97316;
+  --green: #ec4899;
+  --purple: #dba896;
+  --orange: #fbbf24;
+  --red: #ef4444;
+}
+
+/* SATURN THEME */
+:root[data-theme='saturn'] {
+  --bg: #120e04;
+  --surface: rgba(63, 52, 10, 0.78);
+  --surface-2: rgba(75, 60, 15, 0.72);
+  --surface-3: #1c1608;
+  --nav: rgba(15, 12, 3, 0.9);
+  --ink: #fef3c7;
+  --muted: #f4d399;
+  --line: rgba(250, 204, 21, 0.16);
+  --blue: #facc15;
+  --green: #e8846a;
+  --purple: #7ea6d6;
+  --orange: #f97316;
+  --red: #f87171;
+}
+
+/* NEPTUNE THEME */
+:root[data-theme='neptune'] {
+  --bg: #050e1c;
+  --surface: rgba(10, 31, 54, 0.78);
+  --surface-2: rgba(15, 40, 65, 0.72);
+  --surface-3: #0a1f36;
+  --nav: rgba(5, 10, 20, 0.9);
+  --ink: #cffafe;
+  --muted: #81e5f7;
+  --line: rgba(45, 212, 191, 0.16);
+  --blue: #2dd4bf;
+  --green: #5eead4;
+  --purple: #93a9f5;
+  --orange: #fbbf24;
+  --red: #f87171;
+}
+
+/* NEBULA THEME */
+:root[data-theme='nebula'] {
+  --bg: #100819;
+  --surface: rgba(40, 20, 50, 0.78);
+  --surface-2: rgba(50, 25, 65, 0.72);
+  --surface-3: #190d24;
+  --nav: rgba(15, 8, 20, 0.9);
+  --ink: #f3e8ff;
+  --muted: #e9d5ff;
+  --line: rgba(192, 132, 252, 0.16);
+  --blue: #c084fc;
+  --green: #f0abfc;
+  --purple: #a78bfa;
+  --orange: #fbbf24;
+  --red: #f87171;
+}
+
+/* GALAXY THEME */
+:root[data-theme='galaxy'] {
+  --bg: #070a1c;
+  --surface: rgba(15, 20, 50, 0.78);
+  --surface-2: rgba(20, 30, 65, 0.72);
+  --surface-3: #0d1230;
+  --nav: rgba(7, 10, 25, 0.9);
+  --ink: #e0e7ff;
+  --muted: #a5b4fc;
+  --line: rgba(96, 165, 250, 0.16);
+  --blue: #60a5fa;
+  --green: #6ee7b7;
+  --purple: #a78bfa;
+  --orange: #fbbf24;
+  --red: #f87171;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RESPONSIVE DESIGN — Scale adjustments for smaller screens
+   ───────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+  :root {
+    --space-5: 20px;
+    --space-6: 24px;
+  }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --space-4: 12px;
+    --space-5: 16px;
+    --space-6: 20px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ACCESSIBILITY — Reduced Motion & Transparency
+   ───────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0.01ms;
+    --transition-standard: 0.01ms;
+    --transition-slow: 0.01ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --surface: rgba(14, 21, 42, 0.95);
+    --surface-2: rgba(24, 34, 63, 0.9);
+    --nav: rgba(7, 11, 25, 0.98);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   TRANSITION & ANIMATION TIMINGS
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --transition-fast: 120ms;
+  --transition-standard: 200ms;
+  --transition-slow: 400ms;
+
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RTL / LTR SUPPORT
+   ───────────────────────────────────────────────────────────────────────── */
+
+[dir='rtl'] {
+  direction: rtl;
+}
+
+[dir='ltr'] {
+  direction: ltr;
+}
