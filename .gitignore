@@ -1,29 +1,40 @@
-# Dependencies
-node_modules/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Build output
-dist/
+node_modules
+dist
+dist-ssr
+*.local
 
-# Local environment (real Firebase project credentials — never commit)
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
 .env
 .env.local
 .env.*.local
 
-# Editor/OS cruft
-.DS_Store
-*.log
-
-# Generated analysis files
-PROJECT_STRUCTURE.txt
-SOURCE_FILES.txt
+# Build
+coverage
+.cache
 
 # Test artifacts
 playwright-report/
 test-results/
-
-# Generated analysis files
-PROJECT_STRUCTURE.txt
-SOURCE_FILES.txt
 
 # Test artifacts
 playwright-report/
