@@ -1,57 +1,62 @@
-# MyLife (Momentum)
+# MyLife
 
-A personal productivity & Islamic-lifestyle app — Todo, Habits, Goals,
-Calendar, Workout, Nutrition, Study, Prayer, Quran, Weather, Statistics, and
-Settings in one place, with 9 visual themes and English/German/Arabic/French
-support (including RTL).
+A personal productivity & Islamic-lifestyle application integrating Todo, Habits, Goals, Calendar, Workout, Nutrition, Study, Prayer, Quran, Weather, Statistics, and Settings.
 
 ## Status
 
-**v1.0.0.** Firebase Authentication, Cloud Firestore, and the Repository
-Pattern are in place (see `ARCHITECTURE.md`). **Only the Todo module is
-fully migrated onto Firestore** — every other module still uses the
-original LocalStorage-based data model. This is a deliberate, disclosed,
-incremental migration, not an oversight; see `MIGRATION_NOTES_PHASE2.md` and
-`FINAL_QA_REPORT_PHASE6.md` for exactly what is and isn't on Firestore
-today.
+**Migration in Progress**: Transitioning from legacy vanilla JavaScript application to modern React + TypeScript architecture.
 
-## Quick start
+**Completed**:
+- ✅ Phase 1: Legacy app audit and migration planning
+- ✅ Phase 2: React foundation (authentication, routing, theme, app shell)
+- ✅ Phase 3: Dashboard feature migration
+- 🔄 Phase 4: Project cleanup and consolidation (in progress)
 
+**Migration Progress**: 2 of 11 features migrated to React (18%)
+- ✅ Dashboard
+- ✅ Authentication
+- ❌ Todo, Habits, Goals, Calendar, Workout, Nutrition, Study, Prayer, Quran, Weather
+
+See [Migration Status](docs/migration/MIGRATION_STATUS.md) for detailed progress and roadmap.
+
+## Quick Start
+
+**Legacy Application** (currently deployed):
 ```bash
 npm install
-cp .env.example .env.local   # fill in your Firebase project config
-npm run dev                   # local dev server — serves any page directly
+cp .env.example .env.local   # fill in Firebase config
+npm run dev
 ```
 
+**React Application** (in development):
 ```bash
-npm run build                 # production build -> dist/
-npm run preview               # serve the production build locally
+cd MyLife-React
+npm install
+cp .env.example .env
+npm run dev
 ```
 
-## Deploying
+## Documentation
+
+- [Migration Status](docs/migration/MIGRATION_STATUS.md) — Current progress, roadmap
+- [Architecture Overview](docs/architecture/ARCHITECTURE.md) — System design
+- [React Application](MyLife-React/README.md) — React app setup and architecture
+- [Documentation Index](docs/README.md) — Full documentation map
+
+## Deployment
 
 ```bash
 npm run build
 firebase deploy --only hosting,firestore:rules
 ```
 
-See `ARCHITECTURE.md` → "Deployment" for the cache-header reasoning behind
-`firebase.json`.
-
-## Documentation map
-
-| Doc | Covers |
-|---|---|
-| `ARCHITECTURE.md` | Folder structure, Firebase flow, Repository Pattern, build process, env vars, deployment |
-| `AUTHENTICATION.md` | Auth flow, provider linking, error mapping, profile sync, session lifecycle |
-| `DESIGN_SYSTEM.md` | Design tokens, shared components, the Phase 3 UI fixes |
-| `MIGRATION_NOTES_PHASE2.md` | What's actually migrated to Firestore vs. still LocalStorage |
-| `FINAL_REPORT_PHASE4.md` | PWA/performance/security production-hardening |
-| `FINAL_REPORT_PHASE5.md` | OAuth/authentication UI work |
-| `FINAL_QA_REPORT_PHASE6.md` | v1.0 release readiness — bugs found & fixed, known limitations, release checklist |
+Currently deploys the legacy application. React application deployment planned for Phase 15 (final migration).
 
 ## Requirements
 
-- Node.js 18+ (for the Vite build step)
-- A Firebase project with Authentication (Email/Password, Google, GitHub
-  providers enabled) and Cloud Firestore
+- Node.js 18+
+- Firebase project with Authentication and Cloud Firestore
+
+## License
+
+Proprietary

@@ -12,3 +12,19 @@ dist/
 # Editor/OS cruft
 .DS_Store
 *.log
+
+# Generated analysis files
+PROJECT_STRUCTURE.txt
+SOURCE_FILES.txt
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Generated analysis files
+PROJECT_STRUCTURE.txt
+SOURCE_FILES.txt
+
+# Test artifacts
+playwright-report/
+test-results/

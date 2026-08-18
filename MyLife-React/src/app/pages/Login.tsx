@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../providers/AuthProvider'
 
 export function Login() {
@@ -91,7 +91,7 @@ export function Login() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="auth-form">
+          <form onSubmit={handleSubmit} className="auth-form login-form">
             <div
               className="field reveal"
               style={{ '--i': error ? 2 : 1 } as React.CSSProperties}
@@ -159,10 +159,8 @@ export function Login() {
             style={{ '--i': error ? 5 : 4, textAlign: 'center' } as React.CSSProperties}
           >
             <p className="auth-panel-sub">
-              Don't have an account?{' '}
-              <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'var(--blue)' }}>
-                Sign up
-              </a>
+              Don't have an account? <Link to="/register" style={{ color: 'var(--blue)' }}>Sign up</Link>{' '}
+              <Link to="/reset-password" style={{ color: 'var(--blue)' }}>Forgot password?</Link>
             </p>
           </div>
         </div>

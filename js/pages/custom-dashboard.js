@@ -74,20 +74,40 @@ function persistLayout() {
 }
 
 function renderShell(root, user) {
-  root.innerHTML = `
-    <div class="cdash-toolbar">
-      <div class="cdash-quick-actions" data-cdash-quick-actions></div>
-      <div class="cdash-toolbar-actions">
-        <button type="button" class="secondary-btn" data-cdash-add-widget>+ ${t ? t('Add Widget') : 'Add Widget'}</button>
-        <button type="button" class="text-btn" data-cdash-personalize">${t ? t('Personalize') : 'Personalize'}</button>
-      </div>
-    </div>
-    <div class="cdash-grid" data-cdash-grid></div>
-  `;
-  root.querySelector('[data-cdash-quick-actions]').innerHTML = quickActionsHtml();
+  const toolbar = document.createElement('div');
+  toolbar.className = 'cdash-toolbar';
+
+  const quickActions = document.createElement('div');
+  quickActions.className = 'cdash-quick-actions';
+  quickActions.dataset.cdashQuickActions = '';
+  quickActions.innerHTML = quickActionsHtml();
+
+  const toolbarActions = document.createElement('div');
+  toolbarActions.className = 'cdash-toolbar-actions';
+
+  const addWidgetButton = document.createElement('button');
+  addWidgetButton.type = 'button';
+  addWidgetButton.className = 'secondary-btn';
+  addWidgetButton.dataset.cdashAddWidget = '';
+  addWidgetButton.textContent = `+ ${t ? t('Add Widget') : 'Add Widget'}`;
+
+  const personalizeButton = document.createElement('button');
+  personalizeButton.type = 'button';
+  personalizeButton.className = 'text-btn';
+  personalizeButton.dataset.cdashPersonalize = '';
+  personalizeButton.textContent = t ? t('Personalize') : 'Personalize';
+
+  const grid = document.createElement('div');
+  grid.className = 'cdash-grid';
+  grid.dataset.cdashGrid = '';
+
+  toolbarActions.append(addWidgetButton, personalizeButton);
+  toolbar.append(quickActions, toolbarActions);
+  root.replaceChildren(toolbar, grid);
+
   bindQuickActions(root, user);
-  root.querySelector('[data-cdash-add-widget]').addEventListener('click', () => openWidgetStore(root, user));
-  root.querySelector('[data-cdash-personalize]').addEventListener('click', () => openPersonalizationPanel(root));
+  addWidgetButton.addEventListener('click', () => openWidgetStore(root, user));
+  personalizeButton.addEventListener('click', () => openPersonalizationPanel(root));
 
   applyPersonalization(root);
   mountAllVisibleWidgets(root, user);

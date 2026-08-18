@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User } from 'firebase/auth'
-import { auth } from '../../services/firebase/auth'
+import { auth, authReady } from '../../services/firebase/auth'
 import { AppLoading } from '../../components/feedback/AppLoading'
 
 interface AuthContextType {
@@ -20,12 +20,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((authUser) => {
-      setUser(authUser)
-      setLoading(false)
-    })
+    let cancelled = false
+    let unsubscribe: (() => void) | undefined
+    void authReady.then(() => {
+      if (cancelled) return
+      unsubscribe = auth.onAuthStateChanged((authUser) => {
+        setUser(authUser)
+        setLoading(false)
+      })
+    }).catch(() => setLoading(false))
 
-    return () => unsubscribe()
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {

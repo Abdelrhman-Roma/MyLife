@@ -1,6 +1,16 @@
-# MyLife - React Phase 2
+# MyLife - React Application
 
-A production-grade React + Vite + TypeScript application following the Phase 2 core architecture specification.
+Modern React + TypeScript implementation of the MyLife productivity application.
+
+## Status
+
+**Completed Phases**:
+- ✅ Phase 2: Core foundation (auth, routing, theme, app shell)
+- ✅ Phase 3: Dashboard feature migration
+
+**Current Phase**: Phase 4 - Project cleanup and consolidation
+
+**Next**: Phase 5-14 - Feature-by-feature migration (Todo, Habits, Goals, etc.)
 
 ## Project Structure
 
@@ -103,6 +113,8 @@ npm run type-check
 
 ## Architecture
 
+See [Architecture Overview](../docs/architecture/ARCHITECTURE.md) for detailed architectural decisions.
+
 ### Core Principles
 
 - **Single responsibility** — Each module has one clear purpose
@@ -201,9 +213,10 @@ Features like Todo, Habits, Goals will be migrated incrementally in later phases
 
 ## Documentation
 
-- `PHASE2_ARCHITECTURE.md` — Detailed architecture decisions
-- `PHASE2_TEST_REPORT.md` — Manual testing results
-- Phase 2 spec — `../rebuild mylife project/phase2 rebuild.md`
+- [Architecture Overview](../docs/architecture/ARCHITECTURE.md)
+- [Migration Status](../docs/migration/MIGRATION_STATUS.md)
+- [Phase 2 Reports](../docs/archive/phase2/) — Historical Phase 2 documentation
+- [Phase 3 Reports](../docs/archive/phase3/) — Dashboard migration documentation
 
 ## License
 

@@ -5,12 +5,15 @@ import {
   signOut,
   sendPasswordResetEmail,
   updateProfile,
+  browserLocalPersistence,
+  setPersistence,
   User,
   AuthError
 } from 'firebase/auth'
 import { app } from './firebase'
 
 export const auth = getAuth(app)
+export const authReady = setPersistence(auth, browserLocalPersistence)
 
 export async function signInWithEmail(email: string, password: string): Promise<User> {
   try {

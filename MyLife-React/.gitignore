@@ -31,3 +31,11 @@ dist-ssr
 # Build
 coverage
 .cache
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Test artifacts
+playwright-report/
+test-results/

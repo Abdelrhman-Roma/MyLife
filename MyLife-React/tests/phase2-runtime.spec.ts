@@ -50,8 +50,9 @@ test.describe('Phase 2 Runtime Verification', () => {
     await page.waitForSelector('.login-form', { timeout: 10000 }).catch(() => null)
     await page.waitForTimeout(1000)
 
-    const emailInput = page.locator('input[type="email"]')
-    const passwordInput = page.locator('input[type="password"]')
+    const loginForm = page.locator('.login-form')
+    const emailInput = loginForm.locator('input[type="email"]')
+    const passwordInput = loginForm.locator('input[type="password"]')
     const submitButton = page.locator('button[type="submit"]')
 
     const emailCount = await emailInput.count()

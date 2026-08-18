@@ -1,15 +1,20 @@
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, Firestore } from 'firebase/firestore'
 import { app } from './firebase'
 
-export const db = getFirestore(app)
-
-try {
-  enableIndexedDbPersistence(db)
-} catch (error: unknown) {
-  const err = error as Error & { code?: string }
-  if (err?.code === 'failed-precondition') {
-    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.')
-  } else if (err?.code === 'unimplemented') {
-    console.warn('The current browser does not support offline persistence.')
+function createFirestore(): Firestore {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    })
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Failed-precondition')) {
+      console.warn('[Firestore] Incompatible cache detected, falling back to memory cache. This is expected after SDK version changes.')
+      return initializeFirestore(app, {
+        localCache: memoryLocalCache()
+      })
+    }
+    throw error
   }
 }
+
+export const db = createFirestore()
